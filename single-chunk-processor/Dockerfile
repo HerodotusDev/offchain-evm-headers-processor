@@ -19,4 +19,6 @@ RUN wget https://github.com/starkware-libs/cairo-lang/releases/download/v0.10.3/
 RUN pip3 install cairo-lang-0.10.3.zip
 RUN rm cairo-lang-0.10.3.zip
 
+
+
 CMD ["cairo-compile --version"]
