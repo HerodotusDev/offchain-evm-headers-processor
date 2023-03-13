@@ -18,7 +18,6 @@ async def fetch_blocks_from_rpc(range_from: int, range_till: int, rpc_url: str):
 
     for i in range(1, rpc_batches_amount + 1):
         current_batch_size = last_batch_size if (i == rpc_batches_amount and last_batch_size) else RPC_BATCH_MAX_SIZE
-
         requests = map(lambda j: {
             "jsonrpc": '2.0',
             "method": 'eth_getBlockByNumber',
@@ -33,11 +32,15 @@ async def fetch_blocks_from_rpc(range_from: int, range_till: int, rpc_url: str):
     
 
 async def main():
-    from_block = int(os.environ.get('FROM_BLOCK'))
-    till_block = int(os.environ.get('TILL_BLOCK'))
-    rpc_url = os.environ.get('RPC_URL')
+    # from_block = int(os.environ.get('FROM_BLOCK'))
+    # till_block = int(os.environ.get('TILL_BLOCK'))
+    from_block=1
+    till_block=-1
+    # rpc_url = os.environ.get('https://eth-goerli.g.alchemy.com/v2/powIIZZbxPDT4bm1SODbzrDH9dE9f_q9')
+    rpc_url='https://eth-goerli.g.alchemy.com/v2/powIIZZbxPDT4bm1SODbzrDH9dE9f_q9'
 
     results = await fetch_blocks_from_rpc(from_block, till_block, rpc_url)
     print(results)
+    return results
 
-asyncio.run(main())
+r=asyncio.run(main())
