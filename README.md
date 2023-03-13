@@ -4,7 +4,7 @@
 make setup
 ```
 
-#### Run and profile programs in tests/cairo_programs (interactive script) 
+#### Run and profile cairo programs (interactive script) 
 
 ```bash
 make run-profile
