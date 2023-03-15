@@ -101,12 +101,11 @@ if new_hash!=prev_hash:
 
     if input_exists:
         print(f"Running {FILENAME_DOT_CAIRO} with input {JSON_INPUT_PATH} ... ")
-
-        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --program_input={JSON_INPUT_PATH} --layout=all --print_output --profile_output ./build/profiling/{FILENAME}/profile.pb.gz ")
+        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --program_input={JSON_INPUT_PATH} --layout=all --print_output --profile_output ./build/profiling/{FILENAME}/profile.pb.gz > build/profiling/{FILENAME}/{FILENAME}_stdout.txt ")
     else:
         print(f"Running {FILENAME_DOT_CAIRO} ... ")
 
-        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --layout=all --print_output --profile_output ./build/profiling/{FILENAME}/profile.pb.gz ")
+        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --layout=all --print_output --profile_output ./build/profiling/{FILENAME}/profile.pb.gz > build/profiling/{FILENAME}/{FILENAME}_stdout.txt ")
     print(f"Running profiling tool for {FILENAME_DOT_CAIRO} because the compiled file has changed ... ")
 
     os.system(f"cd ./build/profiling/{FILENAME} && go tool pprof -png profile.pb.gz ")
@@ -115,11 +114,11 @@ else:
     if input_exists:
         print(f"Running {FILENAME_DOT_CAIRO} with input {JSON_INPUT_PATH} ... ")
 
-        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --program_input={JSON_INPUT_PATH} --layout=all --print_output ")
+        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --program_input={JSON_INPUT_PATH} --layout=all --print_output > build/profiling/{FILENAME}/{FILENAME}_stdout.txt")
     else:
         print(f"Running {FILENAME_DOT_CAIRO} ... ")
 
-        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --layout=all --print_output ")
+        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --layout=all --print_output > build/profiling/{FILENAME}/{FILENAME}_stdout.txt")
 
     print(f"Profiling for {FILENAME_DOT_CAIRO} should already be available in /build/profiling/{FILENAME} ! ")
 
@@ -136,12 +135,11 @@ def format_stdout(file_path:str)-> str:
         program_output=[int(x) for x in list(filter(None,program_output))]
         program_output_dict = dict(zip(range(len(program_output)), program_output))
         print(program_output)
-        with open(f"tests/profiling/{FILENAME}/{FILENAME}_output.json", 'w') as fp:
+        with open(f"build/profiling/{FILENAME}/{FILENAME}_output.json", 'w') as fp:
             json.dump(program_output_dict, fp)
 
 
-
-format_stdout(f"tests/profiling/{FILENAME}/{FILENAME}_stdout.txt")
+format_stdout(f"build/profiling/{FILENAME}/{FILENAME}_stdout.txt")
 
 
 

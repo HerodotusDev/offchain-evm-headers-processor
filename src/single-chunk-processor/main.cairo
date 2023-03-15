@@ -27,14 +27,25 @@ func main{
     local mmr_last_pos: felt;
     local mmr_last_root: felt;
     %{
-        ids.mmr_last_pos=program_input['mmr_last_size'] 
+        ids.mmr_last_pos=program_input['mmr_last_pos'] 
         ids.mmr_last_root=program_input['mmr_last_root']
+        print(ids.mmr_last_pos)
+        print(ids.mmr_last_root)
     %}
 
     // Returns private input as public output
-    [ap] = mmr_last_pos, ap++;
-    [ap] = mmr_last_root, ap++;
+    [ap] = mmr_last_pos;
+    [ap] = [output_ptr], ap++;
+
+    [ap] = mmr_last_root;
+    [ap] = [output_ptr + 1], ap++;
+
     [ap] = output_ptr + 2, ap++;
+    let output_ptr = output_ptr + 2;
+
+    // Return the new value of output_ptr, which was advanced
+    // by 3.
+
     return ();
 }
 
