@@ -5,7 +5,7 @@ from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
-from src.cairo_mmr.helpers import bit_length, all_ones, bitshift_left, array_contains
+from src.merkle_mountain.helpers import bit_length, all_ones, bitshift_left, array_contains
 
 func bag_peaks{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     peaks_len: felt, peaks: felt*

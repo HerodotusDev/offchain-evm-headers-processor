@@ -1,3 +1,4 @@
+%lang starknet
 from starkware.cairo.common.hash import hash2
 from starkware.cairo.common.math import assert_le, assert_nn_le, assert_nn
 from starkware.cairo.common.math_cmp import is_le
@@ -5,7 +6,7 @@ from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
-from src.helpers import bit_length, all_ones, bitshift_left, array_contains
+from src.merkle_mountain.helpers import bit_length, all_ones, bitshift_left, array_contains
 
 @storage_var
 func _root() -> (res: felt) {

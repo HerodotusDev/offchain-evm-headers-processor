@@ -3,8 +3,8 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 from starkware.cairo.common.uint256 import split_64
 
-from lib.words64 import to_words128
-from lib.types import IntsSequence
+from src.words64 import to_words128
+from src.types import IntsSequence
 
 func keccak256{range_check_ptr, keccak_ptr: felt*, bitwise_ptr: BitwiseBuiltin*}(
     input: IntsSequence
