@@ -3,6 +3,117 @@ import math
 import json
 import aiohttp
 import asyncio
+from hexbytes.main import HexBytes
+from rlp import Serializable, encode
+from web3.types import BlockData, HexBytes
+from rlp.sedes import (
+    BigEndianInt,
+    big_endian_int,
+    Binary,
+    binary,
+)
+from web3 import Web3
+from typing import Union
+address = Binary.fixed_length(20, allow_empty=True)
+hash32 = Binary.fixed_length(32)
+int256 = BigEndianInt(256)
+trie_root = Binary.fixed_length(32, allow_empty=True)
+
+class BlockHeader(Serializable):
+    fields = (
+        ('parentHash', hash32),
+        ('unclesHash', hash32),
+        ('coinbase', address),
+        ('stateRoot', trie_root),
+        ('transactionsRoot', trie_root),
+        ('receiptsRoot', trie_root),
+        ('logsBloom', int256),
+        ('difficulty', big_endian_int),
+        ('number', big_endian_int),
+        ('gasLimit', big_endian_int),
+        ('gasUsed', big_endian_int),
+        ('timestamp', big_endian_int),
+        ('extraData', binary),
+        ('mixHash', binary),
+        ('nonce', Binary(8, allow_empty=True)),
+    )
+
+    def hash(self) -> HexBytes:
+        _rlp = encode(self)
+        return Web3.keccak(_rlp)
+    
+    def raw_rlp(self) -> bytes:
+        return encode(self)
+    
+class BlockHeaderEIP1559(Serializable):
+    fields = (
+        ('parentHash', hash32),
+        ('unclesHash', hash32),
+        ('coinbase', address),
+        ('stateRoot', trie_root),
+        ('transactionsRoot', trie_root),
+        ('receiptsRoot', trie_root),
+        ('logsBloom', int256),
+        ('difficulty', big_endian_int),
+        ('number', big_endian_int),
+        ('gasLimit', big_endian_int),
+        ('gasUsed', big_endian_int),
+        ('timestamp', big_endian_int),
+        ('extraData', binary),
+        ('mixHash', binary),
+        ('nonce', Binary(8, allow_empty=True)),
+    )
+
+def hash(self) -> HexBytes:
+    _rlp = encode(self)
+    return Web3.keccak(_rlp)
+
+def raw_rlp(self) -> bytes:
+    return encode(self)
+    
+def build_block_header(block: BlockData) -> Union[BlockHeader, BlockHeaderEIP1559]:
+    if 'baseFeePerGas' in block.keys():
+        header = BlockHeaderEIP1559(
+        HexBytes(block["parentHash"]),
+        HexBytes(block["sha3Uncles"]),
+        bytearray.fromhex(block['miner'][2:]),
+        HexBytes(block["stateRoot"]),
+        HexBytes(block['transactionsRoot']),
+        HexBytes(block["receiptsRoot"]),
+        int.from_bytes(HexBytes(block["logsBloom"]), 'big'),
+        HexBytes(block["difficulty"]),
+        HexBytes(block["number"]),
+        HexBytes(block["gasLimit"]),
+        HexBytes(block["gasUsed"]),
+        HexBytes(block["timestamp"]),
+        HexBytes(block["extraData"]),
+        HexBytes(block["mixHash"]),
+        HexBytes(block["nonce"]),
+        HexBytes(block["baseFeePerGas"]), 
+    )
+        
+    else:
+        header = BlockHeader(
+        HexBytes(block["parentHash"]),
+        HexBytes(block["sha3Uncles"]),
+        bytearray.fromhex(block['miner'][2:]),
+        HexBytes(block["stateRoot"]),
+        HexBytes(block['transactionsRoot']),
+        HexBytes(block["receiptsRoot"]),
+        int.from_bytes(HexBytes(block["logsBloom"]), 'big'),
+        int(block["difficulty"],16),
+        int(block["number"], 16),
+        int(block["gasLimit"],16),
+        int(block["gasUsed"],16),
+        int(block["timestamp"],16),
+        HexBytes(block["extraData"]),
+        HexBytes(block["mixHash"]),
+        HexBytes(block["nonce"]),
+    )
+        
+
+    return header
+
 
 RPC_BATCH_MAX_SIZE = 50
 
@@ -29,14 +140,13 @@ async def fetch_blocks_from_rpc(range_from: int, range_till: int, rpc_url: str):
         tasks = [asyncio.ensure_future(send_rpc_request(session, rpc_url, request)) for request in requests]
         results = await asyncio.gather(*tasks)
         return results
-    
 
-async def main():
+async def main(from_block:int=1, till_block:int=0):
     # from_block = int(os.environ.get('FROM_BLOCK'))
     # till_block = int(os.environ.get('TILL_BLOCK'))
-    from_block=1
-    till_block=-1
-    # rpc_url = os.environ.get('https://eth-goerli.g.alchemy.com/v2/powIIZZbxPDT4bm1SODbzrDH9dE9f_q9')
+    from_block=from_block
+    till_block=till_block - 1
+
     rpc_url='https://eth-goerli.g.alchemy.com/v2/powIIZZbxPDT4bm1SODbzrDH9dE9f_q9'
 
     results = await fetch_blocks_from_rpc(from_block, till_block, rpc_url)
@@ -44,3 +154,5 @@ async def main():
     return results
 
 r=asyncio.run(main())
+x=build_block_header(r[0]['result'])
+x.raw_rlp()
