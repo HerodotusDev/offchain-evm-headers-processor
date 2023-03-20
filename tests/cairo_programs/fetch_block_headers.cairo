@@ -44,8 +44,7 @@ func fetch_block_headers_rlp(from_block_number_high: felt, to_block_number_low: 
         # block_header_rlp_array = [rlp.values for rlp in block_header_rlp_array]
         print(f"BLOCK ARRAY\n {block_header_rlp_array}")
     %}
-    let res = fetch_block_headers_rlp_loop(
-        from_block_number_high=from_block_number_high,
+    fetch_block_headers_rlp_loop(
         n_blocks_to_fetch=from_block_number_high - to_block_number_low + 1,
         index=0,
         rlp_array=block_header_rlp_array,
@@ -54,7 +53,7 @@ func fetch_block_headers_rlp(from_block_number_high: felt, to_block_number_low: 
 }
 
 func fetch_block_headers_rlp_loop(
-    from_block_number_high: felt, n_blocks_to_fetch: felt, index: felt, rlp_array: BlockHeaderRLP*
+    n_blocks_to_fetch: felt, index: felt, rlp_array: BlockHeaderRLP*
 ) {
     alloc_locals;
     if (index == n_blocks_to_fetch) {
@@ -69,8 +68,9 @@ func fetch_block_headers_rlp_loop(
             segments.write_arg(ids.block_header_rlp, block_header_rlp_array[ids.index].values)
         %}
         assert rlp_array[index].block_header_rlp = block_header_rlp;
-        assert block_header_rlp[0] = 17942999112997382945;
-        assert block_header_rlp[1] = 10046320500414946469;
+        return fetch_block_headers_rlp_loop(
+            n_blocks_to_fetch=n_blocks_to_fetch, index=index + 1, rlp_array=rlp_array
+        );
     }
 
     return ();
