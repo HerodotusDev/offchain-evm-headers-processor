@@ -7,7 +7,7 @@ from starkware.cairo.common.hash_state import hash_felts
 
 // from starkware.cairo.common.cairo_keccak.keccak import
 
-from src.cairo_mmr.stateless_mmr import (
+from src.merkle_mountain.stateless_mmr import (
     append as mmr_append,
     multi_append as mmr_multi_append,
     verify_proof as mmr_verify_proof,
@@ -131,7 +131,7 @@ func validate_parent_block_and_proof_integrity{
 
     local rlp: IntsSequence = IntsSequence(
         reference_header_rlp, reference_header_rlp_len, reference_header_rlp_bytes_len
-        );
+    );
     let (local child_block_parent_hash: Keccak256Hash) = decode_parent_hash(rlp);
     validate_provided_header_rlp(
         child_block_parent_hash, block_header_rlp_bytes_len, block_header_rlp_len, block_header_rlp
@@ -228,7 +228,7 @@ func validate_provided_header_rlp{
 
     local header_ints_sequence: IntsSequence = IntsSequence(
         block_header_rlp, block_header_rlp_len, block_header_rlp_bytes_len
-        );
+    );
 
     // let (provided_rlp_hash) = keccak256{keccak_ptr=keccak_ptr}(header_ints_sequence);
     // finalize_keccak(keccak_ptr_start, keccak_ptr)
