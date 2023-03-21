@@ -8,7 +8,7 @@ import json
 from tinydb import TinyDB, Query
 
 
-CAIRO_PROGRAMS_FOLDERS = ["src/single-chunk-processor/", "tests/cairo_programs/"]
+CAIRO_PROGRAMS_FOLDERS = ["src/single_chunk_processor/", "tests/cairo_programs/"]
 DEP_FOLDERS = ["src/merkle_mountain", "src"]
 
 CAIRO_PROGRAMS = []
