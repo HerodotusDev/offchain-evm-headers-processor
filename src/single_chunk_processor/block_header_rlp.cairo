@@ -1,7 +1,9 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.math import unsigned_div_rem
-from src.utils import pow2
+from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
+
+from src.utils import pow2, bitwise_divmod
 struct BlockHeaderRLP {
     block_header_rlp_bytes_len: felt,
     block_header_rlp_len: felt,
@@ -54,19 +56,26 @@ func fetch_block_headers_rlp_loop(
 }
 
 // Assumes all words in BlockheaderRLP are 64 bits.
-func extract_parent_hash{range_check_ptr}(x: BlockHeaderRLP) -> (res: Uint256) {
+func extract_parent_hash{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x: BlockHeaderRLP) -> (
+    res: Uint256
+) {
     alloc_locals;
 
-    let first_192_bits_from_word_number = x.rlp[0] * 2 ** 128 + x.rlp[1] * 2 ** 64 + x.rlp[2];
+    let first_192_bits = x.rlp[0] * 2 ** 128 + x.rlp[1] * 2 ** 64 + x.rlp[2];
+    %{ print_felt_info(ids.first_192_bits, 'first 192') %}
+    let (thrash, requested_first_160_bits) = bitwise_divmod(first_192_bits, 2 ** 160);
 
-    let (_, requested_first_160_bits) = unsigned_div_rem(first_192_bits_from_word_number, 2 ** 32);
-    let (requested_first_128_bits, next_32_bits) = unsigned_div_rem(
+    %{ print_felt_info(ids.requested_first_160_bits, 'requested_first_160_bits') %}
+    // %{ print_felt_info(ids.next, 'next') %}
+
+    let (requested_first_128_bits, next_32_bits) = bitwise_divmod(
         requested_first_160_bits, 2 ** 32
     );
+    %{ print_felt_info(ids.requested_first_128_bits, 'requested_first_128_bits') %}
 
     let requested_last_128_bits_and_extra_32_bits = next_32_bits * 2 ** 128 + x.rlp[3] * 2 ** 64 +
         x.rlp[4];
-    let (requested_last_128_bits, _) = unsigned_div_rem(
+    let (requested_last_128_bits, thrash) = bitwise_divmod(
         requested_last_128_bits_and_extra_32_bits, 2 ** 32
     );
 
