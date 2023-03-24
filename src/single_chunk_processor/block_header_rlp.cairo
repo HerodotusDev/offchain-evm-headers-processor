@@ -4,6 +4,7 @@ from starkware.cairo.common.math import unsigned_div_rem
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 
 from src.utils import pow2, bitwise_divmod
+
 struct BlockHeaderRLP {
     block_header_rlp_bytes_len: felt,
     block_header_rlp_len: felt,
@@ -19,10 +20,17 @@ func fetch_block_headers_rlp(from_block_number_high: felt, to_block_number_low: 
     %{
         from tools.py.fetch_block_headers import main, build_block_header
         from tools.py.types import Data
-        import asyncio
-        fetch_block_call = asyncio.run(main(ids.from_block_number_high, ids.to_block_number_low))
-        block_headers = [build_block_header(block['result']) for block in fetch_block_call]
-        block_header_rlp_array = [Data.from_bytes(block_header.raw_rlp()).to_ints() for block_header in block_headers]
+        import pickle, os, asyncio
+        if not os.path.isfile('src/single_chunk_processor/sample_block_header.pickle'):
+            fetch_block_call = asyncio.run(main(ids.from_block_number_high, ids.to_block_number_low))
+            block_headers = [build_block_header(block['result']) for block in fetch_block_call]
+            block_header_rlp_array = [Data.from_bytes(block_header.raw_rlp()).to_ints() for block_header in block_headers]
+            file = open('src/single_chunk_processor/sample_block_header.pickle', 'wb')
+            pickle.dump(block_header_rlp_array, file)
+            file.close()
+        file = open('src/single_chunk_processor/sample_block_header.pickle', 'rb')
+        block_header_rlp_array = pickle.load(file)
+        file.close()
         print(f"BLOCK ARRAY\n {block_header_rlp_array}")
     %}
     fetch_block_headers_rlp_loop(

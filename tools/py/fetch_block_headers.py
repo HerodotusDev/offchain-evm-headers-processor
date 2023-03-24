@@ -153,6 +153,12 @@ async def main(from_block:int=1, till_block:int=0):
     print(results)
     return results
 
-r=asyncio.run(main())
-x=build_block_header(r[0]['result'])
-x.raw_rlp()
+
+if __name__=="main":
+    r=asyncio.run(main())
+    x=build_block_header(r[0]['result'])
+    y=build_block_header(r[1]['result'])
+    x_raw=x.raw_rlp()
+    from tools.py.types import Data
+
+    xx=Data.from_bytes(x.raw_rlp()).to_ints()

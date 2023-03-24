@@ -3,3 +3,4 @@ venv/
 __pycache__
 /build/*.json
 /build/compiled_cairo_files/*.json
+*.pickle
