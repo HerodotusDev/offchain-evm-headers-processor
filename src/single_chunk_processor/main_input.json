@@ -1,4 +1,6 @@
 {
+    "from_block_number_high": 8477500,
+    "from_block_number_low": 8477451,
     "mmr_last_pos": 2,
     "mmr_last_root": 1234
 }
