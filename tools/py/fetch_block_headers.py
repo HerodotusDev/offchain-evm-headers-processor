@@ -12,6 +12,7 @@ from rlp.sedes import (
     Binary,
     binary,
 )
+from eth_utils import keccak
 from web3 import Web3
 from typing import Union
 address = Binary.fixed_length(20, allow_empty=True)
@@ -141,7 +142,7 @@ async def fetch_blocks_from_rpc(range_from: int, range_till: int, rpc_url: str):
         results = await asyncio.gather(*tasks)
         return results
 
-async def main(from_block:int=1, till_block:int=0):
+async def main(from_block:int=2, till_block:int=0):
     # from_block = int(os.environ.get('FROM_BLOCK'))
     # till_block = int(os.environ.get('TILL_BLOCK'))
     from_block=from_block
@@ -153,12 +154,36 @@ async def main(from_block:int=1, till_block:int=0):
     print(results)
     return results
 
+def bytes_to_little_endian_ints(input_bytes):
+    # Split the input_bytes into 8-byte chunks
+    byte_chunks = [input_bytes[i:i + 8] for i in range(0, len(input_bytes), 8)]
+
+    # Convert each chunk to little-endian integers
+    little_endian_ints = [int.from_bytes(chunk, byteorder='little') for chunk in byte_chunks]
+
+    return little_endian_ints
+
+def reverse_endian(input_int, byte_length):
+    # Convert the input integer to bytes with the given byte length
+    byte_representation = input_int.to_bytes(byte_length, byteorder='little')
+    # Convert the bytes back to an integer with reversed endianness
+    reversed_endian_int = int.from_bytes(byte_representation, byteorder='big')
+
+    return reversed_endian_int
+
+def split_128(a):
+    """Takes in value, returns uint256-ish tuple."""
+    return (a & ((1 << 128) - 1), a >> 128)
 
 if __name__=="main":
     r=asyncio.run(main())
     x=build_block_header(r[0]['result'])
     y=build_block_header(r[1]['result'])
     x_raw=x.raw_rlp()
+    y_raw=y.raw_rlp()
+    z_raw = build_block_header(r[2]['result']).raw_rlp()
     from tools.py.types import Data
 
     xx=Data.from_bytes(x.raw_rlp()).to_ints()
+
+
