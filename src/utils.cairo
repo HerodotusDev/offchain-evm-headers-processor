@@ -77,7 +77,44 @@ func get_felt_bitlength{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x: felt) 
     let bitwise_ptr = bitwise_ptr + 2 * BitwiseBuiltin.SIZE;
     return bit_length;
 }
+func word_reverse_endian_64{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: felt) {
+    // A function to reverse the endianness of a 8 bytes (64 bits) integer.
+    // The result will not make sense if word > 2^64.
+    // The implementation is directly inspired by the function word_reverse_endian
 
+    // Step 1.
+    assert bitwise_ptr[0].x = word;
+    assert bitwise_ptr[0].y = 0x00ff00ff00ff00ff00ff00ff00ff00ff;
+    tempvar word = word + (2 ** 16 - 1) * bitwise_ptr[0].x_and_y;
+    // Step 2.
+    assert bitwise_ptr[1].x = word;
+    assert bitwise_ptr[1].y = 0x00ffff0000ffff0000ffff0000ffff00;
+    tempvar word = word + (2 ** 32 - 1) * bitwise_ptr[1].x_and_y;
+    // Step 3.
+    assert bitwise_ptr[2].x = word;
+    assert bitwise_ptr[2].y = 0x00ffffffff00000000ffffffff000000;
+    tempvar word = word + (2 ** 64 - 1) * bitwise_ptr[2].x_and_y;
+
+    let bitwise_ptr = bitwise_ptr + 3 * BitwiseBuiltin.SIZE;
+    return (res=word / 2 ** (8 + 16 + 32));
+}
+
+func word_reverse_endian_32{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: felt) {
+    // A function to reverse the endianness of a 4 bytes (32 bits) integer.
+    // The result will not make sense if word > 2^32.
+    // The implementation is directly inspired by the function word_reverse_endian
+    // Step 1.
+    assert bitwise_ptr[0].x = word;
+    assert bitwise_ptr[0].y = 0x00ff00ff00ff00ff00ff00ff00ff00ff;
+    tempvar word = word + (2 ** 16 - 1) * bitwise_ptr[0].x_and_y;
+    // Step 2.
+    assert bitwise_ptr[1].x = word;
+    assert bitwise_ptr[1].y = 0x00ffff0000ffff0000ffff0000ffff00;
+    tempvar word = word + (2 ** 32 - 1) * bitwise_ptr[1].x_and_y;
+
+    let bitwise_ptr = bitwise_ptr + 2 * BitwiseBuiltin.SIZE;
+    return (res=word / 2 ** (8 + 16));
+}
 // Utility to get 2^i when i is a cairo variable.
 func pow2(i) -> felt {
     let (data_address) = get_label_location(data);
