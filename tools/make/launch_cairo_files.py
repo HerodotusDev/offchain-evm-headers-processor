@@ -6,7 +6,7 @@ import readline
 import blake3
 import json
 from tinydb import TinyDB, Query
-
+import subprocess
 
 CAIRO_PROGRAMS_FOLDERS = ["src/single_chunk_processor/", "tests/cairo_programs/"]
 DEP_FOLDERS = ["src/merkle_mountain", "src"]
@@ -111,32 +111,27 @@ else:
 
 
 new_hash = get_hash_if_file_exists(f"build/compiled_cairo_files/{FILENAME}.json")
+if input_exists:
+    print(f"Running {FILENAME_DOT_CAIRO} with input {JSON_INPUT_PATH} ... ")
+    
+    cmd=f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --program_input={JSON_INPUT_PATH} --layout=starknet_with_keccak --print_output --profile_output ./build/profiling/{FILENAME}/profile.pb.gz --cairo_pie_output ./build/profiling/{FILENAME}/{FILENAME}_pie.zip"
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,stderr=subprocess.STDOUT,shell=True,text=True)
 
-if new_hash!=prev_hash:
-
-    if input_exists:
-        print(f"Running {FILENAME_DOT_CAIRO} with input {JSON_INPUT_PATH} ... ")
-        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --program_input={JSON_INPUT_PATH} --layout=starknet_with_keccak --print_output --profile_output ./build/profiling/{FILENAME}/profile.pb.gz --cairo_pie_output ./build/profiling/{FILENAME}/{FILENAME}_pie.zip > build/profiling/{FILENAME}/{FILENAME}_stdout.txt ")
-    else:
-        print(f"Running {FILENAME_DOT_CAIRO} ... ")
-
-        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --layout=starknet_with_keccak --print_output --profile_output ./build/profiling/{FILENAME}/profile.pb.gz --cairo_pie_output ./build/profiling/{FILENAME}/{FILENAME}_pie.zip > build/profiling/{FILENAME}/{FILENAME}_stdout.txt ")
-    print(f"Running profiling tool for {FILENAME_DOT_CAIRO} because the compiled file has changed ... ")
-
-    os.system(f"cd ./build/profiling/{FILENAME} && go tool pprof -png profile.pb.gz ")
 else:
-    print(f"Running {FILENAME_DOT_CAIRO} without profiling ...")
-    if input_exists:
-        print(f"Running {FILENAME_DOT_CAIRO} with input {JSON_INPUT_PATH} ... ")
+    print(f"Running {FILENAME_DOT_CAIRO} ... ")
+    cmd=f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --layout=starknet_with_keccak --print_output --profile_output ./build/profiling/{FILENAME}/profile.pb.gz --cairo_pie_output ./build/profiling/{FILENAME}/{FILENAME}_pie.zip"
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,stderr=subprocess.STDOUT,shell=True,text=True)
 
-        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --program_input={JSON_INPUT_PATH} --layout=starknet_with_keccak --print_output --cairo_pie_output ./build/profiling/{FILENAME}/{FILENAME}_pie.zip > build/profiling/{FILENAME}/{FILENAME}_stdout.txt")
-    else:
-        print(f"Running {FILENAME_DOT_CAIRO} ... ")
 
-        os.system(f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --layout=starknet_with_keccak --print_output --cairo_pie_output ./build/profiling/{FILENAME}/{FILENAME}_pie.zip > build/profiling/{FILENAME}/{FILENAME}_stdout.txt")
+print(f"Running profiling tool for {FILENAME_DOT_CAIRO} because the compiled file has changed ... ")
 
-    print(f"Profiling for {FILENAME_DOT_CAIRO} should already be available in /build/profiling/{FILENAME} ! ")
+os.system(f"cd ./build/profiling/{FILENAME} && go tool pprof -png profile.pb.gz ")
+stdout_file = f"build/profiling/{FILENAME}/{FILENAME}_stdout.txt"
 
+with open(stdout_file, "w") as f:
+    for line in process.stdout:
+        print(line, end="")
+        f.write(line)
 
 def format_stdout(file_path:str)-> str:
     isExist = os.path.exists(file_path)
