@@ -63,7 +63,15 @@ class BlockHeaderEIP1559(Serializable):
         ('extraData', binary),
         ('mixHash', binary),
         ('nonce', Binary(8, allow_empty=True)),
+        ('baseFeePerGas', big_endian_int), 
+
     )
+    def hash(self) -> HexBytes:
+        _rlp = encode(self)
+        return Web3.keccak(_rlp)
+    
+    def raw_rlp(self) -> bytes:
+        return encode(self)
 
 def hash(self) -> HexBytes:
     _rlp = encode(self)
@@ -82,15 +90,15 @@ def build_block_header(block: BlockData) -> Union[BlockHeader, BlockHeaderEIP155
         HexBytes(block['transactionsRoot']),
         HexBytes(block["receiptsRoot"]),
         int.from_bytes(HexBytes(block["logsBloom"]), 'big'),
-        HexBytes(block["difficulty"]),
-        HexBytes(block["number"]),
-        HexBytes(block["gasLimit"]),
-        HexBytes(block["gasUsed"]),
-        HexBytes(block["timestamp"]),
+        int(block["difficulty"],16),
+        int(block["number"], 16),
+        int(block["gasLimit"],16),
+        int(block["gasUsed"],16),
+        int(block["timestamp"],16),
         HexBytes(block["extraData"]),
         HexBytes(block["mixHash"]),
         HexBytes(block["nonce"]),
-        HexBytes(block["baseFeePerGas"]), 
+        int(block["baseFeePerGas"],16), 
     )
         
     else:
@@ -140,7 +148,7 @@ async def fetch_blocks_from_rpc(range_from: int, range_till: int, rpc_url: str):
     async with aiohttp.ClientSession() as session:
         tasks = [asyncio.ensure_future(send_rpc_request(session, rpc_url, request)) for request in requests]
         results = await asyncio.gather(*tasks)
-        return results
+        return list(reversed(results))
 
 async def main(from_block:int=2, till_block:int=0):
     # from_block = int(os.environ.get('FROM_BLOCK'))
@@ -151,7 +159,6 @@ async def main(from_block:int=2, till_block:int=0):
     rpc_url='https://eth-goerli.g.alchemy.com/v2/powIIZZbxPDT4bm1SODbzrDH9dE9f_q9'
 
     results = await fetch_blocks_from_rpc(from_block, till_block, rpc_url)
-    print(results)
     return results
 
 def bytes_to_little_endian_ints(input_bytes):
@@ -183,7 +190,3 @@ if __name__=="main":
     y_raw=y.raw_rlp()
     z_raw = build_block_header(r[2]['result']).raw_rlp()
     from tools.py.types import Data
-
-    xx=Data.from_bytes(x.raw_rlp()).to_ints()
-
-
