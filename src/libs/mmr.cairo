@@ -6,7 +6,7 @@ from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
-from src.merkle_mountain.helpers import bit_length, all_ones, bitshift_left, array_contains
+from src.helpers import bit_length, all_ones, bitshift_left, array_contains
 
 @storage_var
 func _root() -> (res: felt) {
@@ -14,10 +14,6 @@ func _root() -> (res: felt) {
 
 @storage_var
 func _last_pos() -> (res: felt) {
-}
-
-@storage_var
-func _tree_size_to_root(tree_size: felt) -> (res: felt) {
 }
 
 @view
@@ -30,13 +26,6 @@ func get_last_pos{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     res: felt
 ) {
     return _last_pos.read();
-}
-
-@view
-func get_tree_size_to_root{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    tree_size: felt
-) -> (res: felt) {
-    return _tree_size_to_root.read(tree_size);
 }
 
 @view
@@ -87,7 +76,7 @@ func height{range_check_ptr}(index: felt) -> (res: felt) {
 @external
 func append{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     elem: felt, peaks_len: felt, peaks: felt*
-) -> (pos: felt) {
+) {
     alloc_locals;
 
     let (pos) = _last_pos.read();
@@ -96,9 +85,8 @@ func append{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     if (pos == 0) {
         let (root0) = hash2{hash_ptr=pedersen_ptr}(1, elem);
         let (root) = hash2{hash_ptr=pedersen_ptr}(1, root0);
-        _tree_size_to_root.write(1, root);
         _root.write(root);
-        return (pos=1);
+        return ();
     }
 
     let (computed_root) = compute_root(peaks_len, peaks, pos);
@@ -116,10 +104,9 @@ func append{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
     let (new_pos) = _last_pos.read();
     let (new_root) = compute_root(peaks_len, peaks, new_pos);
-    _tree_size_to_root.write(new_pos, new_root);
     _root.write(new_root);
 
-    return (pos=new_pos);
+    return ();
 }
 
 func append_rec{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -151,30 +138,6 @@ func append_rec{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     }
 
     return (p_len=peaks_len, p=peaks);
-}
-
-@view
-func verify_past_proof{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    index: felt,
-    value: felt,
-    proof_len: felt,
-    proof: felt*,
-    peaks_len: felt,
-    peaks: felt*,
-    pos: felt,
-) {
-    alloc_locals;
-    let (computed_root) = compute_root(peaks_len, peaks, pos);
-    let (root) = _tree_size_to_root.read(pos);
-    assert computed_root = root;
-
-    let (hash) = hash2{hash_ptr=pedersen_ptr}(index, value);
-
-    let (peak) = verify_proof_rec(0, hash, index, proof_len, proof);
-    let (valid) = array_contains(peak, peaks_len, peaks);
-
-    assert valid = 1;
-    return ();
 }
 
 @view

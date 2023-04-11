@@ -151,8 +151,6 @@ async def fetch_blocks_from_rpc(range_from: int, range_till: int, rpc_url: str):
         return list(reversed(results))
 
 async def main(from_block:int=2, till_block:int=0):
-    # from_block = int(os.environ.get('FROM_BLOCK'))
-    # till_block = int(os.environ.get('TILL_BLOCK'))
     from_block=from_block
     till_block=till_block - 1
 

@@ -8,16 +8,7 @@ from starkware.cairo.common.uint256 import Uint256
 
 from starkware.cairo.common.builtin_keccak.keccak import keccak
 
-from src.merkle_mountain.stateless_mmr import (
-    append as mmr_append,
-    multi_append as mmr_multi_append,
-    verify_proof as mmr_verify_proof,
-)
-
-from src.single_chunk_processor.block_header_rlp import (
-    fetch_block_headers_rlp,
-    extract_parent_hash_little,
-)
+from src.libs.block_header_rlp import fetch_block_headers_rlp, extract_parent_hash_little
 
 func verify_block_headers_until_index_0{
     range_check_ptr, bitwise_ptr: BitwiseBuiltin*, keccak_ptr: KeccakBuiltin*

@@ -3,7 +3,7 @@ from starkware.cairo.common.uint256 import Uint256, uint256_reverse_endian
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 
-from src.utils import pow2, bitwise_divmod
+from src.libs.utils import pow2, bitwise_divmod
 
 func fetch_block_headers_rlp(from_block_number_high: felt, to_block_number_low: felt) -> (
     rlp_array: felt**, rlp_array_bytes_len: felt*
@@ -15,22 +15,12 @@ func fetch_block_headers_rlp(from_block_number_high: felt, to_block_number_low: 
         import pickle, os, asyncio
         print(f"Building block headers from block {ids.from_block_number_high} to {ids.to_block_number_low} ...")
         offline_mode = False
-        if offline_mode:
-            file = open('src/single_chunk_processor/sample_block_header.pickle', 'rb')
-            block_header_rlp_array = pickle.load(file)
-            rlp_arrays = block_header_rlp_array[0]
-            bytes_len_array = block_header_rlp_array[1]
-            file.close()
-        else:
-            fetch_block_call = asyncio.run(main(ids.from_block_number_high, ids.to_block_number_low))
-            block_headers_raw_rlp = [build_block_header(block['result']).raw_rlp() for block in fetch_block_call]
-            rlp_arrays = [to_keccak_felts(raw_rlp) for raw_rlp in block_headers_raw_rlp]
-            bytes_len_array= [len(raw_rlp) for raw_rlp in block_headers_raw_rlp]
-            if not os.path.isfile('src/single_chunk_processor/sample_block_header.pickle'):
-                block_header_rlp_array = [rlp_array, bytes_len_array]
-                file = open('src/single_chunk_processor/sample_block_header.pickle', 'wb')
-                pickle.dump(block_header_rlp_array, file)
-                file.close()
+
+        fetch_block_call = asyncio.run(main(ids.from_block_number_high, ids.to_block_number_low))
+        block_headers_raw_rlp = [build_block_header(block['result']).raw_rlp() for block in fetch_block_call]
+        rlp_arrays = [to_keccak_felts(raw_rlp) for raw_rlp in block_headers_raw_rlp]
+        bytes_len_array= [len(raw_rlp) for raw_rlp in block_headers_raw_rlp]
+
 
         segments.write_arg(ids.rlp_arrays, rlp_arrays)
         segments.write_arg(ids.rlp_arrays_bytes_len, bytes_len_array)

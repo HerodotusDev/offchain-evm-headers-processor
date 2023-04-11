@@ -26,9 +26,9 @@ class Data:
     def to_bytes(self) -> bytes:
         return self.raw_bytes
 
-    def to_ints(self, encoding: Encoding = Encoding.BIG) -> IntsSequence:
+    def to_ints(self, encoding: Encoding = Encoding.BIG.value) -> IntsSequence:
         chunked = chunk_bytes_input(self.raw_bytes)
-        ints_array = list(map(lambda chunk: int.from_bytes(chunk, encoding.value), chunked)) 
+        ints_array = list(map(lambda chunk: int.from_bytes(chunk, encoding), chunked)) 
         return IntsSequence(values=ints_array, length=len(self.raw_bytes))
 
     def to_hex(self) -> str:
