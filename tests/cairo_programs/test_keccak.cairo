@@ -9,26 +9,6 @@ from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.builtin_keccak.keccak import keccak
 from starkware.cairo.common.keccak_utils.keccak_utils import keccak_add_felts
 
-from src.merkle_mountain.stateless_mmr import (
-    append as mmr_append,
-    multi_append as mmr_multi_append,
-    verify_proof as mmr_verify_proof,
-)
-from src.types import Keccak256Hash, Address, IntsSequence, slice_arr
-from src.blockheader_rlp_extractor import decode_parent_hash, decode_block_number
-
-from src.single_chunk_processor.block_header_rlp import (
-    BlockHeaderRLP,
-    fetch_block_headers_rlp,
-    extract_parent_hash,
-)
-
-// struct BlockHeaderRLP {
-//     block_header_rlp_bytes_len: felt,
-//     block_header_rlp_len: felt,
-//     rlp: felt*,
-// }
-
 func main{
     output_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -67,7 +47,7 @@ func main{
     // Initalize keccak and validate RLP value for block n-1 :
     let (inputs: felt*) = alloc();
     local inputs_start: felt* = inputs;
-    assert inputs[0] = 2248280000481854201;
+    assert inputs[0] = 22482800004818542010000;
     assert inputs[1] = 7375015890835569791;
     assert inputs[2] = 11401577666402859883;
     assert inputs[3] = 11336311909656352177;
