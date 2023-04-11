@@ -1,206 +1,51 @@
-%lang starknet
-from starkware.cairo.common.hash import hash2
-from starkware.cairo.common.math import assert_le, assert_nn_le, assert_nn
-from starkware.cairo.common.math_cmp import is_le
-from starkware.cairo.common.memcpy import memcpy
-from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.cairo_builtins import HashBuiltin
+from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
+from src.libs.utils import pow2
 
-from src.helpers import bit_length, all_ones, bitshift_left, array_contains
-
-@storage_var
-func _root() -> (res: felt) {
-}
-
-@storage_var
-func _last_pos() -> (res: felt) {
-}
-
-@view
-func get_root{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (res: felt) {
-    return _root.read();
-}
-
-@view
-func get_last_pos{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    res: felt
-) {
-    return _last_pos.read();
-}
-
-@view
-func bag_peaks{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    peaks_len: felt, peaks: felt*
-) -> (res: felt) {
-    assert_le(1, peaks_len);
-
-    if (peaks_len == 1) {
-        return (res=[peaks]);
-    }
-
-    let last_peak = [peaks];
-    let (rec) = bag_peaks(peaks_len - 1, peaks + 1);
-
-    let (res) = hash2{hash_ptr=pedersen_ptr}(last_peak, rec);
-
-    return (res=res);
-}
-
-@view
-func compute_root{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    peaks_len: felt, peaks: felt*, size: felt
-) -> (res: felt) {
-    let (bagged_peaks) = bag_peaks(peaks_len, peaks);
-    let (root) = hash2{hash_ptr=pedersen_ptr}(size, bagged_peaks);
-
-    return (res=root);
-}
-
-@view
-func height{range_check_ptr}(index: felt) -> (res: felt) {
+// Computes the height of a MMR index.
+// inputs:
+//   x: the index of the MMR.
+func compute_height{bitwise_ptr: BitwiseBuiltin*}(x: felt) -> felt {
     alloc_locals;
+    local bit_length;
+    %{
+        x = ids.x
+        ids.bit_length = x.bit_length()
+    %}
 
-    assert_le(1, index);
+    // Computes N=2^bit_length and n=2^(bit_length-1)
+    // x is supposed to verify n <= x < N
+    let N = pow2(bit_length);
+    let n = pow2(bit_length - 1);
 
-    let (bits) = bit_length(index);
-    let (ones) = all_ones(bits);
-    if (index != ones) {
-        let (shifted) = bitshift_left(1, bits - 1);
-        let (rec_height) = height(index - (shifted - 1));
-        return (res=rec_height);
-    }
+    // Computes bitwise x AND (N-1)
+    // (N-1) in binary representation is 111...1111 with bit_length 1's.
+    assert bitwise_ptr[0].x = x;
+    assert bitwise_ptr[0].y = N - 1;
+    tempvar word = bitwise_ptr[0].x_and_y;
 
-    return (res=bits - 1);
-}
+    // This ensures x < N:
+    assert word = x;
 
-@external
-func append{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    elem: felt, peaks_len: felt, peaks: felt*
-) {
-    alloc_locals;
+    // Computes bitwise x AND (n-1)
+    // (n-1) in binary representation is 111...111 with (bit_length-1) 1's.
+    assert bitwise_ptr[1].x = x;
+    assert bitwise_ptr[1].y = n - 1;
+    tempvar word = bitwise_ptr[1].x_and_y;
 
-    let (pos) = _last_pos.read();
-    _last_pos.write(pos + 1);
+    // This ensures x >= n:
+    assert word = x - n;
 
-    if (pos == 0) {
-        let (root0) = hash2{hash_ptr=pedersen_ptr}(1, elem);
-        let (root) = hash2{hash_ptr=pedersen_ptr}(1, root0);
-        _root.write(root);
-        return ();
-    }
+    // We have proven that 2^(bit_length-1) <= x < 2^bit_length
+    // Therefore, x has bit_length bits.
 
-    let (computed_root) = compute_root(peaks_len, peaks, pos);
-    let (root) = _root.read();
-    assert computed_root = root;
-
-    let (current_pos) = _last_pos.read();
-    let (hash) = hash2{hash_ptr=pedersen_ptr}(current_pos, elem);
-
-    let (local append_peak) = alloc();
-    memcpy(append_peak, peaks, peaks_len);
-    assert append_peak[peaks_len] = hash;
-
-    let (peaks_len, peaks) = append_rec(0, peaks_len + 1, append_peak);
-
-    let (new_pos) = _last_pos.read();
-    let (new_root) = compute_root(peaks_len, peaks, new_pos);
-    _root.write(new_root);
-
-    return ();
-}
-
-func append_rec{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    h: felt, peaks_len: felt, peaks: felt*
-) -> (p_len: felt, p: felt*) {
-    alloc_locals;
-
-    let (pos) = _last_pos.read();
-    let (next_height) = height(pos + 1);
-
-    let is_higher = is_le(h + 1, next_height);
-    if (is_higher == 1) {
-        _last_pos.write(pos + 1);
-
-        let right_hash = peaks[peaks_len - 1];
-        let left_hash = peaks[peaks_len - 2];
-        let peaks_len = peaks_len - 2;
-
-        let (hash) = hash2{hash_ptr=pedersen_ptr}(left_hash, right_hash);
-
-        let (current_pos) = _last_pos.read();
-        let (parent_hash) = hash2{hash_ptr=pedersen_ptr}(current_pos, hash);
-
-        let (local merged_peaks) = alloc();
-        memcpy(merged_peaks, peaks, peaks_len);
-        assert merged_peaks[peaks_len] = parent_hash;
-
-        return append_rec(h + 1, peaks_len + 1, merged_peaks);
-    }
-
-    return (p_len=peaks_len, p=peaks);
-}
-
-@view
-func verify_proof{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    index: felt, value: felt, proof_len: felt, proof: felt*, peaks_len: felt, peaks: felt*
-) {
-    alloc_locals;
-
-    let (pos) = _last_pos.read();
-    assert_nn_le(index, pos);
-
-    let (computed_root) = compute_root(peaks_len, peaks, pos);
-    let (root) = _root.read();
-    assert computed_root = root;
-
-    let (hash) = hash2{hash_ptr=pedersen_ptr}(index, value);
-
-    let (peak) = verify_proof_rec(0, hash, index, proof_len, proof);
-    let (valid) = array_contains(peak, peaks_len, peaks);
-
-    assert valid = 1;
-    return ();
-}
-
-func verify_proof_rec{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    h: felt, hash: felt, pos: felt, proof_len: felt, proof: felt*
-) -> (res: felt) {
-    alloc_locals;
-
-    if (proof_len == 0) {
-        return (res=hash);
-    }
-
-    let current_sibling = [proof];
-    let (current_height) = height(pos);
-    let (next_height) = height(pos + 1);
-
-    let is_higher = is_le(h + 1, next_height);
-
-    local new_hash;
-    local new_pos;
-    if (is_higher == 1) {
-        // right child
-        let (hashed) = hash2{hash_ptr=pedersen_ptr}(current_sibling, hash);
-        new_pos = pos + 1;
-
-        let (parent_hash) = hash2{hash_ptr=pedersen_ptr}(new_pos, hashed);
-        new_hash = parent_hash;
-
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+    if (x == N - 1) {
+        // x has bit_length bit they are all ones.
+        // We return the height which is bit_length - 1.
+        tempvar bitwise_ptr = bitwise_ptr + 2 * BitwiseBuiltin.SIZE;
+        return bit_length - 1;
     } else {
-        // left child
-        let (hashed) = hash2{hash_ptr=pedersen_ptr}(hash, current_sibling);
-        let (shifted) = bitshift_left(2, h);
-        new_pos = pos + shifted;
-
-        let (parent_hash) = hash2{hash_ptr=pedersen_ptr}(new_pos, hashed);
-        new_hash = parent_hash;
-
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+        // Jump left on the MMR and continue until it's all ones.
+        tempvar bitwise_ptr = bitwise_ptr + 2 * BitwiseBuiltin.SIZE;
+        return compute_height(x - (n - 1));
     }
-
-    return verify_proof_rec(h + 1, new_hash, new_pos, proof_len - 1, proof + 1);
 }

@@ -1,49 +1,57 @@
-%builtins output pedersen range_check bitwise keccak
+%builtins output pedersen range_check bitwise keccak poseidon
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, HashBuiltin, KeccakBuiltin
+from starkware.cairo.common.cairo_builtins import PoseidonBuiltin
+
 from starkware.cairo.common.serialize import serialize_word
 from starkware.cairo.common.hash_state import hash_felts
 from starkware.cairo.common.uint256 import Uint256
-
+from starkware.cairo.common.math import unsigned_div_rem as felt_divmod
 from starkware.cairo.common.builtin_keccak.keccak import keccak
+from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash, poseidon_hash_many
 
 from src.libs.block_header_rlp import fetch_block_headers_rlp, extract_parent_hash_little
+from src.libs.utils import pow2
 
 func verify_block_headers_until_index_0{
     range_check_ptr, bitwise_ptr: BitwiseBuiltin*, keccak_ptr: KeccakBuiltin*
-}(rlp_arrays: felt**, byte_len_array: felt*, index: felt, parent_hash: Uint256) -> (
+}(rlp_arrays: felt**, bytes_len_array: felt*, index: felt, parent_hash: Uint256) -> (
     index_0_parent_hash: Uint256
 ) {
     alloc_locals;
 
-    let (rlp_hash: Uint256) = keccak(inputs=rlp_arrays[index], n_bytes=byte_len_array[index]);
+    let (rlp_keccak_hash: Uint256) = keccak(
+        inputs=rlp_arrays[index], n_bytes=bytes_len_array[index]
+    );
 
-    assert rlp_hash.low = parent_hash.low;
-    assert rlp_hash.high = parent_hash.high;
+    assert rlp_keccak_hash.low = parent_hash.low;
+    assert rlp_keccak_hash.high = parent_hash.high;
 
     let (block_i_parent_hash: Uint256) = extract_parent_hash_little(rlp_arrays[index]);
     %{ print("\n") %}
-    %{ print_u256(ids.rlp_hash,f"rlp_hash_{ids.index}") %}
-    %{ print_u256(ids.parent_hash,f"prt_hash_{ids.index}") %}
+    %{ print_u256(ids.rlp_keccak_hash,f"rlp_keccak_hash_{ids.index}") %}
+    %{ print_u256(ids.parent_hash,f"prt_keccak_hash_{ids.index}") %}
 
     if (index == 0) {
         return (block_i_parent_hash,);
     } else {
         return verify_block_headers_until_index_0(
             rlp_arrays=rlp_arrays,
-            byte_len_array=byte_len_array,
+            bytes_len_array=bytes_len_array,
             index=index - 1,
             parent_hash=block_i_parent_hash,
         );
     }
 }
+
 func main{
     output_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
     keccak_ptr: KeccakBuiltin*,
+    poseidon_ptr: PoseidonBuiltin*,
 }() {
     alloc_locals;
     local from_block_number_high: felt;
@@ -84,9 +92,9 @@ func main{
             print(f" {un}_{u.bit_length()}bits = {bin_8(u)}")
             print(f" {un} = {u}")
             print(f" {un} = {int.to_bytes(u, n_bytes, 'big')}")
-        def print_block_rlp(rlp_arrays, byte_len_array, index):
+        def print_block_rlp(rlp_arrays, bytes_len_array, index):
             rlp_ptr = memory[rlp_arrays + index]
-            n_bytes= memory[byte_len_array + index]
+            n_bytes= memory[bytes_len_array + index]
             n_felts = n_bytes // 8 + 1 if n_bytes % 8 != 0 else n_bytes // 8
             rlp_array = [memory[rlp_ptr + i] for i in range(n_felts)]
             rlp_bytes_array=[int.to_bytes(x, 8, "big") for x in rlp_array]
@@ -110,9 +118,11 @@ func main{
         from_block_number_high, from_block_number_low
     );
 
-    %{ print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n) %}
-    %{ print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 1) %}
-    %{ print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 2) %}
+    %{
+        print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n)
+        print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 0)
+        print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 1)
+    %}
 
     // Store the first parent hash into a specific Cairo variable to be returned as ouput of the Cairo program:
     let (block_n_parent_hash_little: Uint256) = extract_parent_hash_little(rlp_arrays[n]);
@@ -128,13 +138,28 @@ func main{
     assert block_n_parent_hash_little.low = hash_rlp_n_minus_one.low;
     assert block_n_parent_hash_little.high = hash_rlp_n_minus_one.high;
 
-    // Extract the parent hash of block n-1;
-    // Validate chain of RLP values for blocks [n-2, n-1, ..., n-r]:
+    //
+    //
+    // Intialize Poseidon(rlp) into the Merkle Mountain Range:
+    // 1. get element hash:
+    local n_felts;
+    let (n_felts_temp, rem) = felt_divmod(bytes_len_array[n - 1], 8);
+    if (rem != 0) {
+        assert n_felts = n_felts_temp + 1;
+    } else {
+        assert n_felts = n_felts_temp;
+    }
+    let block_n_minus_one_hash: felt = poseidon_hash_many(n=n_felts, elements=rlp_arrays[n - 1]);
+    // 2. Init first node and root:
+    let node_1: felt = poseidon_hash(x=1, y=block_n_minus_one_hash);
+    let root: felt = poseidon_hash(x=1, y=node_1);
 
+    // Extract the parent hash of block n-1:
     let (block_n_minus_one_parent_hash: Uint256) = extract_parent_hash_little(rlp_arrays[n - 1]);
+    // Validate chain of RLP values for blocks [n-2, n-1, ..., n-r]:
     let (block_0_parent_hash: Uint256) = verify_block_headers_until_index_0(
         rlp_arrays=rlp_arrays,
-        byte_len_array=bytes_len_array,
+        bytes_len_array=bytes_len_array,
         index=n - 2,
         parent_hash=block_n_minus_one_parent_hash,
     );

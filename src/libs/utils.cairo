@@ -12,7 +12,6 @@ from starkware.cairo.common.registers import get_label_location
 from starkware.cairo.common.math import unsigned_div_rem as felt_divmod, split_felt
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.pow import pow
 
 // y MUST be a power of 2
 func bitwise_divmod{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x: felt, y: felt) -> (
@@ -77,6 +76,7 @@ func get_felt_bitlength{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x: felt) 
     let bitwise_ptr = bitwise_ptr + 2 * BitwiseBuiltin.SIZE;
     return bit_length;
 }
+
 func word_reverse_endian_64{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: felt) {
     // A function to reverse the endianness of a 8 bytes (64 bits) integer.
     // The result will not make sense if word > 2^64.
