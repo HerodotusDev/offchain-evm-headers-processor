@@ -56,9 +56,9 @@ func verify_block_headers_and_hash_them{
 }
 
 // TODO : complete this function
-func construct_mmr{range_check_ptr, mmr_array: felt*, mmr_array_len: felt, pow2_array: felt*}(
-    index: felt
-) {
+func construct_mmr{
+    range_check_ptr, hash_array: felt*, mmr_array: felt*, mmr_array_len: felt, pow2_array: felt*
+}(index: felt) {
     alloc_locals;
     // // 2. Compute node
     // let node: felt = poseidon_hash(x=mmr_array_len + 1, y=block_n_hash);
@@ -198,7 +198,7 @@ func main{
         verify_block_headers_and_hash_them(index=n - 1, parent_hash=block_n_parent_hash_little);
     }
     // Build MMR by adding all poseidon hashes of RLPs:
-    with mmr_array, mmr_array_len, pow2_array {
+    with hash_array, mmr_array, mmr_array_len, pow2_array {
         construct_mmr(index=n - 1);
     }
 
