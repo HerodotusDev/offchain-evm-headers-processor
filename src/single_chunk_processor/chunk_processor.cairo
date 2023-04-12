@@ -1,4 +1,4 @@
-%builtins output pedersen range_check bitwise keccak poseidon
+%builtins output range_check bitwise keccak poseidon
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, HashBuiltin, KeccakBuiltin
@@ -12,42 +12,99 @@ from starkware.cairo.common.builtin_keccak.keccak import keccak
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash, poseidon_hash_many
 
 from src.libs.block_header_rlp import fetch_block_headers_rlp, extract_parent_hash_little
-from src.libs.utils import pow2
+from src.libs.utils import pow2alloc127
 
-func verify_block_headers_until_index_0{
-    range_check_ptr, bitwise_ptr: BitwiseBuiltin*, keccak_ptr: KeccakBuiltin*
-}(rlp_arrays: felt**, bytes_len_array: felt*, index: felt, parent_hash: Uint256) -> (
-    index_0_parent_hash: Uint256
-) {
+from src.libs.mmr import compute_height_pre_alloc_pow2 as compute_height
+
+func verify_block_headers_and_hash_them{
+    range_check_ptr,
+    bitwise_ptr: BitwiseBuiltin*,
+    keccak_ptr: KeccakBuiltin*,
+    poseidon_ptr: PoseidonBuiltin*,
+    hash_array: felt*,
+    rlp_arrays: felt**,
+    bytes_len_array: felt*,
+}(index: felt, parent_hash: Uint256) {
     alloc_locals;
-
+    // Keccak Hash RLP of block i and verify it matches the parent hash of block i+1
     let (rlp_keccak_hash: Uint256) = keccak(
         inputs=rlp_arrays[index], n_bytes=bytes_len_array[index]
     );
-
     assert rlp_keccak_hash.low = parent_hash.low;
     assert rlp_keccak_hash.high = parent_hash.high;
-
-    let (block_i_parent_hash: Uint256) = extract_parent_hash_little(rlp_arrays[index]);
     %{ print("\n") %}
     %{ print_u256(ids.rlp_keccak_hash,f"rlp_keccak_hash_{ids.index}") %}
     %{ print_u256(ids.parent_hash,f"prt_keccak_hash_{ids.index}") %}
+    // Poseidon Hash RLP of block i and store it in hash_array[i]:
+    local n_felts;
+    let (n_felts_temp, rem) = felt_divmod(bytes_len_array[index], 8);
+    if (rem != 0) {
+        assert n_felts = n_felts_temp + 1;
+    } else {
+        assert n_felts = n_felts_temp;
+    }
+    let (poseidon_hash) = poseidon_hash_many(n=n_felts, elements=rlp_arrays[index]);
+    assert hash_array[index] = poseidon_hash;
+    // Get parent hash of block i
+    let (block_i_parent_hash: Uint256) = extract_parent_hash_little(rlp_arrays[index]);
 
     if (index == 0) {
-        return (block_i_parent_hash,);
+        return ();
     } else {
-        return verify_block_headers_until_index_0(
-            rlp_arrays=rlp_arrays,
-            bytes_len_array=bytes_len_array,
-            index=index - 1,
-            parent_hash=block_i_parent_hash,
-        );
+        return verify_block_headers_and_hash_them(index=index - 1, parent_hash=block_i_parent_hash);
     }
 }
 
+// TODO : complete this function
+func construct_mmr{range_check_ptr, mmr_array: felt*, mmr_array_len: felt, pow2_array: felt*}(
+    index: felt
+) {
+    alloc_locals;
+    // // 2. Compute node
+    // let node: felt = poseidon_hash(x=mmr_array_len + 1, y=block_n_hash);
+    // // 3. Append node to mmr_array
+    // assert mmr_array[mmr_array_len] = node;
+
+    let mmr_array_len = mmr_array_len + 1;
+    merge_subtrees_if_applicable(height=0);
+    if (index == 0) {
+        return ();
+    } else {
+        return construct_mmr(index=index - 1);
+    }
+}
+// 3              14
+//              /    \
+//             /      \
+//            /        \
+//           /          \
+// 2        7            14
+//        /   \        /    \
+// 1     3     6      10    13     18
+//      / \   / \    / \   /  \   /  \
+// 0   1   2 4   5  8   9 11  12 16  17 19
+func merge_subtrees_if_applicable{
+    range_check_ptr, mmr_array: felt*, mmr_array_len: felt, pow2_array: felt*
+}(height: felt) {
+    alloc_locals;
+    local next_pos_height_higher_than_current_pos_height: felt;
+    let height_next_pos = compute_height(mmr_array_len, pow2_array);
+
+    %{ ids.next_pos_height_higher_than_current_pos_height = 1 if ids.height_next_pos > ids.height else 0 %}
+    if (next_pos_height_higher_than_current_pos_height != 0) {
+        // This ensures height_next_pos > height.
+        // It means than
+        assert [range_check_ptr] = height_next_pos - height - 1;
+        tempvar range_check_ptr = range_check_ptr + 1;
+        // let parent = poseidon_hash(x=0, y=block_n_hash);
+        tempvar left_pos = 0;
+        return ();
+    } else {
+        return ();
+    }
+}
 func main{
     output_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
     keccak_ptr: KeccakBuiltin*,
@@ -110,59 +167,40 @@ func main{
             print(f"bit_lil : {[x.bit_length() for x in rlp_array_little]}")
     %}
 
-    // Compute the number of blocks to be validated:
+    // -----------------------------------------------------
+    // -----------------------------------------------------
+    // INITIALIZE VARIABLES
+    // -----------------------------------------------------
     tempvar number_of_blocks = from_block_number_high - from_block_number_low + 1;
     let n = number_of_blocks - 1;
+    let pow2_array: felt* = pow2alloc127();
     // Ask all the block headers RLPs into Cairo variables from the Prover
     let (rlp_arrays: felt**, bytes_len_array: felt*) = fetch_block_headers_rlp(
         from_block_number_high, from_block_number_low
     );
-
+    // Initialize MMR:
+    let (hash_array: felt*) = alloc();  // Poseidon(rlp_arrays)
+    let (mmr_array: felt*) = alloc();
+    let mmr_array_len = 0;
     %{
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n)
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 0)
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 1)
     %}
-
-    // Store the first parent hash into a specific Cairo variable to be returned as ouput of the Cairo program:
+    // Get the parent hash of the last block (to be retuned as output):
     let (block_n_parent_hash_little: Uint256) = extract_parent_hash_little(rlp_arrays[n]);
-
     %{ print_u256(ids.block_n_parent_hash_little,f'parent_hash_{ids.n}') %}
+    // -----------------------------------------------------
+    // -----------------------------------------------------
 
-    // Validate RLP value for block n-1 using the parent hash of block n:
-    let (hash_rlp_n_minus_one: Uint256) = keccak(
-        inputs=rlp_arrays[n - 1], n_bytes=bytes_len_array[n - 1]
-    );
-    %{ print_u256(ids.hash_rlp_n_minus_one,f'rlp_hash_{ids.n-1}') %}
-
-    assert block_n_parent_hash_little.low = hash_rlp_n_minus_one.low;
-    assert block_n_parent_hash_little.high = hash_rlp_n_minus_one.high;
-
-    //
-    //
-    // Intialize Poseidon(rlp) into the Merkle Mountain Range:
-    // 1. get element hash:
-    local n_felts;
-    let (n_felts_temp, rem) = felt_divmod(bytes_len_array[n - 1], 8);
-    if (rem != 0) {
-        assert n_felts = n_felts_temp + 1;
-    } else {
-        assert n_felts = n_felts_temp;
+    // Validate chain of RLP values for blocks [n-1, n-2, n-1, ..., n-r]:
+    with hash_array, rlp_arrays, bytes_len_array {
+        verify_block_headers_and_hash_them(index=n - 1, parent_hash=block_n_parent_hash_little);
     }
-    let block_n_minus_one_hash: felt = poseidon_hash_many(n=n_felts, elements=rlp_arrays[n - 1]);
-    // 2. Init first node and root:
-    let node_1: felt = poseidon_hash(x=1, y=block_n_minus_one_hash);
-    let root: felt = poseidon_hash(x=1, y=node_1);
-
-    // Extract the parent hash of block n-1:
-    let (block_n_minus_one_parent_hash: Uint256) = extract_parent_hash_little(rlp_arrays[n - 1]);
-    // Validate chain of RLP values for blocks [n-2, n-1, ..., n-r]:
-    let (block_0_parent_hash: Uint256) = verify_block_headers_until_index_0(
-        rlp_arrays=rlp_arrays,
-        bytes_len_array=bytes_len_array,
-        index=n - 2,
-        parent_hash=block_n_minus_one_parent_hash,
-    );
+    // Build MMR by adding all poseidon hashes of RLPs:
+    with mmr_array, mmr_array_len, pow2_array {
+        construct_mmr(index=n - 1);
+    }
 
     // Returns private input as public output, as well as output of interest.
     // NOTE : block_n_parent_hash is critical to be returned and checked against a correct checkpoint on Starknet.
