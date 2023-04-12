@@ -1,11 +1,8 @@
 %builtins output range_check bitwise keccak poseidon
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, HashBuiltin, KeccakBuiltin
-from starkware.cairo.common.cairo_builtins import PoseidonBuiltin
+from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, KeccakBuiltin, PoseidonBuiltin
 
-from starkware.cairo.common.serialize import serialize_word
-from starkware.cairo.common.hash_state import hash_felts
 from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.math import unsigned_div_rem as felt_divmod
 from starkware.cairo.common.builtin_keccak.keccak import keccak
