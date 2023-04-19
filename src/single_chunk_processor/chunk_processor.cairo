@@ -54,13 +54,19 @@ func verify_block_headers_and_hash_them{
 
 // TODO : complete this function
 func construct_mmr{
-    range_check_ptr, hash_array: felt*, mmr_array: felt*, mmr_array_len: felt, pow2_array: felt*
+    range_check_ptr,
+    poseidon_ptr: PoseidonBuiltin*,
+    hash_array: felt*,
+    mmr_array: felt*,
+    mmr_array_len: felt,
+    pow2_array: felt*,
 }(index: felt) {
     alloc_locals;
+    // %{ print_mmr(ids.mmr_array,ids.mmr_array_len) %}
     // // 2. Compute node
-    // let node: felt = poseidon_hash(x=mmr_array_len + 1, y=block_n_hash);
+    let node: felt = poseidon_hash(x=mmr_array_len, y=hash_array[index]);
     // // 3. Append node to mmr_array
-    // assert mmr_array[mmr_array_len] = node;
+    assert mmr_array[mmr_array_len] = node;
 
     let mmr_array_len = mmr_array_len + 1;
     merge_subtrees_if_applicable(height=0);
@@ -81,21 +87,34 @@ func construct_mmr{
 //      / \   / \    / \   /  \   /  \
 // 0   1   2 4   5  8   9 11  12 16  17 19
 func merge_subtrees_if_applicable{
-    range_check_ptr, mmr_array: felt*, mmr_array_len: felt, pow2_array: felt*
+    range_check_ptr,
+    poseidon_ptr: PoseidonBuiltin*,
+    mmr_array: felt*,
+    mmr_array_len: felt,
+    pow2_array: felt*,
 }(height: felt) {
     alloc_locals;
-    local next_pos_height_higher_than_current_pos_height: felt;
+
+    local next_pos_is_parent: felt;
     let height_next_pos = compute_height(mmr_array_len, pow2_array);
 
-    %{ ids.next_pos_height_higher_than_current_pos_height = 1 if ids.height_next_pos > ids.height else 0 %}
-    if (next_pos_height_higher_than_current_pos_height != 0) {
+    %{ ids.next_pos_is_parent = 1 if ids.height_next_pos > ids.height else 0 %}
+    if (next_pos_is_parent != 0) {
         // This ensures height_next_pos > height.
-        // It means than
+        // It means than the last element in the array is a right children.
         assert [range_check_ptr] = height_next_pos - height - 1;
         tempvar range_check_ptr = range_check_ptr + 1;
         // let parent = poseidon_hash(x=0, y=block_n_hash);
-        tempvar left_pos = 0;
-        return ();
+        tempvar left_pos = mmr_array_len - pow2_array[height + 1];
+        tempvar right_pos = left_pos + pow2_array[height + 1] - 1;
+        let (hash) = poseidon_hash(x=mmr_array[left_pos], y=mmr_array[right_pos]);
+        assert mmr_array[mmr_array_len] = hash;
+        %{ print(f"Merged {ids.left_pos} + {ids.right_pos} at index {ids.mmr_array_len} and height {ids.height_next_pos} ") %}
+
+        let mmr_array_len = mmr_array_len + 1;
+        // %{ print(f'mmr index {ids.mmr_array_len}') %}
+        // %{ print(f"height : {ids.height}") %}
+        return merge_subtrees_if_applicable(height=height + 1);
     } else {
         return ();
     }
@@ -119,33 +138,10 @@ func main{
         ids.mmr_last_root=program_input['mmr_last_root']
     %}
     %{
-        def bin_c(u):
-            b=bin(u)
-            f = b[0:10] + ' ' + b[10:19] + '...' + b[-16:-8] + ' ' + b[-8:]
-            return f
-        def bin_64(u):
-            b=bin(u)
-            little = '0b'+b[2:][::-1]
-            f='0b'+' '.join([b[2:][i:i+64] for i in range(0, len(b[2:]), 64)])
-            return f
-        def bin_8(u):
-            b=bin(u)
-            little = '0b'+b[2:][::-1]
-            f="0b"+' '.join([little[2:][i:i+8] for i in range(0, len(little[2:]), 8)])
-            return f
         def print_u256(u, un):
             u = u.low + (u.high << 128) 
             print(f" {un} = {hex(u)}")
 
-        def print_u256_info(u, un):
-            u = u.low + (u.high << 128) 
-            print(f" {un}_{u.bit_length()}bits = {bin_c(u)}")
-            print(f" {un} = {hex(u)}")
-            print(f" {un} = {int.to_bytes(u, 32, 'big')}")
-        def print_felt_info(u, un, n_bytes):
-            print(f" {un}_{u.bit_length()}bits = {bin_8(u)}")
-            print(f" {un} = {u}")
-            print(f" {un} = {int.to_bytes(u, n_bytes, 'big')}")
         def print_block_rlp(rlp_arrays, bytes_len_array, index):
             rlp_ptr = memory[rlp_arrays + index]
             n_bytes= memory[bytes_len_array + index]
@@ -155,13 +151,16 @@ func main{
             rlp_bytes_array_little = [int.to_bytes(x, 8, "little") for x in rlp_array]
             rlp_array_little = [int.from_bytes(x, 'little') for x in rlp_bytes_array]
             x=[x.bit_length() for x in rlp_array]
-
             print(f"\nBLOCK {index} :: bytes_len={n_bytes} || n_felts={n_felts}")
             print(f"RLP_felt ={rlp_array}")
             print(f"bit_big : {[x.bit_length() for x in rlp_array]}")
             print(f"RLP_bytes_arr_big = {rlp_bytes_array}")
             print(f"RLP_bytes_arr_lil = {rlp_bytes_array_little}")
             print(f"bit_lil : {[x.bit_length() for x in rlp_array_little]}")
+        def print_mmr(mmr_array, mmr_array_len):
+            print(f"\nMMR :: mmr_array_len={mmr_array_len}")
+            mmr_values = [memory[mmr_array + i] for i in range(mmr_array_len)]
+            print(f"mmr_values = {mmr_values}")
     %}
 
     // -----------------------------------------------------
@@ -178,7 +177,9 @@ func main{
     // Initialize MMR:
     let (hash_array: felt*) = alloc();  // Poseidon(rlp_arrays)
     let (mmr_array: felt*) = alloc();
-    let mmr_array_len = 0;
+    // We initialize the first index to 0, to start at index 1. (first (index 0) will bot be used)
+    assert mmr_array[0] = 0;
+    let mmr_array_len = 1;
     %{
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n)
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 0)
@@ -194,10 +195,13 @@ func main{
     with hash_array, rlp_arrays, bytes_len_array {
         verify_block_headers_and_hash_them(index=n - 1, parent_hash=block_n_parent_hash_little);
     }
+    %{ print(f"RLP successfully validated!") %}
     // Build MMR by adding all poseidon hashes of RLPs:
+    %{ print(f"Building MMR...") %}
     with hash_array, mmr_array, mmr_array_len, pow2_array {
         construct_mmr(index=n - 1);
     }
+    %{ print_mmr(ids.mmr_array,ids.mmr_array_len) %}
 
     // Returns private input as public output, as well as output of interest.
     // NOTE : block_n_parent_hash is critical to be returned and checked against a correct checkpoint on Starknet.

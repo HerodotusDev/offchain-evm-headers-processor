@@ -649,3 +649,33 @@ func pow2(i) -> felt {
     dw 0x200000000000000000000000000000000000000000000000000000000000000;
     dw 0x400000000000000000000000000000000000000000000000000000000000000;
 }
+
+func print_debug() {
+    alloc_locals;
+    %{
+        def bin_c(u):
+            b=bin(u)
+            f = b[0:10] + ' ' + b[10:19] + '...' + b[-16:-8] + ' ' + b[-8:]
+            return f
+        def bin_64(u):
+            b=bin(u)
+            little = '0b'+b[2:][::-1]
+            f='0b'+' '.join([b[2:][i:i+64] for i in range(0, len(b[2:]), 64)])
+            return f
+        def bin_8(u):
+            b=bin(u)
+            little = '0b'+b[2:][::-1]
+            f="0b"+' '.join([little[2:][i:i+8] for i in range(0, len(little[2:]), 8)])
+            return f
+        def print_u256_info(u, un):
+            u = u.low + (u.high << 128) 
+            print(f" {un}_{u.bit_length()}bits = {bin_c(u)}")
+            print(f" {un} = {hex(u)}")
+            print(f" {un} = {int.to_bytes(u, 32, 'big')}")
+        def print_felt_info(u, un, n_bytes):
+            print(f" {un}_{u.bit_length()}bits = {bin_8(u)}")
+            print(f" {un} = {u}")
+            print(f" {un} = {int.to_bytes(u, n_bytes, 'big')}")
+    %}
+    return ();
+}

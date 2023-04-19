@@ -80,6 +80,15 @@ func compute_height_range_check{range_check_ptr}(x: felt) -> felt {
         return compute_height_range_check(x - n + 1);
     }
 }
+
+// Computes MMR tree height given an index.
+// This assumes the first index is 1. See below:
+// H    MMR positions
+// 2        7
+//        /   \
+// 1     3     6
+//      / \   / \
+// 0   1   2 4   5
 func compute_height_pre_alloc_pow2{range_check_ptr}(x: felt, pow2_array: felt*) -> felt {
     alloc_locals;
     local bit_length;
@@ -96,7 +105,7 @@ func compute_height_pre_alloc_pow2{range_check_ptr}(x: felt, pow2_array: felt*) 
     if (x == N - 1) {
         // x has bit_length bits and they are all ones.
         // We return the height which is bit_length - 1.
-        %{ print(f" compute_ height : {ids.bit_length - 1} ") %}
+        // %{ print(f" compute_height : {ids.bit_length - 1} ") %}
         return bit_length - 1;
     } else {
         // Ensure 2^(bit_length-1) <= x < 2^bit_length so that x has indeed bit_length bits.
