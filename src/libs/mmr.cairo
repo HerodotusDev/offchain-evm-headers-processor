@@ -97,7 +97,7 @@ func compute_height_pre_alloc_pow2{range_check_ptr}(x: felt, pow2_array: felt*) 
         ids.bit_length = x.bit_length()
     %}
     // Computes N=2^bit_length and n=2^(bit_length-1)
-    // x is supposed to verify n <= x < N
+    // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
 
     let N = pow2_array[bit_length];
     let n = pow2_array[bit_length - 1];
@@ -109,7 +109,7 @@ func compute_height_pre_alloc_pow2{range_check_ptr}(x: felt, pow2_array: felt*) 
         return bit_length - 1;
     } else {
         // Ensure 2^(bit_length-1) <= x < 2^bit_length so that x has indeed bit_length bits.
-        assert [range_check_ptr] = N - x;
+        assert [range_check_ptr] = N - x -1;
         assert [range_check_ptr + 1] = x - n;
         tempvar range_check_ptr = range_check_ptr + 2;
         // Jump left on the MMR and continue until it's all ones.

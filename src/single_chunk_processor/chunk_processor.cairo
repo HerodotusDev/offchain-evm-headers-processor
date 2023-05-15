@@ -52,7 +52,6 @@ func verify_block_headers_and_hash_them{
     }
 }
 
-// TODO : complete this function
 func construct_mmr{
     range_check_ptr,
     poseidon_ptr: PoseidonBuiltin*,
@@ -67,8 +66,9 @@ func construct_mmr{
     let node: felt = poseidon_hash(x=mmr_array_len, y=hash_array[index]);
     // // 3. Append node to mmr_array
     assert mmr_array[mmr_array_len] = node;
-
     let mmr_array_len = mmr_array_len + 1;
+
+
     merge_subtrees_if_applicable(height=0);
     if (index == 0) {
         return ();
@@ -104,7 +104,7 @@ func merge_subtrees_if_applicable{
         // It means than the last element in the array is a right children.
         assert [range_check_ptr] = height_next_pos - height - 1;
         tempvar range_check_ptr = range_check_ptr + 1;
-        // let parent = poseidon_hash(x=0, y=block_n_hash);
+
         tempvar left_pos = mmr_array_len - pow2_array[height + 1];
         tempvar right_pos = left_pos + pow2_array[height + 1] - 1;
         let (hash) = poseidon_hash(x=mmr_array[left_pos], y=mmr_array[right_pos]);
@@ -112,10 +112,14 @@ func merge_subtrees_if_applicable{
         %{ print(f"Merged {ids.left_pos} + {ids.right_pos} at index {ids.mmr_array_len} and height {ids.height_next_pos} ") %}
 
         let mmr_array_len = mmr_array_len + 1;
+        
         // %{ print(f'mmr index {ids.mmr_array_len}') %}
         // %{ print(f"height : {ids.height}") %}
         return merge_subtrees_if_applicable(height=height + 1);
     } else {
+        // We need to assert heigt_next_pos <= height
+        assert [range_check_ptr] = height - height_next_pos;
+        tempvar range_check_ptr = range_check_ptr + 1;
         return ();
     }
 }
