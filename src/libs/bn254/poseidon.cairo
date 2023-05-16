@@ -19,19 +19,67 @@ struct Params {
     ark: BigInt3**,
 }
 
-func hades_round_full{range_check_ptr}(state_len: felt, state: BigInt3*, params: Params) -> BigInt3* {
+func hash_two{range_check_ptr}(x: BigInt3, y: BigInt3, params: Params) -> BigInt3 {
     alloc_locals;
 
-    // todo : add round constants
+    let (local state: BigInt3*) = alloc();
 
-    let sbox_state = apply_sbox(state_len, state);
+    assert state[0] = x;
+    assert state[1] = y;
+    assert state[2] = BigInt3(0, 0, 2);
+
+    let res = hades_permutation(3, state, params);
+
+    return res[0];
+}
+
+func hades_permutation{range_check_ptr}(state_len: felt, state: BigInt3*, params: Params) -> BigInt3* {
+    alloc_locals;
+
+    let half_full = apply_full_rounds(state_len, state, params, 0, params.r_f / 2);
+    let partial = apply_partial_rounds(state_len, half_full, params, params.r_f / 2, params.r_p);
+    let res = apply_full_rounds(state_len, partial, params, params.r_f / 2 + params.r_p, params.r_f / 2);
+
+    return res;
+}
+
+func apply_full_rounds{range_check_ptr}(state_len: felt, state: BigInt3*, params: Params, round_idx: felt, rounds: felt) -> BigInt3* {
+    alloc_locals;
+
+    if (round_idx == rounds) {
+        return state;
+    }
+
+    let full_round_state = hades_round_full(state_len, state, params, round_idx);
+
+    return apply_full_rounds(state_len, full_round_state, params, round_idx + 1, rounds);
+}
+
+func apply_partial_rounds{range_check_ptr}(state_len: felt, state: BigInt3*, params: Params, round_idx: felt, rounds: felt) -> BigInt3* {
+    alloc_locals;
+
+    if (round_idx == rounds) {
+        return state;
+    }
+
+    let full_round_state = hades_round_full(state_len, state, params, round_idx);
+
+    return apply_partial_rounds(state_len, full_round_state, params, round_idx + 1, rounds);
+}
+
+func hades_round_full{range_check_ptr}(state_len: felt, state: BigInt3*, params: Params, round_idx: felt) -> BigInt3* {
+    alloc_locals;
+
+    let constant_add_state = add_round_constant(state_len, state, params.ark, round_idx);
+
+    let sbox_state = apply_sbox(state_len, constant_add_state);
 
     let mds_state = multiply_mds(state_len, state, params.mds);
 
     return mds_state;
 }
 
-func hades_round_partial{range_check_ptr}(state_len: felt, state: BigInt3*, params: Params) -> BigInt3* {
+func hades_round_partial{range_check_ptr}(state_len: felt, state: BigInt3*, params: Params, round_idx: felt) -> BigInt3* {
     alloc_locals;
 
     // todo : add round constants
@@ -41,6 +89,27 @@ func hades_round_partial{range_check_ptr}(state_len: felt, state: BigInt3*, para
     let mds_state = multiply_mds(state_len, state, params.mds);
 
     return mds_state;
+}
+
+func add_round_constant{range_check_ptr}(state_len: felt, state: BigInt3*, ark: BigInt3**, round_idx: felt) -> BigInt3* {
+    alloc_locals;
+
+    let (local new_state: BigInt3*) = alloc();
+
+    return add_round_constant_rec(state_len, state, new_state, ark, round_idx, 0);
+}
+
+func add_round_constant_rec{range_check_ptr}(state_len: felt, state: BigInt3*, new_state: BigInt3*, ark: BigInt3**, round_idx: felt, index: felt) -> BigInt3* {
+    alloc_locals;
+
+    if (index == state_len) {
+        return new_state;
+    }
+
+    let addition = fq.add(&state[index], &ark[round_idx][index]);
+    assert new_state[index] = [addition];
+
+    return add_round_constant_rec(state_len, state, new_state, ark, round_idx, index + 1);
 }
 
 // Cubic function
@@ -55,7 +124,7 @@ func apply_sbox{range_check_ptr}(state_len: felt, state: BigInt3*) -> BigInt3* {
 func apply_sbox_rec{range_check_ptr}(state_len: felt, state: BigInt3*, index: felt, new_state: BigInt3*) -> BigInt3* {
 
     if (index == state_len) {
-        return state;
+        return new_state;
     }
 
     let square = fq.mul(&state[index], &state[index]);
@@ -80,7 +149,7 @@ func apply_sbox_last_rec{range_check_ptr}(state_len: felt, state: BigInt3*, inde
         let cubic = fq.mul(square, &state[index]);
         assert new_state[index] = [cubic];
 
-        return state;
+        return new_state;
     } else {
         return apply_sbox_last_rec(state_len, state, index + 1, new_state);
     }
