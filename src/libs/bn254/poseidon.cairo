@@ -1,7 +1,29 @@
+%builtins range_check
+
 from src.libs.bn254.fq import fq
 from starkware.cairo.common.registers import get_fp_and_pc, get_label_location
 from starkware.cairo.common.cairo_secp.bigint import BigInt3
 from starkware.cairo.common.alloc import alloc
+
+func main{range_check_ptr}() {
+    alloc_locals;
+    let (__fp__, _) = get_fp_and_pc();
+
+    local nine: BigInt3 = BigInt3(9, 0, 0);
+    local eleven: BigInt3 = BigInt3(11, 0, 0);
+
+    let x = hash_two(&nine, &eleven);
+
+    %{
+        def print_bigint3(x, name):
+            print(f"{name} = {x.d0 + x.d1*2**86 + x.d2*2**172}")
+
+        print_bigint3(ids.nine, "x")
+        print_bigint3(ids.x, "x")
+    %}
+
+    return ();
+}
 
 struct PoseidonState {
     s0: BigInt3*,
@@ -39,6 +61,14 @@ func hades_round_full{range_check_ptr}(
 
     // 1. Add round constants
     let ark_constant = get_round_constant(round_idx);
+
+    %{
+        def print_bigint3(x, name):
+            print(f"{name} = {x.d0 + x.d1*2**86 + x.d2*2**172}")
+
+        print_bigint3(ids.nine, "x")
+        print_bigint3(ids.x, "x")
+    %}
 
     let state0 = fq.add(state.s0, ark_constant.s0);
     let state1 = fq.add(state.s1, ark_constant.s1);
