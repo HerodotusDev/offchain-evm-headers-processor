@@ -31,8 +31,9 @@ struct PoseidonState {
     s2: BigInt3*,
 }
 
-const r_p = 10;
-const r_f = 10;
+const r_p = 83;
+const r_f = 8;
+const r_f_div_2 = 4;
 
 func hash_two{range_check_ptr}(x: BigInt3*, y: BigInt3*) -> BigInt3* {
     alloc_locals;
@@ -43,8 +44,9 @@ func hash_two{range_check_ptr}(x: BigInt3*, y: BigInt3*) -> BigInt3* {
 
     // Hades Permutation
     let half_full: PoseidonState* = hades_round_full(&state, 0, 0);
-    let partial: PoseidonState* = hades_round_partial(half_full, r_f, 0);
-    let final_state: PoseidonState* = hades_round_full(partial, r_f + r_p, 0);
+
+    let partial: PoseidonState* = hades_round_partial(half_full, r_f_div_2, 0);
+    let final_state: PoseidonState* = hades_round_full(partial, r_f_div_2 + r_p, 0);
     let res = final_state.s0;
     return res;
 }
@@ -55,20 +57,12 @@ func hades_round_full{range_check_ptr}(
     alloc_locals;
     let (__fp__, _) = get_fp_and_pc();
 
-    if (index == r_f) {
+    if (index == r_f_div_2) {
         return state;
     }
 
     // 1. Add round constants
     let ark_constant = get_round_constant(round_idx);
-
-    %{
-        def print_bigint3(x, name):
-            print(f"{name} = {x.d0 + x.d1*2**86 + x.d2*2**172}")
-
-        print_bigint3(ids.nine, "x")
-        print_bigint3(ids.x, "x")
-    %}
 
     let state0 = fq.add(state.s0, ark_constant.s0);
     let state1 = fq.add(state.s1, ark_constant.s1);
@@ -113,7 +107,7 @@ func hades_round_partial{range_check_ptr}(
     alloc_locals;
     let (__fp__, _) = get_fp_and_pc();
 
-    if (index == r_f) {
+    if (index == r_p) {
         return state;
     }
 
@@ -156,7 +150,7 @@ func get_round_constant(index: felt) -> PoseidonState* {
     let (__fp__, _) = get_fp_and_pc();
     let (data_address) = get_label_location(data);
     let arr = cast(data_address, felt*);
-
+    %{ print(f"getting round index {ids.index}") %}
     // PoseidonState => 3 * BigInt3 => 3 * felt = 9 felts
     let start_index = 9 * index;
 
@@ -164,9 +158,9 @@ func get_round_constant(index: felt) -> PoseidonState* {
     local big1: BigInt3 = BigInt3(arr[start_index + 3], arr[start_index + 4], arr[start_index + 5]);
     local big2: BigInt3 = BigInt3(arr[start_index + 6], arr[start_index + 7], arr[start_index + 8]);
 
-    local state: PoseidonState =  PoseidonState(s0=&big0, s1=&big1, s2=&big2);
+    local state: PoseidonState = PoseidonState(s0=&big0, s1=&big1, s2=&big2);
     return &state;
-    
+
     data:
     dw 43426927226019481180962437;
     dw 58619926353141091854114408;
