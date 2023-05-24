@@ -42,7 +42,7 @@ namespace fq {
         local add_mod_p: BigInt3*;
         %{
             from starkware.cairo.common.cairo_secp.secp_utils import pack, split
-            p = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+            p = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001
             a = pack(ids.a, p)
             b = pack(ids.b, p)
             add_mod_p = value = (a+b)%p
@@ -56,7 +56,7 @@ namespace fq {
         local sub_mod_p: BigInt3*;
         %{
             from starkware.cairo.common.cairo_secp.secp_utils import pack, split
-            p = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+            p = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001
             a = pack(ids.a, p)
             b = pack(ids.b, p)
             sub_mod_p = value = (a-b)%p
@@ -70,7 +70,7 @@ namespace fq {
         local result: BigInt3*;
         %{
             from starkware.cairo.common.cairo_secp.secp_utils import split
-            p = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+            p = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001
             mul = (ids.a.d0 + ids.a.d1*2**86 + ids.a.d2*2**172) * (ids.b.d0 + ids.b.d1*2**86 + ids.b.d2*2**172)
             value = mul%p
 
