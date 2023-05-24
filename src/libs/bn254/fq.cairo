@@ -8,12 +8,13 @@ from starkware.cairo.common.cairo_secp.bigint import (
 )
 from starkware.cairo.common.registers import get_fp_and_pc
 
+// Operations under BN254 Curve Order (Fr)
 const N_LIMBS = 3;
 const DEGREE = 2;
 const BASE = 2 ** 86;
 
-const P0 = 60193888514187762220203335;
-const P1 = 27625954992973055882053025;
+const P0 = 69440356433466637143769089;
+const P1 = 27625954992971143715037670;
 const P2 = 3656382694611191768777988;
 
 const SHIFT_MIN_BASE = SHIFT - BASE;
