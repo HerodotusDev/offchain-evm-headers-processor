@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from poseidon_utils import PoseidonParams, hades_permutation
+from .poseidon_utils import PoseidonParams, hades_permutation
 from starkware.python.utils import blockify, from_bytes, to_bytes
 
 
