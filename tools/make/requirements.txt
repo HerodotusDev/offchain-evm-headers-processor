@@ -1,4 +1,4 @@
-cairo-lang==0.11.0.1
+cairo-lang
 blake3
 tinydb
 typeguard==2.13.3
