@@ -30,8 +30,8 @@ func main{range_check_ptr}() {
     local true_res: BigInt3;
 
     %{
-        x = random.randint(0, p)
-        y = random.randint(0, p)
+        x = random.randint(0, p-1)
+        y = random.randint(0, p-1)
         true_res = split(poseidon_hash(x, y))
         xs = split(x)
         ys = split(y)

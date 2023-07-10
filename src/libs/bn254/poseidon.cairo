@@ -1,6 +1,6 @@
 %builtins range_check
 
-from src.libs.bn254.fq import fq
+from src.libs.bn254.fq import fq, BASE, BASE_MIN_1, DEGREE, N_LIMBS, P0, P1, P2
 from starkware.cairo.common.registers import get_fp_and_pc, get_label_location
 from starkware.cairo.common.cairo_secp.bigint import BigInt3
 from starkware.cairo.common.alloc import alloc
@@ -42,40 +42,43 @@ func hash_two{range_check_ptr}(x: BigInt3*, y: BigInt3*) -> BigInt3* {
     local two: BigInt3 = BigInt3(2, 0, 0);
     local state: PoseidonState = PoseidonState(s0=x, s1=y, s2=&two);
 
+    let round_constants: BigInt3* = get_round_constants();
     // Hades Permutation
-    let half_full: PoseidonState* = hades_round_full(&state, 0, 0);
 
-    let partial: PoseidonState* = hades_round_partial(half_full, r_f_div_2, 0);
-    let final_state: PoseidonState* = hades_round_full(partial, r_f_div_2 + r_p, 0);
+    with round_constants {
+        let half_full: PoseidonState* = hades_round_full(&state, 0, 0);
+        let partial: PoseidonState* = hades_round_partial(half_full, r_f_div_2, 0);
+        let final_state: PoseidonState* = hades_round_full(partial, r_f_div_2 + r_p, 0);
+    }
+
     let res = final_state.s0;
     return res;
 }
 
-func hades_round_full{range_check_ptr}(
+func hades_round_full{range_check_ptr, round_constants: BigInt3*}(
     state: PoseidonState*, round_idx: felt, index: felt
 ) -> PoseidonState* {
     alloc_locals;
     let (__fp__, _) = get_fp_and_pc();
-
+    %{ print("round index, index : ", ids.round_idx, ids.index) %}
     if (index == r_f_div_2) {
         return state;
     }
 
     // 1. Add round constants
-    let ark_constant = get_round_constant(round_idx);
 
-    let state0 = fq.add(state.s0, ark_constant.s0);
-    let state1 = fq.add(state.s1, ark_constant.s1);
-    let state2 = fq.add(state.s2, ark_constant.s2);
+    let state0 = fq.add_rc(state.s0, round_idx * 3);
+    let state1 = fq.add_rc(state.s1, round_idx * 3 + 1);
+    let state2 = fq.add_rc(state.s2, round_idx * 3 + 2);
 
     // 2. Apply sbox
-    let square0 = fq.mul(state0, state0);
+    let square0 = fq.square(state0);
     let r0 = fq.mul(square0, state0);
 
-    let square1 = fq.mul(state1, state1);
+    let square1 = fq.square(state1);
     let r1 = fq.mul(square1, state1);
 
-    let square2 = fq.mul(state2, state2);
+    let square2 = fq.square(state2);
     let r2 = fq.mul(square2, state2);
 
     // 3. Multiply by MDS matrix
@@ -85,41 +88,212 @@ func hades_round_full{range_check_ptr}(
     // [1, -1, 1]  *[r1]  = [r0 - r1 + r2    ]
     // [1, 1, -2]   [r2]    [r0 + r1 - 2 * r2]
 
-    let two_r0 = fq.add(r0, r0);
-    let three_r0 = fq.add(two_r0, r0);
-    let r1_plus_r2 = fq.add(r1, r2);
-    let mds_mul_0 = fq.add(three_r0, r1_plus_r2);
+    local mds_mul0: BigInt3;
+    local mds_mul1: BigInt3;
+    local mds_mul2: BigInt3;
+    local q0: felt;
+    local q1: felt;
+    local q2: felt;
+    local mds_0_c0: felt;
+    local mds_0_c1: felt;
+    local mds_1_c0: felt;
+    local mds_1_c1: felt;
+    local mds_2_c0: felt;
+    local mds_2_c1: felt;
+    local mds_0_flag0: felt;
+    local mds_0_flag1: felt;
+    local mds_1_flag0: felt;
+    local mds_1_flag1: felt;
+    local mds_2_flag0: felt;
+    local mds_2_flag1: felt;
 
-    let r0_min_r1 = fq.sub(r0, r1);
-    let mds_mul_1 = fq.add(r0_min_r1, r2);
+    %{
+        r0,r1,r2,p, r0_limbs, r1_limbs, r2_limbs, p_limbs = 0,0,0,0,ids.N_LIMBS*[0],ids.N_LIMBS*[0],ids.N_LIMBS*[0],ids.N_LIMBS*[0]
 
-    let two_r2 = fq.add(r2, r2);
-    let r0_plus_r1 = fq.add(r0, r1);
-    let mds_mul_2 = fq.sub(r0_plus_r1, two_r2);
+        def split(x, degree=ids.DEGREE, base=ids.BASE):
+            coeffs = []
+            for n in range(degree, 0, -1):
+                q, r = divmod(x, base ** n)
+                coeffs.append(q)
+                x = r
+            coeffs.append(x)
+            return coeffs[::-1]
+        def abs_poly(x:list):
+            result = [0] * len(x)
+            for i in range(len(x)):
+                result[i] = abs(x[i])
+            return result
 
-    local mds_mul_state: PoseidonState = PoseidonState(s0=mds_mul_0, s1=mds_mul_1, s2=mds_mul_2);
+        def reduce_zero_poly(x:list):
+            x = x.copy()
+            carries = [0] * (len(x)-1)
+            for i in range(0, len(x)-1):
+                carries[i] = x[i] // ids.BASE
+                x[i] = x[i] % ids.BASE
+                assert x[i] == 0
+                x[i+1] += carries[i]
+            assert x[-1] == 0
+            return x, carries
+        for i in range(ids.N_LIMBS):
+            r0+=as_int(getattr(ids.r0, 'd'+str(i)),PRIME) * ids.BASE**i
+            r1+=as_int(getattr(ids.r1, 'd'+str(i)),PRIME) * ids.BASE**i
+            r2+=as_int(getattr(ids.r2, 'd'+str(i)),PRIME) * ids.BASE**i
+            p+=getattr(ids, 'P'+str(i)) * ids.BASE**i
+            r0_limbs[i]=as_int(getattr(ids.r0, 'd'+str(i)),PRIME)
+            r1_limbs[i]=as_int(getattr(ids.r1, 'd'+str(i)),PRIME)
+            r2_limbs[i]=as_int(getattr(ids.r2, 'd'+str(i)),PRIME)
+            p_limbs[i]=getattr(ids, 'P'+str(i))
+
+        mds_0 = (3 * r0 + r1 + r2)
+        mds_1 = (r0 - r1 + r2)
+        mds_2 = (r0 + r1 - 2 * r2)
+        q = [mds_0//p, mds_1//p, mds_2//p]
+        assert abs(q[0]) < ids.BASE
+        assert abs(q[1]) < ids.BASE
+        assert abs(q[2]) < ids.BASE
+        print('q', q)
+        mds_0, mds_1, mds_2 = mds_0%p, mds_1%p, mds_2%p
+
+        diff_0, diff_1, diff_2=ids.N_LIMBS*[0], ids.N_LIMBS*[0], ids.N_LIMBS*[0]
+        # carries_0, carries_1, carries_2=ids.DEGREE*[0], ids.DEGREE*[0], ids.DEGREE*[0]
+
+        mds_0_s, mds_1_s, mds_2_s = split(mds_0%p), split(mds_1%p), split(mds_2%p)
+        for i in range(3):
+            diff_0[i] = 3*r0_limbs[i] + r1_limbs[i] + r2_limbs[i] - q[0]*p_limbs[i] - mds_0_s[i]
+            diff_1[i] = r0_limbs[i] - r1_limbs[i] + r2_limbs[i] - q[1]*p_limbs[i] - mds_1_s[i]
+            diff_2[i] = r0_limbs[i] + r1_limbs[i] - 2*r2_limbs[i] - q[2]*p_limbs[i] - mds_2_s[i]
+        print('diff_0', diff_0)
+        print('diff_1', diff_1)
+        print('diff_2', diff_2)
+        _, carries_0 = reduce_zero_poly(diff_0)
+        _, carries_1 = reduce_zero_poly(diff_1)
+        _, carries_2 = reduce_zero_poly(diff_2)
+        carries_0 = abs_poly(carries_0)
+        carries_1 = abs_poly(carries_1)
+        carries_2 = abs_poly(carries_2)
+        for i in range(2):
+            setattr(ids, 'mds_0_c'+str(i), carries_0[i])
+            setattr(ids, 'mds_1_c'+str(i), carries_1[i])
+            setattr(ids, 'mds_2_c'+str(i), carries_2[i])
+        for i in range(3):
+            setattr(ids, 'q'+str(i), q[i])
+        for i in range(ids.N_LIMBS):
+            setattr(ids.mds_mul0, 'd'+str(i), mds_0_s[i])
+            setattr(ids.mds_mul1, 'd'+str(i), mds_1_s[i])
+            setattr(ids.mds_mul2, 'd'+str(i), mds_2_s[i])
+        for i in range(2):
+            setattr(ids,'mds_0_flag'+str(i), 1 if diff_0[i] >= 0 else 0)
+            setattr(ids,'mds_1_flag'+str(i), 1 if diff_1[i] >= 0 else 0)
+            setattr(ids,'mds_2_flag'+str(i), 1 if diff_2[i] >= 0 else 0)
+    %}
+
+    assert [range_check_ptr] = 4 - q0;
+    assert [range_check_ptr + 1] = 2 - q1;
+    assert [range_check_ptr + 2] = 2 - q2;
+    assert [range_check_ptr + 3] = BASE_MIN_1 - mds_mul0.d0;
+    assert [range_check_ptr + 4] = BASE_MIN_1 - mds_mul0.d1;
+    assert [range_check_ptr + 5] = P2 - mds_mul0.d2;
+    assert [range_check_ptr + 6] = BASE_MIN_1 - mds_mul1.d0;
+    assert [range_check_ptr + 7] = BASE_MIN_1 - mds_mul1.d1;
+    assert [range_check_ptr + 8] = P2 - mds_mul1.d2;
+    assert [range_check_ptr + 9] = BASE_MIN_1 - mds_mul2.d0;
+    assert [range_check_ptr + 10] = BASE_MIN_1 - mds_mul2.d1;
+    assert [range_check_ptr + 11] = P2 - mds_mul2.d2;
+    assert [range_check_ptr + 12] = mds_0_c0;
+    assert [range_check_ptr + 13] = mds_0_c1;
+    assert [range_check_ptr + 14] = mds_1_c0;
+    assert [range_check_ptr + 15] = mds_1_c1;
+    assert [range_check_ptr + 16] = mds_2_c0;
+    assert [range_check_ptr + 17] = mds_2_c1;
+
+    tempvar mds_0_d0_diff = 3 * r0.d0 + r1.d0 + r2.d0 - q0 * P0 - mds_mul0.d0;
+    tempvar mds_0_d1_diff = 3 * r0.d1 + r1.d1 + r2.d1 - q0 * P1 - mds_mul0.d1;
+    tempvar mds_0_d2_diff = 3 * r0.d2 + r1.d2 + r2.d2 - q0 * P2 - mds_mul0.d2;
+    tempvar mds_1_d0_diff = r0.d0 - r1.d0 + r2.d0 - q1 * P0 - mds_mul1.d0;
+    tempvar mds_1_d1_diff = r0.d1 - r1.d1 + r2.d1 - q1 * P1 - mds_mul1.d1;
+    tempvar mds_1_d2_diff = r0.d2 - r1.d2 + r2.d2 - q1 * P2 - mds_mul1.d2;
+    tempvar mds_2_d0_diff = r0.d0 + r1.d0 - 2 * r2.d0 - q2 * P0 - mds_mul2.d0;
+    tempvar mds_2_d1_diff = r0.d1 + r1.d1 - 2 * r2.d1 - q2 * P1 - mds_mul2.d1;
+    tempvar mds_2_d2_diff = r0.d2 + r1.d2 - 2 * r2.d2 - q2 * P2 - mds_mul2.d2;
+
+    local mds_0_carry0;
+    local mds_0_carry1;
+    local mds_1_carry0;
+    local mds_1_carry1;
+    local mds_2_carry0;
+    local mds_2_carry1;
+
+    if (mds_0_flag0 != 0) {
+        assert mds_0_carry0 = mds_0_c0;
+        assert mds_0_d0_diff = mds_0_carry0 * BASE;
+    } else {
+        assert mds_0_carry0 = (-1) * mds_0_c0;
+        assert mds_0_d0_diff = mds_0_carry0 * BASE;
+    }
+    if (mds_0_flag1 != 0) {
+        assert mds_0_carry1 = mds_0_c1;
+        assert mds_0_d1_diff + mds_0_carry0 = mds_0_carry1 * BASE;
+    } else {
+        assert mds_0_carry1 = (-1) * mds_0_c1;
+        assert mds_0_d1_diff + mds_0_carry0 = mds_0_carry1 * BASE;
+    }
+    if (mds_1_flag0 != 0) {
+        assert mds_1_carry0 = mds_1_c0;
+        assert mds_1_d0_diff = mds_1_carry0 * BASE;
+    } else {
+        assert mds_1_carry0 = (-1) * mds_1_c0;
+        assert mds_1_d0_diff = mds_1_carry0 * BASE;
+    }
+    if (mds_1_flag1 != 0) {
+        assert mds_1_carry1 = mds_1_c1;
+        assert mds_1_d1_diff + mds_1_carry0 = mds_1_carry1 * BASE;
+    } else {
+        assert mds_1_carry1 = (-1) * mds_1_c1;
+        assert mds_1_d1_diff + mds_1_carry0 = mds_1_carry1 * BASE;
+    }
+    if (mds_2_flag0 != 0) {
+        assert mds_2_carry0 = mds_2_c0;
+        assert mds_2_d0_diff = mds_2_carry0 * BASE;
+    } else {
+        assert mds_2_carry0 = (-1) * mds_2_c0;
+        assert mds_2_d0_diff = mds_2_carry0 * BASE;
+    }
+    if (mds_2_flag1 != 0) {
+        assert mds_2_carry1 = mds_2_c1;
+        assert mds_2_d1_diff + mds_2_carry0 = mds_2_carry1 * BASE;
+    } else {
+        assert mds_2_carry1 = (-1) * mds_2_c1;
+        assert mds_2_d1_diff + mds_2_carry0 = mds_2_carry1 * BASE;
+    }
+
+    assert mds_0_d2_diff + mds_0_carry1 = 0;
+    assert mds_1_d2_diff + mds_1_carry1 = 0;
+    assert mds_2_d2_diff + mds_2_carry1 = 0;
+
+    local mds_mul_state: PoseidonState = PoseidonState(s0=&mds_mul0, s1=&mds_mul1, s2=&mds_mul2);
+    tempvar range_check_ptr = range_check_ptr + 18;
     return hades_round_full(&mds_mul_state, round_idx + 1, index + 1);
 }
 
-func hades_round_partial{range_check_ptr}(
+func hades_round_partial{range_check_ptr, round_constants: BigInt3*}(
     state: PoseidonState*, round_idx: felt, index: felt
 ) -> PoseidonState* {
     alloc_locals;
     let (__fp__, _) = get_fp_and_pc();
+    %{ print("round index, index : ", ids.round_idx, ids.index) %}
 
     if (index == r_p) {
         return state;
     }
 
     // 1. Add round constant
-    let ark_constant = get_round_constant(round_idx);
 
-    let r0 = fq.add(state.s0, ark_constant.s0);
-    let r1 = fq.add(state.s1, ark_constant.s1);
-    let state2 = fq.add(state.s2, ark_constant.s2);
+    let r0 = fq.add_rc(state.s0, round_idx * 3);
+    let r1 = fq.add_rc(state.s1, round_idx * 3 + 1);
+    let state2 = fq.add_rc(state.s2, round_idx * 3 + 2);
 
     // 2. Apply sbox to last element
-    let square2 = fq.mul(state2, state2);
+    let square2 = fq.square(state2);
     let r2 = fq.mul(square2, state2);
 
     // 3. Multiply by MDS matrix
@@ -127,39 +301,199 @@ func hades_round_partial{range_check_ptr}(
     // [3, 1, 1]    [r0]    [3* r0 + r1 + r2 ]
     // [1, -1, 1]  *[r1]  = [r0 - r1 + r2    ]
     // [1, 1, -2]   [r2]    [r0 + r1 - 2 * r2]
+    local mds_mul0: BigInt3;
+    local mds_mul1: BigInt3;
+    local mds_mul2: BigInt3;
+    local q0: felt;
+    local q1: felt;
+    local q2: felt;
+    local mds_0_c0: felt;
+    local mds_0_c1: felt;
+    local mds_1_c0: felt;
+    local mds_1_c1: felt;
+    local mds_2_c0: felt;
+    local mds_2_c1: felt;
+    local mds_0_flag0: felt;
+    local mds_0_flag1: felt;
+    local mds_1_flag0: felt;
+    local mds_1_flag1: felt;
+    local mds_2_flag0: felt;
+    local mds_2_flag1: felt;
 
-    let two_r0 = fq.add(r0, r0);
-    let three_r0 = fq.add(two_r0, r0);
-    let r1_plus_r2 = fq.add(r1, r2);
-    let mds_mul_0 = fq.add(three_r0, r1_plus_r2);
+    %{
+        r0,r1,r2,p, r0_limbs, r1_limbs, r2_limbs, p_limbs = 0,0,0,0,ids.N_LIMBS*[0],ids.N_LIMBS*[0],ids.N_LIMBS*[0],ids.N_LIMBS*[0] 
 
-    let r0_min_r1 = fq.sub(r0, r1);
-    let mds_mul_1 = fq.add(r0_min_r1, r2);
+        def split(x, degree=ids.DEGREE, base=ids.BASE):
+            coeffs = []
+            for n in range(degree, 0, -1):
+                q, r = divmod(x, base ** n)
+                coeffs.append(q)
+                x = r
+            coeffs.append(x)
+            return coeffs[::-1]
+        def abs_poly(x:list):
+            result = [0] * len(x)
+            for i in range(len(x)):
+                result[i] = abs(x[i])
+            return result
 
-    let two_r2 = fq.add(r2, r2);
-    let r0_plus_r1 = fq.add(r0, r1);
-    let mds_mul_2 = fq.sub(r0_plus_r1, two_r2);
+        def reduce_zero_poly(x:list):
+            x = x.copy()
+            carries = [0] * (len(x)-1)
+            for i in range(0, len(x)-1):
+                carries[i] = x[i] // ids.BASE
+                x[i] = x[i] % ids.BASE
+                assert x[i] == 0
+                x[i+1] += carries[i]
+            assert x[-1] == 0
+            return x, carries
+        for i in range(ids.N_LIMBS):
+            r0+=as_int(getattr(ids.r0, 'd'+str(i)),PRIME) * ids.BASE**i
+            r1+=as_int(getattr(ids.r1, 'd'+str(i)),PRIME) * ids.BASE**i
+            r2+=as_int(getattr(ids.r2, 'd'+str(i)),PRIME) * ids.BASE**i
+            p+=getattr(ids, 'P'+str(i)) * ids.BASE**i
+            r0_limbs[i]=as_int(getattr(ids.r0, 'd'+str(i)),PRIME)
+            r1_limbs[i]=as_int(getattr(ids.r1, 'd'+str(i)),PRIME)
+            r2_limbs[i]=as_int(getattr(ids.r2, 'd'+str(i)),PRIME)
+            p_limbs[i]=getattr(ids, 'P'+str(i))
 
-    local mds_mul_state: PoseidonState = PoseidonState(s0=mds_mul_0, s1=mds_mul_1, s2=mds_mul_2);
+        mds_0 = (3 * r0 + r1 + r2)
+        mds_1 = (r0 - r1 + r2)
+        mds_2 = (r0 + r1 - 2 * r2)
+        q = [mds_0//p, mds_1//p, mds_2//p]
+        assert abs(q[0]) < ids.BASE
+        assert abs(q[1]) < ids.BASE
+        assert abs(q[2]) < ids.BASE
+        #print('q', q)
+        mds_0, mds_1, mds_2 = mds_0%p, mds_1%p, mds_2%p
 
+        diff_0, diff_1, diff_2=ids.N_LIMBS*[0], ids.N_LIMBS*[0], ids.N_LIMBS*[0]
+        # carries_0, carries_1, carries_2=ids.DEGREE*[0], ids.DEGREE*[0], ids.DEGREE*[0]
+
+        mds_0_s, mds_1_s, mds_2_s = split(mds_0%p), split(mds_1%p), split(mds_2%p)
+        for i in range(3):
+            diff_0[i] = 3*r0_limbs[i] + r1_limbs[i] + r2_limbs[i] - q[0]*p_limbs[i] - mds_0_s[i]
+            diff_1[i] = r0_limbs[i] - r1_limbs[i] + r2_limbs[i] - q[1]*p_limbs[i] - mds_1_s[i]
+            diff_2[i] = r0_limbs[i] + r1_limbs[i] - 2*r2_limbs[i] - q[2]*p_limbs[i] - mds_2_s[i]
+        #print('diff_0', diff_0)
+        #print('diff_1', diff_1)
+        #print('diff_2', diff_2)
+        _, carries_0 = reduce_zero_poly(diff_0)
+        _, carries_1 = reduce_zero_poly(diff_1)
+        _, carries_2 = reduce_zero_poly(diff_2)
+        carries_0 = abs_poly(carries_0)
+        carries_1 = abs_poly(carries_1)
+        carries_2 = abs_poly(carries_2)
+        for i in range(2):
+            setattr(ids, 'mds_0_c'+str(i), carries_0[i])
+            setattr(ids, 'mds_1_c'+str(i), carries_1[i])
+            setattr(ids, 'mds_2_c'+str(i), carries_2[i])
+        for i in range(3):
+            setattr(ids, 'q'+str(i), q[i])
+        for i in range(ids.N_LIMBS):
+            setattr(ids.mds_mul0, 'd'+str(i), mds_0_s[i])
+            setattr(ids.mds_mul1, 'd'+str(i), mds_1_s[i])
+            setattr(ids.mds_mul2, 'd'+str(i), mds_2_s[i])
+        for i in range(2):
+            setattr(ids,'mds_0_flag'+str(i), 1 if diff_0[i] >= 0 else 0)
+            setattr(ids,'mds_1_flag'+str(i), 1 if diff_1[i] >= 0 else 0)
+            setattr(ids,'mds_2_flag'+str(i), 1 if diff_2[i] >= 0 else 0)
+    %}
+
+    assert [range_check_ptr] = 4 - q0;
+    assert [range_check_ptr + 1] = 2 - q1;
+    assert [range_check_ptr + 2] = 2 - q2;
+    assert [range_check_ptr + 3] = BASE_MIN_1 - mds_mul0.d0;
+    assert [range_check_ptr + 4] = BASE_MIN_1 - mds_mul0.d1;
+    assert [range_check_ptr + 5] = P2 - mds_mul0.d2;
+    assert [range_check_ptr + 6] = BASE_MIN_1 - mds_mul1.d0;
+    assert [range_check_ptr + 7] = BASE_MIN_1 - mds_mul1.d1;
+    assert [range_check_ptr + 8] = P2 - mds_mul1.d2;
+    assert [range_check_ptr + 9] = BASE_MIN_1 - mds_mul2.d0;
+    assert [range_check_ptr + 10] = BASE_MIN_1 - mds_mul2.d1;
+    assert [range_check_ptr + 11] = P2 - mds_mul2.d2;
+    assert [range_check_ptr + 12] = mds_0_c0;
+    assert [range_check_ptr + 13] = mds_0_c1;
+    assert [range_check_ptr + 14] = mds_1_c0;
+    assert [range_check_ptr + 15] = mds_1_c1;
+    assert [range_check_ptr + 16] = mds_2_c0;
+    assert [range_check_ptr + 17] = mds_2_c1;
+
+    tempvar mds_0_d0_diff = 3 * r0.d0 + r1.d0 + r2.d0 - q0 * P0 - mds_mul0.d0;
+    tempvar mds_0_d1_diff = 3 * r0.d1 + r1.d1 + r2.d1 - q0 * P1 - mds_mul0.d1;
+    tempvar mds_0_d2_diff = 3 * r0.d2 + r1.d2 + r2.d2 - q0 * P2 - mds_mul0.d2;
+    tempvar mds_1_d0_diff = r0.d0 - r1.d0 + r2.d0 - q1 * P0 - mds_mul1.d0;
+    tempvar mds_1_d1_diff = r0.d1 - r1.d1 + r2.d1 - q1 * P1 - mds_mul1.d1;
+    tempvar mds_1_d2_diff = r0.d2 - r1.d2 + r2.d2 - q1 * P2 - mds_mul1.d2;
+    tempvar mds_2_d0_diff = r0.d0 + r1.d0 - 2 * r2.d0 - q2 * P0 - mds_mul2.d0;
+    tempvar mds_2_d1_diff = r0.d1 + r1.d1 - 2 * r2.d1 - q2 * P1 - mds_mul2.d1;
+    tempvar mds_2_d2_diff = r0.d2 + r1.d2 - 2 * r2.d2 - q2 * P2 - mds_mul2.d2;
+
+    local mds_0_carry0;
+    local mds_0_carry1;
+    local mds_1_carry0;
+    local mds_1_carry1;
+    local mds_2_carry0;
+    local mds_2_carry1;
+
+    if (mds_0_flag0 != 0) {
+        assert mds_0_carry0 = mds_0_c0;
+        assert mds_0_d0_diff = mds_0_carry0 * BASE;
+    } else {
+        assert mds_0_carry0 = (-1) * mds_0_c0;
+        assert mds_0_d0_diff = mds_0_carry0 * BASE;
+    }
+    if (mds_0_flag1 != 0) {
+        assert mds_0_carry1 = mds_0_c1;
+        assert mds_0_d1_diff + mds_0_carry0 = mds_0_carry1 * BASE;
+    } else {
+        assert mds_0_carry1 = (-1) * mds_0_c1;
+        assert mds_0_d1_diff + mds_0_carry0 = mds_0_carry1 * BASE;
+    }
+    if (mds_1_flag0 != 0) {
+        assert mds_1_carry0 = mds_1_c0;
+        assert mds_1_d0_diff = mds_1_carry0 * BASE;
+    } else {
+        assert mds_1_carry0 = (-1) * mds_1_c0;
+        assert mds_1_d0_diff = mds_1_carry0 * BASE;
+    }
+    if (mds_1_flag1 != 0) {
+        assert mds_1_carry1 = mds_1_c1;
+        assert mds_1_d1_diff + mds_1_carry0 = mds_1_carry1 * BASE;
+    } else {
+        assert mds_1_carry1 = (-1) * mds_1_c1;
+        assert mds_1_d1_diff + mds_1_carry0 = mds_1_carry1 * BASE;
+    }
+    if (mds_2_flag0 != 0) {
+        assert mds_2_carry0 = mds_2_c0;
+        assert mds_2_d0_diff = mds_2_carry0 * BASE;
+    } else {
+        assert mds_2_carry0 = (-1) * mds_2_c0;
+        assert mds_2_d0_diff = mds_2_carry0 * BASE;
+    }
+    if (mds_2_flag1 != 0) {
+        assert mds_2_carry1 = mds_2_c1;
+        assert mds_2_d1_diff + mds_2_carry0 = mds_2_carry1 * BASE;
+    } else {
+        assert mds_2_carry1 = (-1) * mds_2_c1;
+        assert mds_2_d1_diff + mds_2_carry0 = mds_2_carry1 * BASE;
+    }
+
+    assert mds_0_d2_diff + mds_0_carry1 = 0;
+    assert mds_1_d2_diff + mds_1_carry1 = 0;
+    assert mds_2_d2_diff + mds_2_carry1 = 0;
+
+    local mds_mul_state: PoseidonState = PoseidonState(s0=&mds_mul0, s1=&mds_mul1, s2=&mds_mul2);
+    tempvar range_check_ptr = range_check_ptr + 18;
     return hades_round_partial(&mds_mul_state, round_idx + 1, index + 1);
 }
 
-func get_round_constant(index: felt) -> PoseidonState* {
+func get_round_constants() -> BigInt3* {
     alloc_locals;
-    let (__fp__, _) = get_fp_and_pc();
     let (data_address) = get_label_location(data);
-    let arr = cast(data_address, felt*);
-    %{ print(f"getting round index {ids.index}") %}
-    // PoseidonState => 3 * BigInt3 => 3 * felt = 9 felts
-    let start_index = 9 * index;
+    let arr = cast(data_address, BigInt3*);
 
-    local big0: BigInt3 = BigInt3(arr[start_index], arr[start_index + 1], arr[start_index + 2]);
-    local big1: BigInt3 = BigInt3(arr[start_index + 3], arr[start_index + 4], arr[start_index + 5]);
-    local big2: BigInt3 = BigInt3(arr[start_index + 6], arr[start_index + 7], arr[start_index + 8]);
-
-    local state: PoseidonState = PoseidonState(s0=&big0, s1=&big1, s2=&big2);
-    return &state;
+    return arr;
 
     data:
     dw 43426927226019481180962437;
