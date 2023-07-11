@@ -8,10 +8,14 @@ from starkware.cairo.common.math import unsigned_div_rem as felt_divmod
 from starkware.cairo.common.builtin_keccak.keccak import keccak
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash, poseidon_hash_many
 
-from src.libs.block_header_rlp import fetch_block_headers_rlp, extract_parent_hash_little
+from src.libs.block_header_rlp import (
+    fetch_block_headers_rlp,
+    extract_parent_hash_little,
+    read_block_headers_rlp,
+)
 from src.libs.utils import pow2alloc127
 
-from src.libs.mmr import compute_height_pre_alloc_pow2 as compute_height
+from src.libs.mmr import compute_height_pre_alloc_pow2 as compute_height  // , get_root()
 
 func verify_block_headers_and_hash_them{
     range_check_ptr,
@@ -68,7 +72,6 @@ func construct_mmr{
     assert mmr_array[mmr_array_len] = node;
     let mmr_array_len = mmr_array_len + 1;
 
-
     merge_subtrees_if_applicable(height=0);
     if (index == 0) {
         return ();
@@ -96,7 +99,7 @@ func merge_subtrees_if_applicable{
     alloc_locals;
 
     local next_pos_is_parent: felt;
-    let height_next_pos = compute_height(mmr_array_len, pow2_array);
+    let height_next_pos = compute_height{pow2_array=pow2_array}(mmr_array_len);
 
     %{ ids.next_pos_is_parent = 1 if ids.height_next_pos > ids.height else 0 %}
     if (next_pos_is_parent != 0) {
@@ -112,7 +115,7 @@ func merge_subtrees_if_applicable{
         %{ print(f"Merged {ids.left_pos} + {ids.right_pos} at index {ids.mmr_array_len} and height {ids.height_next_pos} ") %}
 
         let mmr_array_len = mmr_array_len + 1;
-        
+
         // %{ print(f'mmr index {ids.mmr_array_len}') %}
         // %{ print(f"height : {ids.height}") %}
         return merge_subtrees_if_applicable(height=height + 1);
@@ -132,12 +135,12 @@ func main{
 }() {
     alloc_locals;
     local from_block_number_high: felt;
-    local from_block_number_low: felt;
+    local to_block_number_low: felt;
     local mmr_last_pos: felt;
     local mmr_last_root: felt;
     %{
         ids.from_block_number_high=program_input['from_block_number_high']
-        ids.from_block_number_low=program_input['from_block_number_low']
+        ids.to_block_number_low=program_input['to_block_number_low']
         ids.mmr_last_pos=program_input['mmr_last_pos'] 
         ids.mmr_last_root=program_input['mmr_last_root']
     %}
@@ -171,13 +174,12 @@ func main{
     // -----------------------------------------------------
     // INITIALIZE VARIABLES
     // -----------------------------------------------------
-    tempvar number_of_blocks = from_block_number_high - from_block_number_low + 1;
-    let n = number_of_blocks - 1;
+    tempvar number_of_blocks = from_block_number_high - to_block_number_low + 1;
+    let n = number_of_blocks - 1;  // index of last block
     let pow2_array: felt* = pow2alloc127();
     // Ask all the block headers RLPs into Cairo variables from the Prover
-    let (rlp_arrays: felt**, bytes_len_array: felt*) = fetch_block_headers_rlp(
-        from_block_number_high, from_block_number_low
-    );
+    let (rlp_arrays: felt**, bytes_len_array: felt*) = read_block_headers_rlp();
+
     // Initialize MMR:
     let (hash_array: felt*) = alloc();  // Poseidon(rlp_arrays)
     let (mmr_array: felt*) = alloc();
@@ -186,8 +188,8 @@ func main{
     let mmr_array_len = 1;
     %{
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n)
+        print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n-1)
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 0)
-        print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 1)
     %}
     // Get the parent hash of the last block (to be retuned as output):
     let (block_n_parent_hash_little: Uint256) = extract_parent_hash_little(rlp_arrays[n]);
@@ -207,6 +209,7 @@ func main{
     }
     %{ print_mmr(ids.mmr_array,ids.mmr_array_len) %}
 
+    // let root: felt = get_root();
     // Returns private input as public output, as well as output of interest.
     // NOTE : block_n_parent_hash is critical to be returned and checked against a correct checkpoint on Starknet.
     // Otherwise, the prover could cheat and feed RLP values that are sound together, but not necessearily

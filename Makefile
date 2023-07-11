@@ -20,6 +20,10 @@ run:
 	@echo "Total number of steps will be shown at the end of the run." 
 	./tools/make/launch_cairo_files.py
 
+prepare-processor-input:
+	@echo "Prepare chunk_processor_input.json data with the parameters in tools/make/processor_input.json"
+	./tools/make/prepare_processor_input.py
+
 clean:
 	rm -rf build/compiled_cairo_files
 	mkdir -p build
