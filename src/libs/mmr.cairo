@@ -43,72 +43,72 @@ func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) 
     }
 }
 
-// func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> felt {
-//     alloc_locals;
-//     local bit_length;
-//     %{
-//         mmr_len = ids.mmr_len
-//         ids.bit_length = mmr_len.bit_length()
-//     %}
-//     // Computes N=2^bit_length and n=2^(bit_length-1)
-//     // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
+func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> felt {
+    alloc_locals;
+    local bit_length;
+    %{
+        mmr_len = ids.mmr_len
+        ids.bit_length = mmr_len.bit_length()
+    %}
+    // Computes N=2^bit_length and n=2^(bit_length-1)
+    // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
 
-// let N = pow2_array[bit_length];
-//     let n = pow2_array[bit_length - 1];
+    let N = pow2_array[bit_length];
+    let n = pow2_array[bit_length - 1];
 
-// assert [range_check_ptr] = N - mmr_len - 1;
-//     assert [range_check_ptr + 1] = mmr_len - n;
-//     tempvar range_check_ptr = range_check_ptr + 2;
+    assert [range_check_ptr] = N - mmr_len - 1;
+    assert [range_check_ptr + 1] = mmr_len - n;
+    tempvar range_check_ptr = range_check_ptr + 2;
 
-// let peak_pos = pow2_array[bit_length - 1] - 1;
-//     return peak_pos;
-// }
+    let peak_pos = pow2_array[bit_length - 1] - 1;
+    return peak_pos;
+}
 
-// // returns peaks position from left to right
-// func compute_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> (
-//     peaks: felt*, peaks_len: felt
-// ) {
-//     alloc_locals;
-//     let (peaks: felt*) = alloc();
-//     with mmr_len {
-//         let first_peak_pos = compute_first_peak_pos(mmr_len);
-//         assert peaks[0] = first_peak_pos;
-//         let peaks_len = compute_peaks_inner(peaks, 1, first_peak_pos);
-//     }
+// returns peaks position from left to right
+func compute_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> (
+    peaks: felt*, peaks_len: felt
+) {
+    alloc_locals;
+    let (peaks: felt*) = alloc();
+    with mmr_len {
+        let first_peak_pos = compute_first_peak_pos(mmr_len);
+        assert peaks[0] = first_peak_pos;
+        let peaks_len = compute_peaks_inner(peaks, 1, first_peak_pos);
+    }
 
-// return (peaks, peaks_len);
-// }
+    return (peaks, peaks_len);
+}
 
-// func compute_peaks_inner{range_check_ptr, pow2_array: felt*, mmr_len: felt}(
-//     peaks: felt*, peaks_len: felt, mmr_pos: felt
-// ) -> felt {
-//     alloc_locals;
-//     if (mmr_pos == mmr_len) {
-//         return peaks_len;
-//     } else {
-//         let height = compute_height_pre_alloc_pow2(mmr_pos);
-//         let right_sibling = mmr_pos + pow2_array[height + 1] - 1;
-//         let left_child = left_child_jump_until_inside_mmr(right_sibling);
-//         assert peaks[peaks_len] = left_child;
-//         return compute_peaks_inner(peaks, peaks_len + 1, left_child);
-//     }
-// }
+func compute_peaks_inner{range_check_ptr, pow2_array: felt*, mmr_len: felt}(
+    peaks: felt*, peaks_len: felt, mmr_pos: felt
+) -> felt {
+    alloc_locals;
+    if (mmr_pos == mmr_len) {
+        return peaks_len;
+    } else {
+        let height = compute_height_pre_alloc_pow2(mmr_pos);
+        let right_sibling = mmr_pos + pow2_array[height + 1] - 1;
+        let left_child = left_child_jump_until_inside_mmr(right_sibling);
+        assert peaks[peaks_len] = left_child;
+        return compute_peaks_inner(peaks, peaks_len + 1, left_child);
+    }
+}
 
-// func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_len}(
-//     left_child: felt
-// ) -> felt {
-//     alloc_locals;
-//     local in_mmr;
+func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_len}(
+    left_child: felt
+) -> felt {
+    alloc_locals;
+    local in_mmr;
 
-// %{ ids.in_mmr = 1 if ids.left_child<=ids.mmr_len else 0 %}
-//     if (in_mmr != 0) {
-//         return left_child;
-//     } else {
-//         let height = compute_height_pre_alloc_pow2(left_child);
-//         let left_child = left_child - pow2_array[height];
-//         return left_child_jump_until_inside_mmr(left_child);
-//     }
-// }
+    %{ ids.in_mmr = 1 if ids.left_child<=ids.mmr_len else 0 %}
+    if (in_mmr != 0) {
+        return left_child;
+    } else {
+        let height = compute_height_pre_alloc_pow2(left_child);
+        let left_child = left_child - pow2_array[height];
+        return left_child_jump_until_inside_mmr(left_child);
+    }
+}
 
 // func get_root{range_check_ptr, pow2_array: felt*}(mmr_array: felt*, mmr_len: felt) -> felt {
 //     alloc_locals;
