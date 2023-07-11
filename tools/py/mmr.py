@@ -138,64 +138,31 @@ class MMR(object):
             height += 1
         return pos
 
+    # def get_root(self) -> Optional[bytes]:
+    #     """
+    #     MMR root
+    #     """
+    #     peaks = get_peaks(self.last_pos + 1)
+    #     print("peaks pos", peaks)
+    #     # bag all rhs peaks, which is exact root
+    #     return self._bag_rhs_peaks(-1, peaks)
+
     def get_root(self) -> Optional[bytes]:
         """
         MMR root
         """
         peaks = get_peaks(self.last_pos + 1)
-        print("peaks pos", peaks)
-        # bag all rhs peaks, which is exact root
-        return self._bag_rhs_peaks(-1, peaks)
+        peaks_values = [self.pos_hash[p] for p in peaks]
+        bagged = self.bag_peaks(peaks_values)
+        root = poseidon_hash(len(self.pos_hash), bagged)
+        return root
 
-    # def gen_proof(self, pos: int) -> 'MerkleProof':
-    #     """
-    #     generate a merkle proof
-    #     1. generate merkle tree proof for pos
-    #     2. find peaks positions
-    #     3. find rhs peaks packs into one single hash, then push to proof
-    #     4. find lhs peaks reverse then push to proof
+    def bag_peaks(self, peaks: List[int]) -> int:
+        bags = peaks[-1]
+        for peak in reversed(peaks[:-1]): 
+            bags = poseidon_hash(peak, bags) 
 
-    #     For peaks: P1, P2, P3, P4, P5, we proof a P4 leaf
-    #     [P4 merkle proof.., P5, P3, P2, P1]
-    #     """
-    #     proof = []
-    #     height = 0
-    #     # construct merkle proof of one peak
-    #     while pos <= self.last_pos:
-    #         pos_height = tree_pos_height(pos)
-    #         next_height = tree_pos_height(pos + 1)
-    #         if next_height > pos_height:
-    #             # get left child sib
-    #             sib = pos - sibling_offset(height)
-    #             # break if sib is out of mmr
-    #             if sib > self.last_pos:
-    #                 break
-    #             proof.append(self.pos_hash[sib])
-    #             # goto parent node
-    #             pos += 1
-    #         else:
-    #             # get right child
-    #             sib = pos + sibling_offset(height)
-    #             # break if sib is out of mmr
-    #             if sib > self.last_pos:
-    #                 break
-    #             proof.append(self.pos_hash[sib])
-    #             # goto parent node
-    #             pos += 2 << height
-    #         height += 1
-    #     # now pos is peak of the mountain(because pos can't find a sibling)
-    #     peak_pos = pos
-    #     peaks = get_peaks(self.last_pos + 1)
-    #     # bagging rhs peaks into one hash
-    #     rhs_peak_hash = self._bag_rhs_peaks(peak_pos, peaks)
-    #     if rhs_peak_hash is not None:
-    #         proof.append(rhs_peak_hash)
-    #     # insert lhs peaks
-    #     proof.extend(reversed(self._lhs_peaks(peak_pos, peaks)))
-    #     return MerkleProof(mmr_size=self.last_pos + 1,
-    #                        proof=proof,
-    #                        hasher=self._hasher)
-
+        return bags
     def _bag_rhs_peaks(self, peak_pos: int, peaks: List[int]
                        ) -> Optional[bytes]:
         rhs_peak_hashes = [self.pos_hash[p] for p in peaks
