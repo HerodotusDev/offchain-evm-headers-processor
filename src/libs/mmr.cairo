@@ -102,8 +102,15 @@ func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_le
 
     %{ ids.in_mmr = 1 if ids.left_child<=ids.mmr_len else 0 %}
     if (in_mmr != 0) {
+        // Ensure left_child <= mmr_len
+        assert [range_check_ptr] = mmr_len - left_child;
+        tempvar range_check_ptr = range_check_ptr + 1;
         return left_child;
     } else {
+        // Ensure mmr_len < left_child
+        assert [range_check_ptr] = left_child - mmr_len - 1;
+        tempvar range_check_ptr = range_check_ptr + 1;
+
         let height = compute_height_pre_alloc_pow2(left_child);
         let left_child = left_child - pow2_array[height];
         return left_child_jump_until_inside_mmr(left_child);
