@@ -28,6 +28,21 @@ func fetch_block_headers_rlp(from_block_number_high: felt, to_block_number_low: 
     return (rlp_arrays, rlp_arrays_bytes_len);
 }
 
+func read_block_headers_rlp() -> (rlp_array: felt**, rlp_array_bytes_len: felt*) {
+    let (rlp_arrays: felt**) = alloc();
+    let (rlp_arrays_bytes_len: felt*) = alloc();
+    %{
+        rlp_arrays = program_input['rlp_arrays']
+        bytes_len_array = program_input['bytes_len_array']
+        print(rlp_arrays)
+        print(bytes_len_array)
+
+        segments.write_arg(ids.rlp_arrays, rlp_arrays)
+        segments.write_arg(ids.rlp_arrays_bytes_len, bytes_len_array)
+    %}
+    return (rlp_arrays, rlp_arrays_bytes_len);
+}
+
 // Assumes all words in rlp are 8 bytes little endian values.
 // Returns the keccak hash in little endian representation, to be asserter directly
 // against the hash of cairo keccak.
