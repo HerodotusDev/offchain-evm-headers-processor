@@ -1,4 +1,4 @@
-from src.libs.bn254.research.poseidon_utils import PoseidonParams
+from tools.py.poseidon.poseidon_utils import PoseidonParams
 
 DEGREE = 2
 BASE = 2 ** 86

@@ -15,7 +15,7 @@ STARK_PRIME = 0x800000000000011000000000000000000000000000000000000000000000001
 SECP256k1_PRIME = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f
 BN254_PRIME = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001
 
-DEFAULT_PRIME = BN254_PRIME
+DEFAULT_PRIME = STARK_PRIME
 
 def generate_round_constant(fn_name: str, field_prime: int, idx: int) -> int:
     """
