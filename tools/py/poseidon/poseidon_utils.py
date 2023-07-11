@@ -77,6 +77,13 @@ class PoseidonParams:
             )
 
         return cls.poseidon_small_params
+    @classmethod
+    def get_emulated_poseidon_params(cls: Type["PoseidonParams"]):
+        if cls.poseidon_small_params is None:
+            cls.poseidon_small_params = cls(
+                field_prime=BN254_PRIME, r=2, c=1, r_f=8, r_p=83, mds=SmallMds
+            )
+        return cls.poseidon_small_params
 
 
 def hades_round(values, params: PoseidonParams, is_full_round: bool, round_idx: int):

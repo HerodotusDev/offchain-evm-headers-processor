@@ -7,7 +7,8 @@ func main{range_check_ptr}() {
     let (__fp__, _) = get_fp_and_pc();
 
     %{
-        from src.libs.bn254.research.poseidon_hash import poseidon_hash
+        from tools.py.poseidon.poseidon_hash import poseidon_hash
+        from tools.py.poseidon.poseidon_utils import PoseidonParams
         import random
         p = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001
         def print_bigint3(x, name):
@@ -32,7 +33,7 @@ func main{range_check_ptr}() {
     %{
         x = random.randint(0, p-1)
         y = random.randint(0, p-1)
-        true_res = split(poseidon_hash(x, y))
+        true_res = split(poseidon_hash(x, y, PoseidonParams.get_emulated_poseidon_params()))
         xs = split(x)
         ys = split(y)
         fill_bigint3(ids.x, xs)
