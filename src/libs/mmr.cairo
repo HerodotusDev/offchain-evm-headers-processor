@@ -6,6 +6,8 @@ from starkware.cairo.common.math import unsigned_div_rem
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import PoseidonBuiltin
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash
+from starkware.cairo.common.dict_access import DictAccess
+from starkware.cairo.common.dict import dict_write, dict_read
 
 // Computes MMR tree height given an index.
 // This assumes the first index is 1. See below:
@@ -116,28 +118,95 @@ func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_le
         return left_child_jump_until_inside_mmr(left_child);
     }
 }
+// Position must be a peak position
+func get_full_mmr_peak_value{
+    range_check_ptr, mmr_array: felt*, mmr_offset: felt, previous_peaks_dict: DictAccess*
+}(position: felt) -> felt {
+    alloc_locals;
+    %{ print(f"Asked position : {ids.position}, mmr_offset : {ids.mmr_offset}") %}
+    local is_position_in_mmr_array: felt;
+    %{ ids.is_position_in_mmr_array= 1 if ids.position > ids.mmr_offset else 0 %}
+    if (is_position_in_mmr_array != 0) {
+        // ensure position > mmr_offset
+        %{ print(f'getting from mmr_array at index {ids.position-ids.mmr_offset -1}') %}
+        assert [range_check_ptr] = position - mmr_offset - 1;
+        tempvar range_check_ptr = range_check_ptr + 1;
+        return mmr_array[position - mmr_offset - 1];
+    } else {
+        // ensure position <= mmr_offset
+        %{ print('getting from dict') %}
+        assert [range_check_ptr] = mmr_offset - position;
+        tempvar range_check_ptr = range_check_ptr + 1;
+        let (value) = dict_read{dict_ptr=previous_peaks_dict}(key=position);
+        %{ print(f"dict_peak value at {ids.position} = {ids.value}") %}
+        return value;
+    }
+}
 
-// func get_root{range_check_ptr, pow2_array: felt*}(mmr_array: felt*, mmr_len: felt) -> felt {
-//     alloc_locals;
-//     let (peaks_positions: felt*, peaks_len: felt) = compute_peaks_positions(mmr_len);
-//     let bagged_peaks = bag_peaks(mmr_array, peaks, peaks_len);
-//     let root = poseidon_hash(mmr_len, bagged_peaks);
-//     return root;
-// }
+func get_root{
+    range_check_ptr,
+    poseidon_ptr: PoseidonBuiltin*,
+    mmr_array: felt*,
+    mmr_array_len: felt,
+    pow2_array: felt*,
+    previous_peaks_dict: DictAccess*,
+    mmr_offset: felt,
+}() -> felt {
+    alloc_locals;
+    let (peaks_positions: felt*, peaks_len: felt) = compute_peaks_positions(
+        mmr_array_len + mmr_offset
+    );
+    let peaks: felt* = get_peaks_from_positions{peaks_positions=peaks_positions}(peaks_len);
+    let bagged_peaks = bag_peaks(peaks, peaks_len);
+    let (root) = poseidon_hash(mmr_array_len + mmr_offset, bagged_peaks);
+    return root;
+}
 
-// func bag_peaks{range_check_ptr, poseidon_ptr: PoseidonBuiltin*}(peaks_len: felt, peaks: felt*) -> (
-//     res: felt
-// ) {
-//     assert_le(1, peaks_len);
+func get_peaks_from_positions{
+    range_check_ptr,
+    mmr_array: felt*,
+    mmr_offset: felt,
+    previous_peaks_dict: DictAccess*,
+    peaks_positions: felt*,
+}(peaks_len: felt) -> felt* {
+    alloc_locals;
+    let (peaks: felt*) = alloc();
+    get_peaks_from_positions_inner(peaks, peaks_len - 1);
+    return peaks;
+}
 
-// if (peaks_len == 1) {
-//         return (res=peaks[0]);
-//     }
+func get_peaks_from_positions_inner{
+    range_check_ptr,
+    mmr_array: felt*,
+    mmr_offset: felt,
+    previous_peaks_dict: DictAccess*,
+    peaks_positions: felt*,
+}(peaks: felt*, index: felt) {
+    alloc_locals;
+    if (index == 0) {
+        let value = get_full_mmr_peak_value(peaks_positions[0]);
+        assert peaks[0] = value;
+        return ();
+    } else {
+        let value = get_full_mmr_peak_value(peaks_positions[index]);
+        assert peaks[index] = value;
+        return get_peaks_from_positions_inner(peaks, index - 1);
+    }
+}
 
-// let last_peak = peaks[0];
-//     let (rec) = bag_peaks(peaks_len - 1, peaks + 1);
+func bag_peaks{range_check_ptr, poseidon_ptr: PoseidonBuiltin*}(
+    peaks: felt*, peaks_len: felt
+) -> felt {
+    assert_le(1, peaks_len);
 
-// let (res) = poseidon_hash(last_peak, rec);
+    if (peaks_len == 1) {
+        return [peaks];
+    }
 
-// return (res=res);
-// }
+    let last_peak = [peaks];
+    let rec = bag_peaks(peaks + 1, peaks_len - 1);
+
+    let (res) = poseidon_hash(last_peak, rec);
+
+    return res;
+}
