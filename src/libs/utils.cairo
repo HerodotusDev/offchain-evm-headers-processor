@@ -13,10 +13,11 @@ from starkware.cairo.common.math import unsigned_div_rem as felt_divmod, split_f
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.alloc import alloc
 
+const div = 2 ** 32;
+const div_minus_1 = div - 1;
+
 // y MUST be a power of 2
-func bitwise_divmod{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x: felt, y: felt) -> (
-    q: felt, r: felt
-) {
+func bitwise_divmod{bitwise_ptr: BitwiseBuiltin*}(x: felt, y: felt) -> (q: felt, r: felt) {
     assert bitwise_ptr.x = x;
     assert bitwise_ptr.y = y - 1;
     let x_and_y = bitwise_ptr.x_and_y;
@@ -24,6 +25,24 @@ func bitwise_divmod{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x: felt, y: f
     let bitwise_ptr = bitwise_ptr + BitwiseBuiltin.SIZE;
     return (q=(x - x_and_y) / y, r=x_and_y);
 }
+
+func felt_divmod_2pow32{range_check_ptr}(value: felt) -> (q: felt, r: felt) {
+    let r = [range_check_ptr];
+    let q = [range_check_ptr + 1];
+    %{
+        from starkware.cairo.common.math_utils import assert_integer
+        assert_integer(ids.div)
+        assert 0 < ids.div <= PRIME // range_check_builtin.bound, \
+            f'div={hex(ids.div)} is out of the valid range.'
+        ids.q, ids.r = divmod(ids.value, ids.div)
+    %}
+    assert [range_check_ptr + 2] = div_minus_1 - r;
+    let range_check_ptr = range_check_ptr + 3;
+
+    assert value = q * div + r;
+    return (q, r);
+}
+
 func felt_divmod_no_input_check{range_check_ptr}(value, div) -> (q: felt, r: felt) {
     // let r = [range_check_ptr];
     // let q = [range_check_ptr + 1];

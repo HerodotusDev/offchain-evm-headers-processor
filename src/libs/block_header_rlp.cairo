@@ -3,7 +3,7 @@ from starkware.cairo.common.uint256 import Uint256, uint256_reverse_endian
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 
-from src.libs.utils import pow2, bitwise_divmod
+from src.libs.utils import pow2, bitwise_divmod, felt_divmod_2pow32
 
 func fetch_block_headers_rlp(from_block_number_high: felt, to_block_number_low: felt) -> (
     rlp_array: felt**, rlp_array_bytes_len: felt*
@@ -46,9 +46,39 @@ func read_block_headers_rlp() -> (rlp_array: felt**, rlp_array_bytes_len: felt*)
 // Assumes all words in rlp are 8 bytes little endian values.
 // Returns the keccak hash in little endian representation, to be asserter directly
 // against the hash of cairo keccak.
-func extract_parent_hash_little{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(rlp: felt*) -> (
-    res: Uint256
-) {
+func extract_parent_hash_little{range_check_ptr}(rlp: felt*) -> (res: Uint256) {
+    alloc_locals;
+    let rlp_0 = rlp[0];
+    let (rlp_0, thrash) = felt_divmod_2pow32(rlp_0);
+    let rlp_1 = rlp[1];
+    let rlp_2 = rlp[2];
+    let (rlp_2_left, rlp_2_right) = felt_divmod_2pow32(rlp_2);
+    let rlp_3 = rlp[3];
+    let rlp_4 = rlp[4];
+    let (thrash, rlp_4) = felt_divmod_2pow32(rlp_4);
+
+    let res_low = rlp_2_right * 2 ** 96 + rlp_1 * 2 ** 32 + rlp_0;
+    let res_high = rlp_4 * 2 ** 96 + rlp_3 * 2 ** 32 + rlp_2_left;
+
+    // %{ print_felt_info(ids.rlp_0, 'rlp_0',4) %}
+    // %{ print_felt_info(ids.rlp_1, 'rlp_1',8) %}
+    // %{ print_felt_info(ids.rlp_2, 'rlp_2',8) %}
+    // %{ print_felt_info(ids.rlp_2_left, 'rlp_2_left', 4) %}
+    // %{ print_felt_info(ids.rlp_2_right, 'rlp_2_right',4) %}
+    // %{ print_felt_info(ids.rlp_3, 'rlp_3',8) %}
+    // %{ print_felt_info(ids.rlp_4, 'rlp_4',4) %}
+    // %{ print_felt_info(ids.res_low, 'res_low', 16) %}
+    // %{ print_felt_info(ids.res_high, 'res_high', 16) %}
+
+    return (res=Uint256(low=res_low, high=res_high));
+}
+
+// Assumes all words in rlp are 8 bytes little endian values.
+// Returns the keccak hash in little endian representation, to be asserter directly
+// against the hash of cairo keccak.
+func extract_parent_hash_little_bitwise{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
+    rlp: felt*
+) -> (res: Uint256) {
     alloc_locals;
     let rlp_0 = rlp[0];
     let (rlp_0, thrash) = bitwise_divmod(rlp_0, 2 ** 32);

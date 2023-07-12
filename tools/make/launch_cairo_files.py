@@ -151,11 +151,12 @@ pie_arg = f" --cairo_pie_output ./build/profiling/{FILENAME}/{FILENAME}_pie.zip"
 if input_exists:
     print(f"Running {FILENAME_DOT_CAIRO} with input {JSON_INPUT_PATH} ... ")
 
-    cmd=f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --program_input={JSON_INPUT_PATH} --layout=starknet_with_keccak --print_output"
+    cmd=f"cairo-run --program=build/compiled_cairo_files/{FILENAME}.json --program_input={JSON_INPUT_PATH} --layout=starknet_with_keccak"
     if args.profile:
         cmd+=profile_arg
     else:
         cmd+=" --print_info"
+        cmd+=pie_arg
     if args.pie:
         cmd+=pie_arg
 
