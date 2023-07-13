@@ -78,7 +78,7 @@ func construct_mmr{
     alloc_locals;
     // %{ print_mmr(ids.mmr_array,ids.mmr_array_len) %}
     // // 2. Compute node
-    let node: felt = poseidon_hash(x=mmr_array_len, y=hash_array[index]);
+    let node: felt = poseidon_hash(x=mmr_array_len + mmr_offset, y=hash_array[index]);
     // // 3. Append node to mmr_array
     assert mmr_array[mmr_array_len] = node;
     let mmr_array_len = mmr_array_len + 1;
@@ -131,6 +131,7 @@ func merge_subtrees_if_applicable{
         let x = get_full_mmr_peak_value(left_pos);
         let y = get_full_mmr_peak_value(right_pos);
         let (hash) = poseidon_hash(x, y);
+        let (hash) = poseidon_hash(x=full_mmr_size, y=hash);
         assert mmr_array[mmr_array_len] = hash;
 
         let mmr_array_len = mmr_array_len + 1;
