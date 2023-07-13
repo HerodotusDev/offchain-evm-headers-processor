@@ -53,7 +53,7 @@ func main{output_ptr: felt*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}() {
         from tools.py.mmr import get_peaks
 
         n=random.randint(1, 20000000)
-        #n=19
+        n=3
         ids.n=n;
         peak_pos = [x+1 for x in get_peaks(n)]
         print("peak_pos", peak_pos)
@@ -64,8 +64,11 @@ func main{output_ptr: felt*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}() {
     let pow2_array: felt* = pow2alloc127();
     with pow2_array {
         let first_peak_pos = compute_first_peak_pos(n);
+        %{ print(f"first peak pos cairo : {ids.first_peak_pos}") %}
         let (peaks: felt*, peaks_len: felt) = compute_peaks_positions(n);
     }
+    %{ print(f"peaks_len cairo : {ids.peaks_len}") %}
+
     assert first_peak_pos = true_first_pos;
     assert_array_rec(true_pos, peaks, peaks_len - 1);
     return ();

@@ -62,8 +62,13 @@ func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -
     assert [range_check_ptr + 1] = mmr_len - n;
     tempvar range_check_ptr = range_check_ptr + 2;
 
-    let peak_pos = pow2_array[bit_length - 1] - 1;
-    return peak_pos;
+    let all_ones = pow2_array[bit_length] - 1;
+    if (mmr_len == all_ones) {
+        return mmr_len;
+    } else {
+        let peak_pos = pow2_array[bit_length - 1] - 1;
+        return peak_pos;
+    }
 }
 
 // returns peaks position from left to right
