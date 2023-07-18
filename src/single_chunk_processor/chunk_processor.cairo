@@ -76,13 +76,13 @@ func construct_mmr{
     pow2_array: felt*,
 }(index: felt) {
     alloc_locals;
-    // %{ print_mmr(ids.mmr_array,ids.mmr_array_len) %}
+    %{ print_mmr(ids.mmr_array,ids.mmr_array_len) %}
     // // 2. Compute node
-    let node: felt = poseidon_hash(x=mmr_array_len + mmr_offset, y=hash_array[index]);
+    %{ print(f"Hash index for node : {ids.mmr_array_len+ids.mmr_offset+1}") %}
+    let node: felt = poseidon_hash(x=mmr_array_len + mmr_offset + 1, y=hash_array[index]);
     // // 3. Append node to mmr_array
     assert mmr_array[mmr_array_len] = node;
     let mmr_array_len = mmr_array_len + 1;
-
     merge_subtrees_if_applicable(height=0);
     if (index == 0) {
         return ();
@@ -112,8 +112,8 @@ func merge_subtrees_if_applicable{
     alloc_locals;
 
     local next_pos_is_parent: felt;
-    tempvar full_mmr_size = mmr_array_len + mmr_offset;
-    let height_next_pos = compute_height{pow2_array=pow2_array}(full_mmr_size);
+    tempvar next_pos: felt = mmr_array_len + mmr_offset + 1;
+    let height_next_pos = compute_height{pow2_array=pow2_array}(next_pos);
 
     %{ ids.next_pos_is_parent = 1 if ids.height_next_pos > ids.height else 0 %}
     if (next_pos_is_parent != 0) {
@@ -123,15 +123,15 @@ func merge_subtrees_if_applicable{
         assert [range_check_ptr] = height_next_pos - height - 1;
         tempvar range_check_ptr = range_check_ptr + 1;
 
-        local left_pos = full_mmr_size - pow2_array[height + 1];
+        local left_pos = next_pos - pow2_array[height + 1];
         local right_pos = left_pos + pow2_array[height + 1] - 1;
 
-        %{ print(f"Merging {ids.left_pos} + {ids.right_pos} at index {ids.full_mmr_size} and height {ids.height_next_pos} ") %}
+        %{ print(f"Merging {ids.left_pos} + {ids.right_pos} at index {ids.next_pos} and height {ids.height_next_pos} ") %}
 
         let x = get_full_mmr_peak_value(left_pos);
         let y = get_full_mmr_peak_value(right_pos);
         let (hash) = poseidon_hash(x, y);
-        let (hash) = poseidon_hash(x=full_mmr_size, y=hash);
+        let (hash) = poseidon_hash(x=next_pos, y=hash);
         assert mmr_array[mmr_array_len] = hash;
 
         let mmr_array_len = mmr_array_len + 1;
@@ -155,11 +155,14 @@ func main{
     local to_block_number_low: felt;
     local mmr_offset: felt;
     local mmr_last_root: felt;
+    local block_n_plus_one_parent_hash_little: Uint256;
     %{
         ids.from_block_number_high=program_input['from_block_number_high']
         ids.to_block_number_low=program_input['to_block_number_low']
         ids.mmr_offset=program_input['mmr_last_len'] 
         ids.mmr_last_root=program_input['mmr_last_root']
+        ids.block_n_plus_one_parent_hash_little.low = program_input['block_n_plus_one_parent_hash_little_low']
+        ids.block_n_plus_one_parent_hash_little.high = program_input['block_n_plus_one_parent_hash_little_high']
     %}
     %{
         def print_u256(u, un):
@@ -183,7 +186,7 @@ func main{
             print(f"bit_lil : {[x.bit_length() for x in rlp_array_little]}")
         def print_mmr(mmr_array, mmr_array_len):
             print(f"\nMMR :: mmr_array_len={mmr_array_len}")
-            mmr_values = [memory[mmr_array + i] for i in range(mmr_array_len)]
+            mmr_values = [hex(memory[mmr_array + i]) for i in range(mmr_array_len)]
             print(f"mmr_values = {mmr_values}")
     %}
 
@@ -218,33 +221,33 @@ func main{
     // Initialize MMR:
     let (hash_array: felt*) = alloc();  // Poseidon(rlp_arrays)
     let (mmr_array: felt*) = alloc();
-    // We initialize the first index to 0, to start at index 1. (first (index 0) will bot be used)
-    // assert mmr_array[0] = 0;
     let mmr_array_len = 0;
     %{
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n)
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n-1)
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 0)
     %}
-    // Get the parent hash of the last block (to be retuned as output):
-    let (block_n_parent_hash_little: Uint256) = extract_parent_hash_little(rlp_arrays[n]);
-    %{ print_u256(ids.block_n_parent_hash_little,f'parent_hash_{ids.n}') %}
 
     // -----------------------------------------------------
     // -----------------------------------------------------
     // MAIN LOOPS : (1) Validate RLPs and prepare hash array, (2) Build MMR array with hash array
 
-    // (1) Validate chain of RLP values for blocks [n-1, n-2, n-1, ..., n-r]:
+    // (1) Validate chain of RLP values for blocks [n, n-1, n-2, n-1, ..., n-r]:
     with hash_array, rlp_arrays, bytes_len_array {
-        verify_block_headers_and_hash_them(index=n - 1, parent_hash=block_n_parent_hash_little);
+        verify_block_headers_and_hash_them(
+            index=n, parent_hash=block_n_plus_one_parent_hash_little
+        );
     }
     %{ print(f"RLP successfully validated!") %}
     // (2) Build MMR by adding all poseidon hashes of RLPs:
     %{ print(f"Building MMR...") %}
     with hash_array, mmr_array, mmr_array_len, pow2_array, mmr_offset, previous_peaks_dict {
-        construct_mmr(index=n - 1);
+        construct_mmr(index=n);
     }
-    %{ print_mmr(ids.mmr_array,ids.mmr_array_len) %}
+    %{
+        print('final') 
+        print_mmr(ids.mmr_array,ids.mmr_array_len)
+    %}
 
     // -----------------------------------------------------
 
@@ -253,11 +256,12 @@ func main{
     with mmr_array, mmr_array_len, pow2_array, previous_peaks_dict, mmr_offset {
         let new_mmr_root: felt = get_root();
     }
-
+    %{ print("new root", hex(ids.new_mmr_root)) %}
+    %{ print("new size", ids.mmr_array_len + ids.mmr_offset) %}
     default_dict_finalize(dict_start, previous_peaks_dict, 0);
 
     // Returns private input as public output, as well as output of interest.
-    // NOTE : block_n_parent_hash is critical to be returned and checked against a correct checkpoint on Starknet.
+    // NOTE : block_n_plus_one_parent_hash is critical to be returned and checked against a correct checkpoint on Starknet.
     // Otherwise, the prover could cheat and feed RLP values that are sound together, but not necessearily
     // the exact requested ones from the Ethereum blockchain.
 
@@ -267,10 +271,10 @@ func main{
     [ap] = mmr_last_root;
     [ap] = [output_ptr + 1], ap++;
 
-    [ap] = block_n_parent_hash_little.low;
+    [ap] = block_n_plus_one_parent_hash_little.low;
     [ap] = [output_ptr + 2], ap++;
 
-    [ap] = block_n_parent_hash_little.high;
+    [ap] = block_n_plus_one_parent_hash_little.high;
     [ap] = [output_ptr + 3], ap++;
 
     [ap] = new_mmr_root;
