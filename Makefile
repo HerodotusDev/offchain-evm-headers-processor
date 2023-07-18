@@ -22,7 +22,7 @@ run:
 
 prepare-processor-input:
 	@echo "Prepare chunk_processor_input.json data with the parameters in tools/make/processor_input.json"
-	./tools/make/prepare_processor_input.py
+	./tools/make/prepare_inputs_api.py
 
 clean:
 	rm -rf build/compiled_cairo_files

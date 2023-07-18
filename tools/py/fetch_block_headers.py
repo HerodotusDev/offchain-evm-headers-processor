@@ -258,7 +258,6 @@ def fetch_blocks_from_rpc_no_async(range_from: int, range_till: int, rpc_url: st
         results = rpc_request(rpc_url, requests)
 
         for result in results:
-            print(result)
             raw_rlp = build_block_header(result['result'])
             all_results.append(raw_rlp)
 
