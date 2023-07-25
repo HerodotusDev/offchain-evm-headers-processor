@@ -17,34 +17,6 @@ from src.libs.utils import pow2alloc127
 
 func main{output_ptr: felt*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}() {
     alloc_locals;
-    %{
-        from typing import List, Tuple, Optional
-        def bin_c(u):
-            b=bin(u)
-            f = b[0:10] + ' ' + b[10:19] + '...' + b[-16:-8] + ' ' + b[-8:]
-            return f
-        def bin_64(u):
-            b=bin(u)
-            little = '0b'+b[2:][::-1]
-            f='0b'+' '.join([b[2:][i:i+64] for i in range(0, len(b[2:]), 64)])
-            return f
-        def bin_8(u):
-            b=bin(u)
-            little = '0b'+b[2:][::-1]
-            f="0b"+' '.join([little[2:][i:i+8] for i in range(0, len(little[2:]), 8)])
-            return f
-
-        def print_u_256_info(u, un):
-            u = u.low + (u.high << 128) 
-            print(f" {un}_{u.bit_length()}bits = {bin_c(u)}")
-            print(f" {un} = {hex(u)}")
-            print(f" {un} = {int.to_bytes(u, 32, 'big')}")
-
-        def print_felt_info(u, un):
-            print(f" {un}_{u.bit_length()}bits = {bin_8(u)}")
-            print(f" {un} = {u}")
-    %}
-
     local n;
     let (true_pos: felt*) = alloc();
     local true_first_pos: felt;
