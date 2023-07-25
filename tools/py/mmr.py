@@ -40,7 +40,7 @@ def sibling_offset(height) -> int:
 
 def get_peaks(mmr_size) -> List[int]:
     """
-    return peaks positions from left to right
+    return peaks positions from left to right, 0-index based. 
     """
     def get_right_peak(height, pos, mmr_size):
         """
@@ -186,57 +186,3 @@ class MMR(object):
                    ) -> List[bytes]:
         return [self.pos_hash[p] for p in peaks if p < peak_pos]
 
-
-# class MerkleProof(object):
-#     """
-#     MerkleProof, used for verify a proof
-#     """
-#     def __init__(self, mmr_size: int,
-#                  proof: List[bytes],
-#                  hasher):
-#         self.mmr_size = mmr_size
-#         self.proof = proof
-#         self._hasher = hasher
-
-#     def verify(self, root: bytes, pos: int, elem: bytes) -> bool:
-#         """
-#         verify proof
-#         root - MMR root that generate this proof
-#         pos - elem insertion pos
-#         elem - elem
-#         """
-#         peaks = get_peaks(self.mmr_size)
-#         hasher = self._hasher()
-#         hasher.update(elem)
-#         elem_hash = hasher.digest()
-#         height = 0
-#         for proof in self.proof:
-#             hasher = self._hasher()
-#             # verify bagging peaks
-#             if pos in peaks:
-#                 if pos == peaks[-1]:
-#                     hasher.update(elem_hash)
-#                     hasher.update(proof)
-#                 else:
-#                     hasher.update(proof)
-#                     hasher.update(elem_hash)
-#                     pos = peaks[-1]
-#                 elem_hash = hasher.digest()
-#                 continue
-
-#             # verify merkle path
-#             pos_height = tree_pos_height(pos)
-#             next_height = tree_pos_height(pos + 1)
-#             if next_height > pos_height:
-#                 # we are in right child
-#                 hasher.update(proof)
-#                 hasher.update(elem_hash)
-#                 pos += 1
-#             else:
-#                 # we are in left child
-#                 hasher.update(elem_hash)
-#                 hasher.update(proof)
-#                 pos += 2 << height
-#             elem_hash = hasher.digest()
-#             height += 1
-#         return elem_hash == root
