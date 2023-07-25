@@ -23,10 +23,10 @@ contract SharpVerifier is Initializable {
 
     // Aggregator state
     struct AggregatorState {
-        bytes32 current_mmr_root;
-        uint256 current_mmr_size;
-        bytes32 most_recent_block_hash;
-        bytes32 oldest_block_hash;
+        bytes32 currentMmrRoot;
+        uint256 currentMmrSize;
+        bytes32 mostRecentBlockHash;
+        bytes32 oldestBlockHash;
     }
 
     // Cairo program's output
@@ -56,10 +56,10 @@ contract SharpVerifier is Initializable {
         bytes32 recentBlock = blockhash(block.number - blocksConfirmations);
 
         // TODO: add proper initialization values:
-        aggregatorState.current_mmr_root = 0x0000000;
-        aggregatorState.current_mmr_size = 1;
-        aggregatorState.most_recent_block_hash = recentBlock;
-        aggregatorState.oldest_block_hash = recentBlock;
+        aggregatorState.currentMmrRoot = 0x0000000;
+        aggregatorState.currentMmrSize = 1;
+        aggregatorState.mostRecentBlockHash = recentBlock;
+        aggregatorState.oldestBlockHash = recentBlock;
     }
 
     // Helper function to verify a fact based on a job output
@@ -117,10 +117,10 @@ contract SharpVerifier is Initializable {
 
         // We save the latest output in the contract state for future calls
         JobOutput memory lastOutput = outputs[len - 1];
-        aggregatorState.current_mmr_root = lastOutput.newMmrRoot;
-        aggregatorState.current_mmr_size = lastOutput.newMmrSize;
-        aggregatorState.most_recent_block_hash = lastOutput
+        aggregatorState.currentMmrRoot = lastOutput.newMmrRoot;
+        aggregatorState.currentMmrSize = lastOutput.newMmrSize;
+        aggregatorState.mostRecentBlockHash = lastOutput
             .childBlockParentHashHigh;
-        aggregatorState.oldest_block_hash = outputs[0].childBlockParentHashLow;
+        aggregatorState.oldestBlockHash = outputs[0].childBlockParentHashLow;
     }
 }
