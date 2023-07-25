@@ -72,9 +72,24 @@ contract SharpVerifier is Initializable {
     }
 
     function aggregateSharpJobs(JobOutput[] calldata outputs) external {
+        // Ensure the first job is correctly linked with the current state
+        JobOutput calldata firstOutput = outputs[0];
+        if (firstOutput.mmrPreviousRoot != aggregatorState.currentMmrRoot)
+            revert AggregationRootMismatch();
+        if (firstOutput.mmrPreviousSize != aggregatorState.currentMmrSize)
+            revert AggregationSizeMismatch();
+        if (
+            firstOutput.childBlockParentHashLow !=
+            aggregatorState.oldestBlockHash
+        ) revert AggregationErrorParentHashLowMismatch();
+        if (
+            firstOutput.childBlockParentHashHigh !=
+            aggregatorState.mostRecentBlockHash
+        ) revert AggregationErrorParentHashHighMismatch();
+
         // Iterate over the jobs outputs and ensure that jobs are correctly linked with the next ones
         uint256 len = outputs.length;
-        for (uint256 i = 0; i < len - 1; ++i) {
+        for (uint256 i = 1; i < len - 1; ++i) {
             JobOutput calldata curOutput = outputs[i];
             JobOutput calldata nextOutput = outputs[i + 1];
 
