@@ -8,6 +8,7 @@ import json
 from tinydb import TinyDB, Query
 import subprocess
 import argparse
+import inquirer
 
 # Create an ArgumentParser object
 parser = argparse.ArgumentParser(description="A simple script to demonstrate argparse")
@@ -70,7 +71,8 @@ readline.set_completer(complete)
 
 
 def find_file_recurse():
-    not_found=True# Find the full local path for the selected Cairo file
+    not_found=True
+    global JSON_INPUT_PATH
     while not_found:
         global FILENAME_DOT_CAIRO_PATH
         global FILENAME_DOT_CAIRO
@@ -82,6 +84,25 @@ def find_file_recurse():
                 break
         if not_found:
             print(f"### File '{FILENAME_DOT_CAIRO}' not found in the Cairo programs folders.")
+        else:
+            FILENAME = FILENAME_DOT_CAIRO.removesuffix('.cairo')
+            JSON_INPUT_PATH = FILENAME_DOT_CAIRO_PATH.replace('.cairo', '_input.json')
+
+        if FILENAME_DOT_CAIRO == "chunk_processor.cairo":
+            json_files = [f for f in listdir("src/single_chunk_processor/data") if f.endswith('.json')]
+            if not json_files:
+                print("### No JSON files found in the directory 'src/single_chunk_processor/data'.")
+                return
+            print("\n>>> Select the input JSON file:")
+            questions = [
+                inquirer.List('file',
+                              message="Choose a file",
+                              choices=json_files,
+                              ),
+            ]
+            answers = inquirer.prompt(questions)
+            JSON_INPUT_PATH = join("src/single_chunk_processor/data", answers['file'])
+            print(f"Selected JSON file: {JSON_INPUT_PATH}")
 
 
 find_file_recurse()
@@ -90,7 +111,7 @@ print(f"Selected Cairo file: {FILENAME_DOT_CAIRO_PATH}")
 
 FILENAME = FILENAME_DOT_CAIRO.removesuffix('.cairo')
 
-JSON_INPUT_PATH = FILENAME_DOT_CAIRO_PATH.replace('.cairo', '_input.json')
+# JSON_INPUT_PATH = FILENAME_DOT_CAIRO_PATH.replace('.cairo', '_input.json')
 
 input_exists = os.path.exists(JSON_INPUT_PATH)
 if input_exists:

@@ -9,7 +9,7 @@ from starkware.cairo.common.builtin_keccak.keccak import keccak
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash, poseidon_hash_many
 from starkware.cairo.common.default_dict import default_dict_new, default_dict_finalize
 from starkware.cairo.common.dict_access import DictAccess
-from starkware.cairo.common.dict import dict_write, dict_read
+from starkware.cairo.common.dict import dict_write
 
 from src.libs.block_header_rlp import (
     fetch_block_headers_rlp,
@@ -76,7 +76,6 @@ func construct_mmr{
     pow2_array: felt*,
 }(index: felt) {
     alloc_locals;
-    %{ print_mmr(ids.mmr_array,ids.mmr_array_len) %}
     // // 2. Compute node
     %{ print(f"Hash index for node : {ids.mmr_array_len+ids.mmr_offset+1}") %}
     let node: felt = poseidon_hash(x=mmr_array_len + mmr_offset + 1, y=hash_array[index]);
@@ -260,15 +259,22 @@ func main{
     %{ print("new size", ids.mmr_array_len + ids.mmr_offset) %}
     default_dict_finalize(dict_start, previous_peaks_dict, 0);
 
-    // Returns private input as public output, as well as output of interest.
+    // Returns "private" input as public output, as well as output of interest.
     // NOTE : block_n_plus_one_parent_hash is critical to be returned and checked against a correct checkpoint on Starknet.
     // Otherwise, the prover could cheat and feed RLP values that are sound together, but not necessearily
     // the exact requested ones from the Ethereum blockchain.
 
-    [ap] = mmr_offset;
-    [ap] = [output_ptr], ap++;
+    // Output:
+    // 0. MMR last root
+    // 1. MMR last size (<=> mmr_offset)
+    // 2+3. Block n+1 parent hash (little endian)
+    // 4. New MMR root
+    // 5. New MMR size
 
     [ap] = mmr_last_root;
+    [ap] = [output_ptr], ap++;
+
+    [ap] = mmr_offset;
     [ap] = [output_ptr + 1], ap++;
 
     [ap] = block_n_plus_one_parent_hash_little.low;
@@ -289,6 +295,8 @@ func main{
     return ();
 }
 
+// Stores the values of the previous peaks in a dictionary.
+// The key is the peak position, and the value is the peak value.
 func initialize_peaks_dict{dict_end: DictAccess*}(
     index: felt, peaks_positions: felt*, peaks_values: felt*
 ) {

@@ -17,6 +17,7 @@ make run-profile
 
 
 ## Processor simulated usage : 
- 1)  Modify `tools/make/processor_input.json` with the relevant block numbers if needed. Make sure `previous_block_high > previous_block_low > from_block_number_high > to_block_number_low` and `previous_block_low - 1 = from_block_number_high`.
- 2) Run `make prepare-processor-input` to generate the `src/single_chunk_processor/chunk_processor_input.json` file.
- 3) Run `make run` and choose `chunk_processor.cairo`
+ 1) Modify last line of `tools/make/prepare_inputs_api.py` 's to choose the start block number and batch size.  
+ 2) Run `make prepare-processor-input` to generate all the cairo .json inputs under `src/single_chunk_processor/data`.
+ 3) Run `make run` and choose `chunk_processor.cairo`. 
+ 4) Select which input to run. 

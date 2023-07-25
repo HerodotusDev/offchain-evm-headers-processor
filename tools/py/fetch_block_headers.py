@@ -237,7 +237,7 @@ def rpc_request(url, rpc_request):
     response = requests.post(url=url, data=json.dumps(rpc_request))
     return response.json()
 
-def fetch_blocks_from_rpc_no_async(range_from: int, range_till: int, rpc_url: str, delay=0.1): # delay is in seconds
+def fetch_blocks_from_rpc_no_async(range_from: int, range_till: int, rpc_url: str, delay=0.5): # delay is in seconds
     assert range_from > range_till, "Invalid range"
     number_of_blocks = range_from - range_till
     rpc_batches_amount = math.ceil(number_of_blocks / RPC_BATCH_MAX_SIZE)
