@@ -5,3 +5,17 @@ __pycache__
 /build/compiled_cairo_files/*.json
 *.pickle
 /src/single_chunk_processor/data/*.json
+
+cache/
+out/
+.gas-snapshot
+.vscode/
+.env
+.encryptedKey
+broadcast/
+
+node_modules
+package-lock.json
+
+.DS_Store
+src/.DS_Store
