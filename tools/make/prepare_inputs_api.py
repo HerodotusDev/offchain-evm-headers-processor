@@ -89,13 +89,26 @@ def prepare_full_chain_inputs(from_block_number_high, batch_size=50):
     from_block_number_high = from_block_number_high
     to_block_number_low = from_block_number_high - batch_size + 1
 
-    last_peaks = []
-    last_mmr_size = 0
+    last_peaks = [511165008604479100545509010942618724] # 'brave new world' in Cairo
+    last_mmr_size = 1
+    last_mmr_root = poseidon_hash(last_mmr_size, last_peaks[0])
 
-    # Initialisation : Start from MMR with one value : next block
+    print(f"Preparing input for blocks from {from_block_number_high} to {to_block_number_low}")
+    
+    chunk_input = prepare_chunk_input(last_peaks, last_mmr_size, last_mmr_root, from_block_number_high, to_block_number_low)
+    with open(f"{PATH}blocks_{from_block_number_high}_{to_block_number_low}_input.json", 'w') as f:
+        json.dump(chunk_input, f, indent=4)
 
-    previous_block_high = from_block_number_high + 1 
-    previous_block_low = from_block_number_high + 1
+    previous_block_high = from_block_number_high
+    previous_block_low = to_block_number_low
+    from_block_number_high = to_block_number_low - 1
+
+
+    to_block_number_low = from_block_number_high - batch_size + 1 if from_block_number_high - batch_size + 1 >= 0 else 0
+
+    if to_block_number_low==0:
+        return
+
 
     while to_block_number_low >= 0:
         print(f"Preparing input for blocks from {from_block_number_high} to {to_block_number_low}")
@@ -106,7 +119,7 @@ def prepare_full_chain_inputs(from_block_number_high, batch_size=50):
         
         time.sleep(0.5)
         chunk_input = prepare_chunk_input(last_peaks, last_mmr_size, last_mmr_root, from_block_number_high, to_block_number_low)
-        with open(f"{PATH}blocks_{from_block_number_high}_{to_block_number_low}.json", 'w') as f:
+        with open(f"{PATH}blocks_{from_block_number_high}_{to_block_number_low}_input.json", 'w') as f:
             json.dump(chunk_input, f, indent=4)
         
         if to_block_number_low==0:
@@ -122,6 +135,6 @@ def prepare_full_chain_inputs(from_block_number_high, batch_size=50):
 
         
 
-prepare_full_chain_inputs(4222,500)
+prepare_full_chain_inputs(100,20)
 
 
