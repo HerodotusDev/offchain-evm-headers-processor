@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, KeccakBuiltin, PoseidonBuiltin
 
-from starkware.cairo.common.uint256 import Uint256
+from starkware.cairo.common.uint256 import Uint256, uint256_reverse_endian
 from starkware.cairo.common.math import unsigned_div_rem as felt_divmod
 from starkware.cairo.common.builtin_keccak.keccak import keccak
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash, poseidon_hash_many
@@ -34,7 +34,7 @@ func verify_block_headers_and_hash_them{
     hash_array: felt*,
     rlp_arrays: felt**,
     bytes_len_array: felt*,
-}(index: felt, parent_hash: Uint256) {
+}(index: felt, parent_hash: Uint256) -> Uint256 {
     alloc_locals;
     // Keccak Hash RLP of block i and verify it matches the parent hash of block i+1
     let (rlp_keccak_hash: Uint256) = keccak(
@@ -59,7 +59,7 @@ func verify_block_headers_and_hash_them{
     let (block_i_parent_hash: Uint256) = extract_parent_hash_little(rlp_arrays[index]);
 
     if (index == 0) {
-        return ();
+        return block_i_parent_hash;
     } else {
         return verify_block_headers_and_hash_them(index=index - 1, parent_hash=block_i_parent_hash);
     }
@@ -77,7 +77,7 @@ func construct_mmr{
 }(index: felt) {
     alloc_locals;
     // // 2. Compute node
-    %{ print(f"Hash index for node : {ids.mmr_array_len+ids.mmr_offset+1}") %}
+    // %{ print(f"Hash index for node : {ids.mmr_array_len+ids.mmr_offset+1}") %}
     let node: felt = poseidon_hash(x=mmr_array_len + mmr_offset + 1, y=hash_array[index]);
     // // 3. Append node to mmr_array
     assert mmr_array[mmr_array_len] = node;
@@ -89,7 +89,7 @@ func construct_mmr{
         return construct_mmr(index=index - 1);
     }
 }
-// 3              14
+// 3              15
 //              /    \
 //             /      \
 //            /        \
@@ -233,7 +233,7 @@ func main{
 
     // (1) Validate chain of RLP values for blocks [n, n-1, n-2, n-1, ..., n-r]:
     with hash_array, rlp_arrays, bytes_len_array {
-        verify_block_headers_and_hash_them(
+        let block_n_minus_r_parent_hash_little: Uint256 = verify_block_headers_and_hash_them(
             index=n, parent_hash=block_n_plus_one_parent_hash_little
         );
     }
@@ -259,17 +259,20 @@ func main{
     %{ print("new size", ids.mmr_array_len + ids.mmr_offset) %}
     default_dict_finalize(dict_start, previous_peaks_dict, 0);
 
+    let (block_n_plus_one_parent_hash) = uint256_reverse_endian(
+        block_n_plus_one_parent_hash_little
+    );
+    let (block_n_minus_r_parent_hash) = uint256_reverse_endian(block_n_minus_r_parent_hash_little);
+
     // Returns "private" input as public output, as well as output of interest.
-    // NOTE : block_n_plus_one_parent_hash is critical to be returned and checked against a correct checkpoint on Starknet.
-    // Otherwise, the prover could cheat and feed RLP values that are sound together, but not necessearily
-    // the exact requested ones from the Ethereum blockchain.
 
     // Output:
     // 0. MMR last root
     // 1. MMR last size (<=> mmr_offset)
-    // 2+3. Block n+1 parent hash (little endian)
+    // 2+3. Block n+1 parent hash (big endian)
     // 4. New MMR root
     // 5. New MMR size
+    // 6+7. Block n-r parent hash (big endian)
 
     [ap] = mmr_last_root;
     [ap] = [output_ptr], ap++;
@@ -277,10 +280,10 @@ func main{
     [ap] = mmr_offset;
     [ap] = [output_ptr + 1], ap++;
 
-    [ap] = block_n_plus_one_parent_hash_little.low;
+    [ap] = block_n_plus_one_parent_hash.low;
     [ap] = [output_ptr + 2], ap++;
 
-    [ap] = block_n_plus_one_parent_hash_little.high;
+    [ap] = block_n_plus_one_parent_hash.high;
     [ap] = [output_ptr + 3], ap++;
 
     [ap] = new_mmr_root;
@@ -289,8 +292,14 @@ func main{
     [ap] = mmr_array_len + mmr_offset;  // New MMR len
     [ap] = [output_ptr + 5], ap++;
 
-    [ap] = output_ptr + 6, ap++;
-    let output_ptr = output_ptr + 6;
+    [ap] = block_n_minus_r_parent_hash.low;
+    [ap] = [output_ptr + 6], ap++;
+
+    [ap] = block_n_minus_r_parent_hash.high;
+    [ap] = [output_ptr + 7], ap++;
+
+    [ap] = output_ptr + 8, ap++;
+    let output_ptr = output_ptr + 8;
 
     return ();
 }
