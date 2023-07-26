@@ -266,36 +266,36 @@ func main{
 
     // Returns "private" input as public output, as well as output of interest.
 
-    // Output:
-    // 0. MMR last root
-    // 1. MMR last size (<=> mmr_offset)
-    // 2+3. Block n+1 parent hash (big endian)
-    // 4. New MMR root
-    // 5. New MMR size
-    // 6+7. Block n-r parent hash (big endian)
-
-    [ap] = mmr_last_root;
-    [ap] = [output_ptr], ap++;
-
-    [ap] = mmr_offset;
-    [ap] = [output_ptr + 1], ap++;
+    // Output :
+    // 0+1 : block_n_plus_one_parent_hash
+    // 2+3 : block_n_minus_r_parent_hash
+    // 4 : MMR last root
+    // 5 : New MMR root
+    // 6 : MMR last size (<=> mmr_offset)
+    // 7 : New MMR size (<=> mmr_array_len + mmr_offset)
 
     [ap] = block_n_plus_one_parent_hash.low;
-    [ap] = [output_ptr + 2], ap++;
+    [ap] = [output_ptr], ap++;
 
     [ap] = block_n_plus_one_parent_hash.high;
-    [ap] = [output_ptr + 3], ap++;
-
-    [ap] = new_mmr_root;
-    [ap] = [output_ptr + 4], ap++;
-
-    [ap] = mmr_array_len + mmr_offset;  // New MMR len
-    [ap] = [output_ptr + 5], ap++;
+    [ap] = [output_ptr + 1], ap++;
 
     [ap] = block_n_minus_r_parent_hash.low;
-    [ap] = [output_ptr + 6], ap++;
+    [ap] = [output_ptr + 2], ap++;
 
     [ap] = block_n_minus_r_parent_hash.high;
+    [ap] = [output_ptr + 3], ap++;
+
+    [ap] = mmr_last_root;
+    [ap] = [output_ptr + 4], ap++;
+
+    [ap] = new_mmr_root;
+    [ap] = [output_ptr + 5], ap++;
+
+    [ap] = mmr_offset;
+    [ap] = [output_ptr + 6], ap++;
+
+    [ap] = mmr_array_len + mmr_offset;
     [ap] = [output_ptr + 7], ap++;
 
     [ap] = output_ptr + 8, ap++;
