@@ -89,7 +89,7 @@ def find_file_recurse():
             JSON_INPUT_PATH = FILENAME_DOT_CAIRO_PATH.replace('.cairo', '_input.json')
 
         if FILENAME_DOT_CAIRO == "chunk_processor.cairo":
-            json_files = [f for f in listdir("src/single_chunk_processor/data") if f.endswith('.json')]
+            json_files = [f for f in listdir("src/single_chunk_processor/data") if f.endswith('_input.json')]
             if not json_files:
                 print("### No JSON files found in the directory 'src/single_chunk_processor/data'.")
                 return
