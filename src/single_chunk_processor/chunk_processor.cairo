@@ -223,7 +223,7 @@ func main{
     let mmr_array_len = 0;
     %{
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n)
-        print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n-1)
+        # print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n-1)
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, 0)
     %}
 
@@ -233,9 +233,8 @@ func main{
 
     // (1) Validate chain of RLP values for blocks [n, n-1, n-2, n-1, ..., n-r]:
     with hash_array, rlp_arrays, bytes_len_array {
-        let block_n_minus_r_parent_hash_little: Uint256 = verify_block_headers_and_hash_them(
-            index=n, parent_hash=block_n_plus_one_parent_hash_little
-        );
+        let block_n_minus_r_plus_one_parent_hash_little: Uint256 = verify_block_headers_and_hash_them(
+            index=n, parent_hash=block_n_plus_one_parent_hash_little);
     }
     %{ print(f"RLP successfully validated!") %}
     // (2) Build MMR by adding all poseidon hashes of RLPs:
@@ -255,20 +254,22 @@ func main{
     with mmr_array, mmr_array_len, pow2_array, previous_peaks_dict, mmr_offset {
         let new_mmr_root: felt = get_root();
     }
-    %{ print("new root", hex(ids.new_mmr_root)) %}
+    %{ print("new root", ids.new_mmr_root) %}
     %{ print("new size", ids.mmr_array_len + ids.mmr_offset) %}
     default_dict_finalize(dict_start, previous_peaks_dict, 0);
 
     let (block_n_plus_one_parent_hash) = uint256_reverse_endian(
         block_n_plus_one_parent_hash_little
     );
-    let (block_n_minus_r_parent_hash) = uint256_reverse_endian(block_n_minus_r_parent_hash_little);
+    let (block_n_minus_r_plus_one_parent_hash) = uint256_reverse_endian(
+        block_n_minus_r_plus_one_parent_hash_little
+    );
 
     // Returns "private" input as public output, as well as output of interest.
 
     // Output :
     // 0+1 : block_n_plus_one_parent_hash
-    // 2+3 : block_n_minus_r_parent_hash
+    // 2+3 : block_n_minus_r_plus_one_parent_hash
     // 4 : MMR last root
     // 5 : New MMR root
     // 6 : MMR last size (<=> mmr_offset)
@@ -280,10 +281,10 @@ func main{
     [ap] = block_n_plus_one_parent_hash.high;
     [ap] = [output_ptr + 1], ap++;
 
-    [ap] = block_n_minus_r_parent_hash.low;
+    [ap] = block_n_minus_r_plus_one_parent_hash.low;
     [ap] = [output_ptr + 2], ap++;
 
-    [ap] = block_n_minus_r_parent_hash.high;
+    [ap] = block_n_minus_r_plus_one_parent_hash.high;
     [ap] = [output_ptr + 3], ap++;
 
     [ap] = mmr_last_root;
