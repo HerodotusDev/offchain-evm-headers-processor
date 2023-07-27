@@ -16,7 +16,7 @@ from src.libs.block_header_rlp import (
     extract_parent_hash_little,
     read_block_headers_rlp,
 )
-from src.libs.utils import pow2alloc127
+from src.libs.utils import pow2alloc127, reverse_block_header_chunks
 
 from src.libs.mmr import (
     compute_height_pre_alloc_pow2 as compute_height,
@@ -53,7 +53,12 @@ func verify_block_headers_and_hash_them{
     } else {
         assert n_felts = n_felts_temp;
     }
-    let (poseidon_hash) = poseidon_hash_many(n=n_felts, elements=rlp_arrays[index]);
+
+    let reversed_block_header: felt* = reverse_block_header_chunks(
+        n_felts, rlp_arrays[index], index
+    );
+
+    let (poseidon_hash) = poseidon_hash_many(n=n_felts, elements=reversed_block_header);
     assert hash_array[index] = poseidon_hash;
     // Get parent hash of block i
     let (block_i_parent_hash: Uint256) = extract_parent_hash_little(rlp_arrays[index]);

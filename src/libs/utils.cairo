@@ -118,6 +118,116 @@ func word_reverse_endian_64{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: f
     return (res=word / 2 ** (8 + 16 + 32));
 }
 
+func word_reverse_endian_64_RC{range_check_ptr}(word: felt) -> felt {
+    %{
+        word = ids.word
+        assert word < 2**64
+        word_bytes=word.to_bytes(8, byteorder='big')
+        for i in range(8):
+            memory[ap+i] = word_bytes[i]
+    %}
+    ap += 8;
+
+    let b0 = [ap - 8];
+    let b1 = [ap - 7];
+    let b2 = [ap - 6];
+    let b3 = [ap - 5];
+    let b4 = [ap - 4];
+    let b5 = [ap - 3];
+    let b6 = [ap - 2];
+    let b7 = [ap - 1];
+
+    assert [range_check_ptr] = b0;
+    assert [range_check_ptr + 1] = b1;
+    assert [range_check_ptr + 2] = b2;
+    assert [range_check_ptr + 3] = b3;
+    assert [range_check_ptr + 4] = b4;
+    assert [range_check_ptr + 5] = b5;
+    assert [range_check_ptr + 6] = b6;
+    assert [range_check_ptr + 7] = b7;
+
+    assert word = b0 * 256 ** 7 + b1 * 256 ** 6 + b2 * 256 ** 5 + b3 * 256 ** 4 + b4 * 256 ** 3 +
+        b5 * 256 ** 2 + b6 * 256 + b7;
+
+    tempvar range_check_ptr = range_check_ptr + 8;
+    return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4 + b5 * 256 ** 5 + b6 *
+        256 ** 6 + b7 * 256 ** 7;
+}
+
+func reverse_block_header_chunks_RC{range_check_ptr}(n_felts: felt, block_header: felt*) -> felt* {
+    alloc_locals;
+    let (reversed_block_header: felt*) = alloc();
+    reverse_block_header_chunks_RC_inner(
+        index=n_felts - 1, block_header=block_header, reversed_block_header=reversed_block_header
+    );
+    return reversed_block_header;
+}
+
+func reverse_block_header_chunks_RC_inner{range_check_ptr}(
+    index: felt, block_header: felt*, reversed_block_header: felt*
+) {
+    if (index == 0) {
+        let reversed_chunk_i: felt = word_reverse_endian_64_RC(block_header[index]);
+        assert reversed_block_header[index] = reversed_chunk_i;
+        return ();
+    } else {
+        let reversed_chunk_i: felt = word_reverse_endian_64_RC(block_header[index]);
+        assert reversed_block_header[index] = reversed_chunk_i;
+        return reverse_block_header_chunks_RC_inner(
+            index=index - 1, block_header=block_header, reversed_block_header=reversed_block_header
+        );
+    }
+}
+
+func reverse_block_header_chunks_bitwise{bitwise_ptr: BitwiseBuiltin*}(
+    n_felts: felt, block_header: felt*
+) -> felt* {
+    let (reversed_block_header: felt*) = alloc();
+    reverse_block_header_chunks_bitwise_inner(
+        index=n_felts - 1, block_header=block_header, reversed_block_header=reversed_block_header
+    );
+    return reversed_block_header;
+}
+
+func reverse_block_header_chunks_bitwise_inner{bitwise_ptr: BitwiseBuiltin*}(
+    index: felt, block_header: felt*, reversed_block_header: felt*
+) {
+    if (index == 0) {
+        let (reversed_chunk_i: felt) = word_reverse_endian_64(block_header[index]);
+        assert reversed_block_header[index] = reversed_chunk_i;
+        return ();
+    } else {
+        let (reversed_chunk_i: felt) = word_reverse_endian_64(block_header[index]);
+        assert reversed_block_header[index] = reversed_chunk_i;
+        return reverse_block_header_chunks_bitwise_inner(
+            index=index - 1, block_header=block_header, reversed_block_header=reversed_block_header
+        );
+    }
+}
+
+func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
+    n_felts: felt, block_header: felt*, block_index: felt
+) -> felt* {
+    alloc_locals;
+    let (reversed_block_header: felt*) = alloc();
+    let (_, rem) = felt_divmod(block_index, 4);
+    if (rem == 0) {
+        reverse_block_header_chunks_RC_inner(
+            index=n_felts - 1,
+            block_header=block_header,
+            reversed_block_header=reversed_block_header,
+        );
+        return reversed_block_header;
+    } else {
+        reverse_block_header_chunks_bitwise_inner(
+            index=n_felts - 1,
+            block_header=block_header,
+            reversed_block_header=reversed_block_header,
+        );
+        return reversed_block_header;
+    }
+}
+
 func word_reverse_endian_32{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: felt) {
     // A function to reverse the endianness of a 4 bytes (32 bits) integer.
     // The result will not make sense if word > 2^32.
