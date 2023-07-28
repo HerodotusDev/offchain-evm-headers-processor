@@ -10,6 +10,7 @@ from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash, pose
 from starkware.cairo.common.default_dict import default_dict_new, default_dict_finalize
 from starkware.cairo.common.dict_access import DictAccess
 from starkware.cairo.common.dict import dict_write
+from starkware.cairo.common.registers import get_fp_and_pc
 
 from src.libs.block_header_rlp import (
     fetch_block_headers_rlp,
@@ -23,7 +24,7 @@ from src.libs.mmr import (
     compute_peaks_positions,
     bag_peaks,
     get_root,
-    get_full_mmr_peak_value,
+    get_full_mmr_peak_value_poseidon,
 )
 
 func verify_block_headers_and_hash_them{
@@ -31,7 +32,8 @@ func verify_block_headers_and_hash_them{
     bitwise_ptr: BitwiseBuiltin*,
     keccak_ptr: KeccakBuiltin*,
     poseidon_ptr: PoseidonBuiltin*,
-    hash_array: felt*,
+    poseidon_hash_array: felt*,
+    keccak_hash_array: Uint256*,
     rlp_arrays: felt**,
     bytes_len_array: felt*,
 }(index: felt, parent_hash: Uint256) -> Uint256 {
@@ -59,7 +61,8 @@ func verify_block_headers_and_hash_them{
     );
 
     let (poseidon_hash) = poseidon_hash_many(n=n_felts, elements=reversed_block_header);
-    assert hash_array[index] = poseidon_hash;
+    assert poseidon_hash_array[index] = poseidon_hash;
+    assert keccak_hash_array[index] = rlp_keccak_hash;
     // Get parent hash of block i
     let (block_i_parent_hash: Uint256) = extract_parent_hash_little(rlp_arrays[index]);
 
@@ -73,19 +76,24 @@ func verify_block_headers_and_hash_them{
 func construct_mmr{
     range_check_ptr,
     poseidon_ptr: PoseidonBuiltin*,
-    hash_array: felt*,
-    mmr_array: felt*,
+    poseidon_hash_array: felt*,
+    mmr_array_poseidon: felt*,
+    keccak_hash_array: Uint256*,
+    mmr_array_keccak: Uint256*,
     mmr_array_len: felt,
     mmr_offset: felt,
-    previous_peaks_dict: DictAccess*,
+    previous_peaks_dict_poseidon: DictAccess*,
+    previous_peaks_dict_keccak: DictAccess*,
     pow2_array: felt*,
 }(index: felt) {
     alloc_locals;
     // // 2. Compute node
     // %{ print(f"Hash index for node : {ids.mmr_array_len+ids.mmr_offset+1}") %}
-    let node: felt = poseidon_hash(x=mmr_array_len + mmr_offset + 1, y=hash_array[index]);
+    let node_poseidon: felt = poseidon_hash(
+        x=mmr_array_len + mmr_offset + 1, y=poseidon_hash_array[index]
+    );
     // // 3. Append node to mmr_array
-    assert mmr_array[mmr_array_len] = node;
+    assert mmr_array_poseidon[mmr_array_len] = node_poseidon;
     let mmr_array_len = mmr_array_len + 1;
     merge_subtrees_if_applicable(height=0);
     if (index == 0) {
@@ -107,10 +115,10 @@ func construct_mmr{
 func merge_subtrees_if_applicable{
     range_check_ptr,
     poseidon_ptr: PoseidonBuiltin*,
-    mmr_array: felt*,
+    mmr_array_poseidon: felt*,
     mmr_array_len: felt,
     mmr_offset: felt,
-    previous_peaks_dict: DictAccess*,
+    previous_peaks_dict_poseidon: DictAccess*,
     pow2_array: felt*,
 }(height: felt) {
     alloc_locals;
@@ -132,11 +140,11 @@ func merge_subtrees_if_applicable{
 
         %{ print(f"Merging {ids.left_pos} + {ids.right_pos} at index {ids.next_pos} and height {ids.height_next_pos} ") %}
 
-        let x = get_full_mmr_peak_value(left_pos);
-        let y = get_full_mmr_peak_value(right_pos);
-        let (hash) = poseidon_hash(x, y);
-        let (hash) = poseidon_hash(x=next_pos, y=hash);
-        assert mmr_array[mmr_array_len] = hash;
+        let x_poseidon = get_full_mmr_peak_value_poseidon(left_pos);
+        let y_poseidon = get_full_mmr_peak_value_poseidon(right_pos);
+        let (hash_poseidon) = poseidon_hash(x_poseidon, y_poseidon);
+        let (hash_poseidon) = poseidon_hash(x=next_pos, y=hash_poseidon);
+        assert mmr_array_poseidon[mmr_array_len] = hash_poseidon;
 
         let mmr_array_len = mmr_array_len + 1;
         return merge_subtrees_if_applicable(height=height + 1);
@@ -158,13 +166,16 @@ func main{
     local from_block_number_high: felt;
     local to_block_number_low: felt;
     local mmr_offset: felt;
-    local mmr_last_root: felt;
+    local mmr_last_root_poseidon: felt;
+    local mmr_last_root_keccak: Uint256;
     local block_n_plus_one_parent_hash_little: Uint256;
     %{
         ids.from_block_number_high=program_input['from_block_number_high']
         ids.to_block_number_low=program_input['to_block_number_low']
         ids.mmr_offset=program_input['mmr_last_len'] 
-        ids.mmr_last_root=program_input['mmr_last_root']
+        ids.mmr_last_root_poseidon=program_input['mmr_last_root']
+        ids.mmr_last_root_keccak.low=program_input['mmr_last_root_keccak_low']
+        ids.mmr_last_root_keccak.high=program_input['mmr_last_root_keccak_high']
         ids.block_n_plus_one_parent_hash_little.low = program_input['block_n_plus_one_parent_hash_little_low']
         ids.block_n_plus_one_parent_hash_little.high = program_input['block_n_plus_one_parent_hash_little_high']
     %}
@@ -206,25 +217,44 @@ func main{
     let (rlp_arrays: felt**, bytes_len_array: felt*) = read_block_headers_rlp();
 
     // Write previous peaks values and compute root of previous MMR:
-    let (previous_peaks_values: felt*) = alloc();  // From left to right
-    %{ segments.write_arg(ids.previous_peaks_values, program_input['mmr_last_peaks']) %}
+    let (previous_peaks_values_poseidon: felt*) = alloc();  // From left to right
+    let (previous_peaks_values_keccak: Uint256*) = alloc();  // From left to right
+
+    %{
+        segments.write_arg(ids.previous_peaks_values_poseidon, program_input['poseidon_mmr_last_peaks']) 
+        segments.write_arg(ids.previous_peaks_values_keccak, program_input['keccak_mmr_last_peaks'])
+    %}
+
     // Compute previous_peaks_positions given the previous MMR size (from left to right):
     let (
         previous_peaks_positions: felt*, previous_peaks_positions_len: felt
     ) = compute_peaks_positions{pow2_array=pow2_array}(mmr_offset);
-    let expected_previous_root_tmp = bag_peaks(previous_peaks_values, previous_peaks_positions_len);
-    let (expected_previous_root) = poseidon_hash(mmr_offset, expected_previous_root_tmp);
-    assert expected_previous_root = mmr_last_root;
+    let expected_previous_root_tmp = bag_peaks(
+        previous_peaks_values_poseidon, previous_peaks_positions_len
+    );
+    let (expected_previous_root_poseidon) = poseidon_hash(mmr_offset, expected_previous_root_tmp);
+    assert expected_previous_root_poseidon = mmr_last_root_poseidon;
     // If previous peaks match the previous root, append the peak values to previous_peaks_dict:
-    let (local previous_peaks_dict) = default_dict_new(default_value=0);
-    tempvar dict_start = previous_peaks_dict;
-    initialize_peaks_dict{dict_end=previous_peaks_dict}(
-        previous_peaks_positions_len - 1, previous_peaks_positions, previous_peaks_values
+    let (local previous_peaks_dict_poseidon) = default_dict_new(default_value=0);
+    let (local previous_peaks_dict_keccak) = default_dict_new(default_value=0);
+    tempvar dict_start_poseidon = previous_peaks_dict_poseidon;
+    tempvar dict_start_keccak = previous_peaks_dict_keccak;
+    initialize_peaks_dicts{
+        dict_end_poseidon=previous_peaks_dict_poseidon, dict_end_keccak=previous_peaks_dict_keccak
+    }(
+        previous_peaks_positions_len - 1,
+        previous_peaks_positions,
+        previous_peaks_values_poseidon,
+        previous_peaks_values_keccak,
     );
 
-    // Initialize MMR:
-    let (hash_array: felt*) = alloc();  // Poseidon(rlp_arrays)
-    let (mmr_array: felt*) = alloc();
+    // Initialize Poseidon MMR:
+    let (poseidon_hash_array: felt*) = alloc();  // Poseidon(rlp_arrays)
+    let (mmr_array_poseidon: felt*) = alloc();
+    // Initialize Keccak MMR :
+    let (keccak_hash_array: Uint256*) = alloc();
+    let (mmr_array_keccak: Uint256*) = alloc();
+    // Common variable for both MMR :
     let mmr_array_len = 0;
     %{
         print_block_rlp(ids.rlp_arrays, ids.bytes_len_array, ids.n)
@@ -237,31 +267,35 @@ func main{
     // MAIN LOOPS : (1) Validate RLPs and prepare hash array, (2) Build MMR array with hash array
 
     // (1) Validate chain of RLP values for blocks [n, n-1, n-2, n-1, ..., n-r]:
-    with hash_array, rlp_arrays, bytes_len_array {
+    with poseidon_hash_array, keccak_hash_array, rlp_arrays, bytes_len_array {
         let block_n_minus_r_plus_one_parent_hash_little: Uint256 = verify_block_headers_and_hash_them(
             index=n, parent_hash=block_n_plus_one_parent_hash_little);
     }
     %{ print(f"RLP successfully validated!") %}
     // (2) Build MMR by adding all poseidon hashes of RLPs:
     %{ print(f"Building MMR...") %}
-    with hash_array, mmr_array, mmr_array_len, pow2_array, mmr_offset, previous_peaks_dict {
+    with poseidon_hash_array, keccak_hash_array, mmr_array_poseidon, mmr_array_keccak, mmr_array_len, pow2_array, mmr_offset, previous_peaks_dict_poseidon, previous_peaks_dict_keccak {
         construct_mmr(index=n);
     }
     %{
         print('final') 
-        print_mmr(ids.mmr_array,ids.mmr_array_len)
+        print_mmr(ids.mmr_array_poseidon,ids.mmr_array_len)
     %}
 
     // -----------------------------------------------------
 
     // FINALIZATION
 
-    with mmr_array, mmr_array_len, pow2_array, previous_peaks_dict, mmr_offset {
-        let new_mmr_root: felt = get_root();
+    with mmr_array_poseidon, mmr_array_len, pow2_array, previous_peaks_dict_poseidon, mmr_offset {
+        let new_mmr_root_poseidon: felt = get_root();
     }
-    %{ print("new root", ids.new_mmr_root) %}
+
+    tempvar new_mmr_root_keccak = Uint256(0, 0);
+
+    %{ print("new root", ids.new_mmr_root_poseidon) %}
     %{ print("new size", ids.mmr_array_len + ids.mmr_offset) %}
-    default_dict_finalize(dict_start, previous_peaks_dict, 0);
+    default_dict_finalize(dict_start_poseidon, previous_peaks_dict_poseidon, 0);
+    default_dict_finalize(dict_start_keccak, previous_peaks_dict_keccak, 0);
 
     let (block_n_plus_one_parent_hash) = uint256_reverse_endian(
         block_n_plus_one_parent_hash_little
@@ -292,36 +326,68 @@ func main{
     [ap] = block_n_minus_r_plus_one_parent_hash.high;
     [ap] = [output_ptr + 3], ap++;
 
-    [ap] = mmr_last_root;
+    [ap] = mmr_last_root_poseidon;
     [ap] = [output_ptr + 4], ap++;
 
-    [ap] = new_mmr_root;
+    [ap] = new_mmr_root_poseidon;
     [ap] = [output_ptr + 5], ap++;
 
-    [ap] = mmr_offset;
+    [ap] = mmr_last_root_keccak.low;
     [ap] = [output_ptr + 6], ap++;
 
-    [ap] = mmr_array_len + mmr_offset;
+    [ap] = mmr_last_root_keccak.high;
     [ap] = [output_ptr + 7], ap++;
 
-    [ap] = output_ptr + 8, ap++;
-    let output_ptr = output_ptr + 8;
+    [ap] = new_mmr_root_keccak.low;
+    [ap] = [output_ptr + 8], ap++;
+
+    [ap] = new_mmr_root_keccak.high;
+    [ap] = [output_ptr + 9], ap++;
+
+    [ap] = mmr_offset;
+    [ap] = [output_ptr + 10], ap++;
+
+    [ap] = mmr_array_len + mmr_offset;
+    [ap] = [output_ptr + 11], ap++;
+
+    [ap] = output_ptr + 12, ap++;
+    let output_ptr = output_ptr + 12;
 
     return ();
 }
 
 // Stores the values of the previous peaks in a dictionary.
 // The key is the peak position, and the value is the peak value.
-func initialize_peaks_dict{dict_end: DictAccess*}(
-    index: felt, peaks_positions: felt*, peaks_values: felt*
+func initialize_peaks_dicts{dict_end_poseidon: DictAccess*, dict_end_keccak: DictAccess*}(
+    index: felt, peaks_positions: felt*, peaks_values_poseidon: felt*, peaks_values_keccak: Uint256*
 ) {
+    alloc_locals;
+    let (__fp__, _) = get_fp_and_pc();
+    local keccak_peak_value: Uint256;
+    assert keccak_peak_value.low = peaks_values_keccak[index].low;
+    assert keccak_peak_value.high = peaks_values_keccak[index].high;
+
     if (index == 0) {
-        dict_write{dict_ptr=dict_end}(key=peaks_positions[0], new_value=peaks_values[0]);
+        dict_write{dict_ptr=dict_end_poseidon}(
+            key=peaks_positions[0], new_value=peaks_values_poseidon[0]
+        );
+        dict_write{dict_ptr=dict_end_keccak}(
+            key=peaks_positions[0], new_value=cast(&keccak_peak_value, felt)
+        );
+
         return ();
     } else {
-        dict_write{dict_ptr=dict_end}(key=peaks_positions[index], new_value=peaks_values[index]);
-        return initialize_peaks_dict(
-            index=index - 1, peaks_positions=peaks_positions, peaks_values=peaks_values
+        dict_write{dict_ptr=dict_end_poseidon}(
+            key=peaks_positions[0], new_value=peaks_values_poseidon[0]
+        );
+        dict_write{dict_ptr=dict_end_keccak}(
+            key=peaks_positions[0], new_value=cast(&keccak_peak_value, felt)
+        );
+        return initialize_peaks_dicts(
+            index=index - 1,
+            peaks_positions=peaks_positions,
+            peaks_values_poseidon=peaks_values_poseidon,
+            peaks_values_keccak=peaks_values_keccak,
         );
     }
 }

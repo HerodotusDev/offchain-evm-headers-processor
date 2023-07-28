@@ -8,6 +8,7 @@ from starkware.cairo.common.cairo_builtins import PoseidonBuiltin
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash
 from starkware.cairo.common.dict_access import DictAccess
 from starkware.cairo.common.dict import dict_write, dict_read
+from starkware.cairo.common.uint256 import Uint256
 
 // Computes MMR tree height given an index.
 // This assumes the first index is 1. See below:
@@ -124,9 +125,12 @@ func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_le
     }
 }
 // Position must be a peak position
-func get_full_mmr_peak_value{
-    range_check_ptr, mmr_array: felt*, mmr_offset: felt, previous_peaks_dict: DictAccess*
-}(position: felt) -> felt {
+func get_full_mmr_peak_value_poseidon{
+    range_check_ptr,
+    mmr_array_poseidon: felt*,
+    mmr_offset: felt,
+    previous_peaks_dict_poseidon: DictAccess*,
+}(position: felt) -> (peak_poseidon: felt, peak_keccak: Uint256) {
     alloc_locals;
     %{ print(f"Asked position : {ids.position}, mmr_offset : {ids.mmr_offset}") %}
     local is_position_in_mmr_array: felt;
@@ -136,13 +140,13 @@ func get_full_mmr_peak_value{
         %{ print(f'getting from mmr_array at index {ids.position-ids.mmr_offset -1}') %}
         assert [range_check_ptr] = position - mmr_offset - 1;
         tempvar range_check_ptr = range_check_ptr + 1;
-        return mmr_array[position - mmr_offset - 1];
+        return mmr_array_poseidon[position - mmr_offset - 1];
     } else {
         // ensure position <= mmr_offset
         %{ print('getting from dict') %}
         assert [range_check_ptr] = mmr_offset - position;
         tempvar range_check_ptr = range_check_ptr + 1;
-        let (value) = dict_read{dict_ptr=previous_peaks_dict}(key=position);
+        let (value) = dict_read{dict_ptr=previous_peaks_dict_poseidon}(key=position);
         %{ print(f"dict_peak value at {ids.position} = {ids.value}") %}
         return value;
     }
@@ -151,10 +155,10 @@ func get_full_mmr_peak_value{
 func get_root{
     range_check_ptr,
     poseidon_ptr: PoseidonBuiltin*,
-    mmr_array: felt*,
+    mmr_array_poseidon: felt*,
     mmr_array_len: felt,
     pow2_array: felt*,
-    previous_peaks_dict: DictAccess*,
+    previous_peaks_dict_poseidon: DictAccess*,
     mmr_offset: felt,
 }() -> felt {
     alloc_locals;
@@ -169,9 +173,9 @@ func get_root{
 
 func get_peaks_from_positions{
     range_check_ptr,
-    mmr_array: felt*,
+    mmr_array_poseidon: felt*,
     mmr_offset: felt,
-    previous_peaks_dict: DictAccess*,
+    previous_peaks_dict_poseidon: DictAccess*,
     peaks_positions: felt*,
 }(peaks_len: felt) -> felt* {
     alloc_locals;
@@ -182,18 +186,18 @@ func get_peaks_from_positions{
 
 func get_peaks_from_positions_inner{
     range_check_ptr,
-    mmr_array: felt*,
+    mmr_array_poseidon: felt*,
     mmr_offset: felt,
-    previous_peaks_dict: DictAccess*,
+    previous_peaks_dict_poseidon: DictAccess*,
     peaks_positions: felt*,
 }(peaks: felt*, index: felt) {
     alloc_locals;
     if (index == 0) {
-        let value = get_full_mmr_peak_value(peaks_positions[0]);
+        let value = get_full_mmr_peak_value_poseidon(peaks_positions[0]);
         assert peaks[0] = value;
         return ();
     } else {
-        let value = get_full_mmr_peak_value(peaks_positions[index]);
+        let value = get_full_mmr_peak_value_poseidon(peaks_positions[index]);
         assert peaks[index] = value;
         return get_peaks_from_positions_inner(peaks, index - 1);
     }
