@@ -23,8 +23,8 @@ from src.libs.mmr import (
     compute_height_pre_alloc_pow2 as compute_height,
     compute_peaks_positions,
     bag_peaks,
-    get_root,
-    get_full_mmr_peak_value_poseidon,
+    get_roots,
+    get_full_mmr_peak_values,
 )
 
 func verify_block_headers_and_hash_them{
@@ -116,9 +116,11 @@ func merge_subtrees_if_applicable{
     range_check_ptr,
     poseidon_ptr: PoseidonBuiltin*,
     mmr_array_poseidon: felt*,
+    mmr_array_keccak: Uint256*,
     mmr_array_len: felt,
     mmr_offset: felt,
     previous_peaks_dict_poseidon: DictAccess*,
+    previous_peaks_dict_keccak: DictAccess*,
     pow2_array: felt*,
 }(height: felt) {
     alloc_locals;
@@ -140,8 +142,8 @@ func merge_subtrees_if_applicable{
 
         %{ print(f"Merging {ids.left_pos} + {ids.right_pos} at index {ids.next_pos} and height {ids.height_next_pos} ") %}
 
-        let x_poseidon = get_full_mmr_peak_value_poseidon(left_pos);
-        let y_poseidon = get_full_mmr_peak_value_poseidon(right_pos);
+        let (x_poseidon, x_keccak) = get_full_mmr_peak_values(left_pos);
+        let (y_poseidon, y_keccak) = get_full_mmr_peak_values(right_pos);
         let (hash_poseidon) = poseidon_hash(x_poseidon, y_poseidon);
         let (hash_poseidon) = poseidon_hash(x=next_pos, y=hash_poseidon);
         assert mmr_array_poseidon[mmr_array_len] = hash_poseidon;
@@ -229,10 +231,12 @@ func main{
     let (
         previous_peaks_positions: felt*, previous_peaks_positions_len: felt
     ) = compute_peaks_positions{pow2_array=pow2_array}(mmr_offset);
-    let expected_previous_root_tmp = bag_peaks(
-        previous_peaks_values_poseidon, previous_peaks_positions_len
+    let (expected_previous_root_tmp_poseidon, expected_previous_root_tmp_keccak) = bag_peaks(
+        previous_peaks_values_poseidon, previous_peaks_values_keccak, previous_peaks_positions_len
     );
-    let (expected_previous_root_poseidon) = poseidon_hash(mmr_offset, expected_previous_root_tmp);
+    let (expected_previous_root_poseidon) = poseidon_hash(
+        mmr_offset, expected_previous_root_tmp_poseidon
+    );
     assert expected_previous_root_poseidon = mmr_last_root_poseidon;
     // If previous peaks match the previous root, append the peak values to previous_peaks_dict:
     let (local previous_peaks_dict_poseidon) = default_dict_new(default_value=0);
@@ -286,11 +290,9 @@ func main{
 
     // FINALIZATION
 
-    with mmr_array_poseidon, mmr_array_len, pow2_array, previous_peaks_dict_poseidon, mmr_offset {
-        let new_mmr_root_poseidon: felt = get_root();
+    with mmr_array_poseidon, mmr_array_keccak, mmr_array_len, pow2_array, previous_peaks_dict_poseidon, previous_peaks_dict_keccak, mmr_offset {
+        let (new_mmr_root_poseidon: felt, new_mmr_root_keccak: Uint256) = get_roots();
     }
-
-    tempvar new_mmr_root_keccak = Uint256(0, 0);
 
     %{ print("new root", ids.new_mmr_root_poseidon) %}
     %{ print("new size", ids.mmr_array_len + ids.mmr_offset) %}
