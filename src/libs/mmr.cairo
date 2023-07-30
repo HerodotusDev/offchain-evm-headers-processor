@@ -29,8 +29,8 @@ func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) 
     // Computes N=2^bit_length and n=2^(bit_length-1)
     // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
 
-    let N = pow2_array[bit_length];
-    let n = pow2_array[bit_length - 1];
+    tempvar N = pow2_array[bit_length];
+    tempvar n = pow2_array[bit_length - 1];
 
     if (x == N - 1) {
         // x has bit_length bits and they are all ones.
@@ -158,7 +158,10 @@ func get_full_mmr_peak_values{
         local peak_keccak: Uint256;
         assert peak_keccak.low = peak_keccak_ptr.low;
         assert peak_keccak.high = peak_keccak_ptr.high;
-        %{ print(f"dict_peak value at {ids.position} = {ids.value}") %}
+        %{
+            print(f"dict_peak poseidon value at {ids.position} = {ids.peak_poseidon}") 
+            print(f"dict_peak keccak value at {ids.position} = {ids.peak_keccak.low} {ids.peak_keccak.high}")
+        %}
         return (peak_poseidon, peak_keccak);
     }
 }
@@ -186,11 +189,8 @@ func get_roots{
     let (bagged_peaks_poseidon, bagged_peaks_keccak) = bag_peaks(
         peaks_poseidon, peaks_keccak, peaks_len
     );
-    let (root_poseidon) = poseidon_hash(mmr_array_len + mmr_offset, bagged_peaks_poseidon);
-    // let (keccak_input: felt*) = alloc();
-    // let inputs_start = keccak_input;
-    let root_keccak = Uint256(0, 0);
-    return (root_poseidon, root_keccak);
+
+    return (bagged_peaks_poseidon, bagged_peaks_keccak);
 }
 
 func get_peaks_from_positions{
