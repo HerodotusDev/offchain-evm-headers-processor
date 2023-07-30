@@ -13,8 +13,8 @@ from starkware.cairo.common.math import unsigned_div_rem as felt_divmod, split_f
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.alloc import alloc
 
-const div = 2 ** 32;
-const div_minus_1 = div - 1;
+const div_32 = 2 ** 32;
+const div_32_minus_1 = div_32 - 1;
 
 // y MUST be a power of 2
 func bitwise_divmod{bitwise_ptr: BitwiseBuiltin*}(x: felt, y: felt) -> (q: felt, r: felt) {
@@ -31,15 +31,15 @@ func felt_divmod_2pow32{range_check_ptr}(value: felt) -> (q: felt, r: felt) {
     let q = [range_check_ptr + 1];
     %{
         from starkware.cairo.common.math_utils import assert_integer
-        assert_integer(ids.div)
-        assert 0 < ids.div <= PRIME // range_check_builtin.bound, \
-            f'div={hex(ids.div)} is out of the valid range.'
-        ids.q, ids.r = divmod(ids.value, ids.div)
+        assert_integer(ids.div_32)
+        assert 0 < ids.div_32 <= PRIME // range_check_builtin.bound, \
+            f'div={hex(ids.div_32)} is out of the valid range.'
+        ids.q, ids.r = divmod(ids.value, ids.div_32)
     %}
-    assert [range_check_ptr + 2] = div_minus_1 - r;
+    assert [range_check_ptr + 2] = div_32_minus_1 - r;
     let range_check_ptr = range_check_ptr + 3;
 
-    assert value = q * div + r;
+    assert value = q * div_32 + r;
     return (q, r);
 }
 
@@ -245,7 +245,7 @@ func word_reverse_endian_32{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: f
     return (res=word / 2 ** (8 + 16));
 }
 
-// Utility to get 2^i
+// Utility to get 2^i from i = 0 to 127.
 // If i>127, fails.
 func pow2alloc127() -> (array: felt*) {
     let (data_address) = get_label_location(data);
@@ -379,6 +379,7 @@ func pow2alloc127() -> (array: felt*) {
     dw 0x10000000000000000000000000000000;
     dw 0x20000000000000000000000000000000;
     dw 0x40000000000000000000000000000000;
+    dw 0x80000000000000000000000000000000;
 }
 
 func pow2h(i) -> (N: felt, n: felt) {
