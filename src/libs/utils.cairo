@@ -1,15 +1,6 @@
-from starkware.cairo.common.uint256 import (
-    Uint256,
-    uint256_reverse_endian,
-    uint256_unsigned_div_rem,
-    uint256_mul,
-    uint256_add,
-    uint256_pow2,
-)
-
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 from starkware.cairo.common.registers import get_label_location
-from starkware.cairo.common.math import unsigned_div_rem as felt_divmod, split_felt
+from starkware.cairo.common.math import unsigned_div_rem as felt_divmod
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.alloc import alloc
 
@@ -100,6 +91,7 @@ func word_reverse_endian_64{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: f
     // A function to reverse the endianness of a 8 bytes (64 bits) integer.
     // The result will not make sense if word > 2^64.
     // The implementation is directly inspired by the function word_reverse_endian
+    // from the common library starkware.cairo.common.uint256 with three steps instead of four.
 
     // Step 1.
     assert bitwise_ptr[0].x = word;
@@ -152,80 +144,6 @@ func word_reverse_endian_64_RC{range_check_ptr}(word: felt) -> felt {
     tempvar range_check_ptr = range_check_ptr + 8;
     return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4 + b5 * 256 ** 5 + b6 *
         256 ** 6 + b7 * 256 ** 7;
-}
-
-func reverse_block_header_chunks_RC{range_check_ptr}(n_felts: felt, block_header: felt*) -> felt* {
-    alloc_locals;
-    let (reversed_block_header: felt*) = alloc();
-    reverse_block_header_chunks_RC_inner(
-        index=n_felts - 1, block_header=block_header, reversed_block_header=reversed_block_header
-    );
-    return reversed_block_header;
-}
-
-func reverse_block_header_chunks_RC_inner{range_check_ptr}(
-    index: felt, block_header: felt*, reversed_block_header: felt*
-) {
-    if (index == 0) {
-        let reversed_chunk_i: felt = word_reverse_endian_64_RC(block_header[index]);
-        assert reversed_block_header[index] = reversed_chunk_i;
-        return ();
-    } else {
-        let reversed_chunk_i: felt = word_reverse_endian_64_RC(block_header[index]);
-        assert reversed_block_header[index] = reversed_chunk_i;
-        return reverse_block_header_chunks_RC_inner(
-            index=index - 1, block_header=block_header, reversed_block_header=reversed_block_header
-        );
-    }
-}
-
-func reverse_block_header_chunks_bitwise{bitwise_ptr: BitwiseBuiltin*}(
-    n_felts: felt, block_header: felt*
-) -> felt* {
-    let (reversed_block_header: felt*) = alloc();
-    reverse_block_header_chunks_bitwise_inner(
-        index=n_felts - 1, block_header=block_header, reversed_block_header=reversed_block_header
-    );
-    return reversed_block_header;
-}
-
-func reverse_block_header_chunks_bitwise_inner{bitwise_ptr: BitwiseBuiltin*}(
-    index: felt, block_header: felt*, reversed_block_header: felt*
-) {
-    if (index == 0) {
-        let (reversed_chunk_i: felt) = word_reverse_endian_64(block_header[index]);
-        assert reversed_block_header[index] = reversed_chunk_i;
-        return ();
-    } else {
-        let (reversed_chunk_i: felt) = word_reverse_endian_64(block_header[index]);
-        assert reversed_block_header[index] = reversed_chunk_i;
-        return reverse_block_header_chunks_bitwise_inner(
-            index=index - 1, block_header=block_header, reversed_block_header=reversed_block_header
-        );
-    }
-}
-
-func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
-    n_felts: felt, block_header: felt*, block_index: felt
-) -> felt* {
-    alloc_locals;
-    let (reversed_block_header: felt*) = alloc();
-    let (_, rem) = felt_divmod(block_index, 2);
-    if (rem == 0) {
-        reverse_block_header_chunks_RC_inner(
-            index=n_felts - 1,
-            block_header=block_header,
-            reversed_block_header=reversed_block_header,
-        );
-        return reversed_block_header;
-    } else {
-        reverse_block_header_chunks_bitwise_inner(
-            index=n_felts - 1,
-            block_header=block_header,
-            reversed_block_header=reversed_block_header,
-        );
-        return reversed_block_header;
-    }
 }
 
 func word_reverse_endian_32{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: felt) {
@@ -380,145 +298,6 @@ func pow2alloc127() -> (array: felt*) {
     dw 0x20000000000000000000000000000000;
     dw 0x40000000000000000000000000000000;
     dw 0x80000000000000000000000000000000;
-}
-
-func pow2h(i) -> (N: felt, n: felt) {
-    %{
-        if ids.i==0:
-            print("WARNING : pow2h(0) is not well-defined. Returning (N=2⁰=1,n=0).")
-    %}
-    let (data_address) = get_label_location(data);
-    return (N=[data_address + i + 1], n=[data_address + i]);
-
-    data:
-    dw 0;
-    dw 0x1;
-    dw 0x2;
-    dw 0x4;
-    dw 0x8;
-    dw 0x10;
-    dw 0x20;
-    dw 0x40;
-    dw 0x80;
-    dw 0x100;
-    dw 0x200;
-    dw 0x400;
-    dw 0x800;
-    dw 0x1000;
-    dw 0x2000;
-    dw 0x4000;
-    dw 0x8000;
-    dw 0x10000;
-    dw 0x20000;
-    dw 0x40000;
-    dw 0x80000;
-    dw 0x100000;
-    dw 0x200000;
-    dw 0x400000;
-    dw 0x800000;
-    dw 0x1000000;
-    dw 0x2000000;
-    dw 0x4000000;
-    dw 0x8000000;
-    dw 0x10000000;
-    dw 0x20000000;
-    dw 0x40000000;
-    dw 0x80000000;
-    dw 0x100000000;
-    dw 0x200000000;
-    dw 0x400000000;
-    dw 0x800000000;
-    dw 0x1000000000;
-    dw 0x2000000000;
-    dw 0x4000000000;
-    dw 0x8000000000;
-    dw 0x10000000000;
-    dw 0x20000000000;
-    dw 0x40000000000;
-    dw 0x80000000000;
-    dw 0x100000000000;
-    dw 0x200000000000;
-    dw 0x400000000000;
-    dw 0x800000000000;
-    dw 0x1000000000000;
-    dw 0x2000000000000;
-    dw 0x4000000000000;
-    dw 0x8000000000000;
-    dw 0x10000000000000;
-    dw 0x20000000000000;
-    dw 0x40000000000000;
-    dw 0x80000000000000;
-    dw 0x100000000000000;
-    dw 0x200000000000000;
-    dw 0x400000000000000;
-    dw 0x800000000000000;
-    dw 0x1000000000000000;
-    dw 0x2000000000000000;
-    dw 0x4000000000000000;
-    dw 0x8000000000000000;
-    dw 0x10000000000000000;
-    dw 0x20000000000000000;
-    dw 0x40000000000000000;
-    dw 0x80000000000000000;
-    dw 0x100000000000000000;
-    dw 0x200000000000000000;
-    dw 0x400000000000000000;
-    dw 0x800000000000000000;
-    dw 0x1000000000000000000;
-    dw 0x2000000000000000000;
-    dw 0x4000000000000000000;
-    dw 0x8000000000000000000;
-    dw 0x10000000000000000000;
-    dw 0x20000000000000000000;
-    dw 0x40000000000000000000;
-    dw 0x80000000000000000000;
-    dw 0x100000000000000000000;
-    dw 0x200000000000000000000;
-    dw 0x400000000000000000000;
-    dw 0x800000000000000000000;
-    dw 0x1000000000000000000000;
-    dw 0x2000000000000000000000;
-    dw 0x4000000000000000000000;
-    dw 0x8000000000000000000000;
-    dw 0x10000000000000000000000;
-    dw 0x20000000000000000000000;
-    dw 0x40000000000000000000000;
-    dw 0x80000000000000000000000;
-    dw 0x100000000000000000000000;
-    dw 0x200000000000000000000000;
-    dw 0x400000000000000000000000;
-    dw 0x800000000000000000000000;
-    dw 0x1000000000000000000000000;
-    dw 0x2000000000000000000000000;
-    dw 0x4000000000000000000000000;
-    dw 0x8000000000000000000000000;
-    dw 0x10000000000000000000000000;
-    dw 0x20000000000000000000000000;
-    dw 0x40000000000000000000000000;
-    dw 0x80000000000000000000000000;
-    dw 0x100000000000000000000000000;
-    dw 0x200000000000000000000000000;
-    dw 0x400000000000000000000000000;
-    dw 0x800000000000000000000000000;
-    dw 0x1000000000000000000000000000;
-    dw 0x2000000000000000000000000000;
-    dw 0x4000000000000000000000000000;
-    dw 0x8000000000000000000000000000;
-    dw 0x10000000000000000000000000000;
-    dw 0x20000000000000000000000000000;
-    dw 0x40000000000000000000000000000;
-    dw 0x80000000000000000000000000000;
-    dw 0x100000000000000000000000000000;
-    dw 0x200000000000000000000000000000;
-    dw 0x400000000000000000000000000000;
-    dw 0x800000000000000000000000000000;
-    dw 0x1000000000000000000000000000000;
-    dw 0x2000000000000000000000000000000;
-    dw 0x4000000000000000000000000000000;
-    dw 0x8000000000000000000000000000000;
-    dw 0x10000000000000000000000000000000;
-    dw 0x20000000000000000000000000000000;
-    dw 0x40000000000000000000000000000000;
 }
 
 // Utility to get 2^i when i is a cairo variable.

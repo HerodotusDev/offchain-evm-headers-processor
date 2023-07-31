@@ -1,8 +1,5 @@
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, PoseidonBuiltin, KeccakBuiltin
-from src.libs.utils import pow2, pow2h
 from starkware.cairo.common.math import assert_le, assert_nn
-from starkware.cairo.common.math_cmp import is_le
-from starkware.cairo.common.math import unsigned_div_rem
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash
 from starkware.cairo.common.dict_access import DictAccess
@@ -139,19 +136,21 @@ func get_full_mmr_peak_values{
     local is_position_in_mmr_array: felt;
     %{ ids.is_position_in_mmr_array= 1 if ids.position > ids.mmr_offset else 0 %}
     if (is_position_in_mmr_array != 0) {
-        // ensure position > mmr_offset
         %{ print(f'getting from mmr_array at index {ids.position-ids.mmr_offset -1}') %}
+        // ensure position > mmr_offset
         assert [range_check_ptr] = position - mmr_offset - 1;
         tempvar range_check_ptr = range_check_ptr + 1;
         let peak_poseidon = mmr_array_poseidon[position - mmr_offset - 1];
         let peak_keccak = mmr_array_keccak[position - mmr_offset - 1];
         return (peak_poseidon, peak_keccak);
     } else {
-        // ensure position <= mmr_offset
         %{ print('getting from dict') %}
+        // ensure position <= mmr_offset
+
         assert [range_check_ptr] = mmr_offset - position;
         tempvar range_check_ptr = range_check_ptr + 1;
         let (peak_poseidon: felt) = dict_read{dict_ptr=previous_peaks_dict_poseidon}(key=position);
+        // Treat the felt value from dict back to a Uint256 ptr:
         let (peak_keccak_ptr: Uint256*) = dict_read{dict_ptr=previous_peaks_dict_keccak}(
             key=position
         );

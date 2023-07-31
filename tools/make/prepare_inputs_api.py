@@ -64,7 +64,7 @@ def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, 
     chunk_input['to_block_number_low'] = to_block_number_low
     chunk_input['block_n_plus_one_parent_hash_little_low'] = block_n_plus_one_parent_hash_little[0]
     chunk_input['block_n_plus_one_parent_hash_little_high'] = block_n_plus_one_parent_hash_little[1]
-    chunk_input["rlp_arrays"] = blocks
+    chunk_input["block_headers_array"] = blocks
     chunk_input["bytes_len_array"] = blocks_len 
 
     chunk_output['block_n_plus_one_parent_hash']=block_n_plus_one_parent_hash_big
@@ -81,8 +81,10 @@ def chunk_process_api(last_peaks:dict, last_mmr_size:int, from_block_number_high
     data={}
 
     params = {"chunk_size":50, 
-          "last_elements_count":last_mmr_size, 
-          "last_peaks":[hex(x) for x in last_peaks['poseidon']], 
+          "poseidon_last_elements_count":last_mmr_size,
+          "poseidon_last_peaks":[hex(x) for x in last_peaks['poseidon']], 
+          "keccak_last_elements_count":last_mmr_size,
+          "keccak_last_peaks":[hex(x) for x in last_peaks['keccak']],
           "start_block": to_block_number_low, 
           "end_block": from_block_number_high, 
           'rpc_url':RPC_BACKEND_URL, 
@@ -107,7 +109,8 @@ def prepare_full_chain_inputs(from_block_number_high, batch_size=50):
     from_block_number_high = from_block_number_high
     to_block_number_low = from_block_number_high - batch_size + 1
 
-    last_peaks = {'poseidon':[511165008604479100545509010942618724], 'keccak':[511165008604479100545509010942618724]} # 'brave new world' in Cairo
+    # 'brave new world' in Cairo, keccak(hex(511165008604479100545509010942618724))
+    last_peaks = {'poseidon':[511165008604479100545509010942618724], 'keccak':[93435818137180840214006077901347441834554899062844693462640230920378475721064]} 
     last_mmr_size = 1
     last_mmr_root = {'poseidon':last_peaks['poseidon'][0], 'keccak':last_peaks['keccak'][0]}
 
