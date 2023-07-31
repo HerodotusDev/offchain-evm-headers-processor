@@ -342,9 +342,9 @@ func main{
     // 4 : MMR last root poseidon
     // 5 : New MMR root poseidon
     // 6+7 : MMR last root keccak
-
-    // 6 : MMR last size (<=> mmr_offset)
-    // 7 : New MMR size (<=> mmr_array_len + mmr_offset)
+    // 8+9 : New MMR root keccak
+    // 10 : MMR last size (<=> mmr_offset)
+    // 11 : New MMR size (<=> mmr_array_len + mmr_offset)
 
     [ap] = block_n_plus_one_parent_hash.low;
     [ap] = [output_ptr], ap++;
@@ -410,7 +410,7 @@ func initialize_peaks_dicts{dict_end_poseidon: DictAccess*, dict_end_keccak: Dic
         return ();
     } else {
         dict_write{dict_ptr=dict_end_poseidon}(
-            key=peaks_positions[index], new_value=peaks_values_poseidon[0]
+            key=peaks_positions[index], new_value=peaks_values_poseidon[index]
         );
         dict_write{dict_ptr=dict_end_keccak}(
             key=peaks_positions[index], new_value=cast(&keccak_peak_value, felt)
