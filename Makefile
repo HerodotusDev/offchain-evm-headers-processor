@@ -28,3 +28,13 @@ clean:
 	rm -rf build/compiled_cairo_files
 	mkdir -p build
 	mkdir build/compiled_cairo_files
+
+
+Max resources per job : 
+
+Steps = 16777216
+RC = 1048576
+Bitwise = 262144
+Keccaks = 8192
+Poseidon = 524288
+

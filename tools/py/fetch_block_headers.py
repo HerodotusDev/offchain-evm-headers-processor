@@ -220,6 +220,15 @@ def bytes_to_little_endian_ints(input_bytes):
 
     return little_endian_ints
 
+def bytes_to_8_bytes_chunks(input_bytes):
+    # Split the input_bytes into 8-byte chunks
+    byte_chunks = [input_bytes[i:i + 8] for i in range(0, len(input_bytes), 8)]
+
+    # Convert each chunk to little-endian integers
+    little_endian_ints = [int.from_bytes(chunk, byteorder='big') for chunk in byte_chunks]
+
+    return little_endian_ints
+
 def reverse_endian(input_int, byte_length):
     # Convert the input integer to bytes with the given byte length
     byte_representation = input_int.to_bytes(byte_length, byteorder='little')
