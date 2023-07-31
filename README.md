@@ -21,3 +21,12 @@ make run-profile
  2) Run `make prepare-processor-input` to generate all the cairo .json inputs under `src/single_chunk_processor/data`.
  3) Run `make run` and choose `chunk_processor.cairo`. 
  4) Select which input to run. 
+
+
+Max resources per job : 
+
+Steps = 16777216  
+RC = 1048576  
+Bitwise = 262144  
+Keccaks = 8192  
+Poseidon = 524288  
