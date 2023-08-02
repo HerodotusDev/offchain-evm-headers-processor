@@ -361,22 +361,22 @@ func main{
     [ap] = mmr_last_root_poseidon;
     [ap] = [output_ptr + 4], ap++;
 
-    [ap] = new_mmr_root_poseidon;
+    [ap] = mmr_last_root_keccak.low;
     [ap] = [output_ptr + 5], ap++;
 
-    [ap] = mmr_last_root_keccak.low;
+    [ap] = mmr_last_root_keccak.high;
     [ap] = [output_ptr + 6], ap++;
 
-    [ap] = mmr_last_root_keccak.high;
+    [ap] = mmr_offset;
     [ap] = [output_ptr + 7], ap++;
 
-    [ap] = new_mmr_root_keccak.low;
+    [ap] = new_mmr_root_poseidon;
     [ap] = [output_ptr + 8], ap++;
 
-    [ap] = new_mmr_root_keccak.high;
+    [ap] = new_mmr_root_keccak.low;
     [ap] = [output_ptr + 9], ap++;
 
-    [ap] = mmr_offset;
+    [ap] = new_mmr_root_keccak.high;
     [ap] = [output_ptr + 10], ap++;
 
     [ap] = mmr_array_len + mmr_offset;

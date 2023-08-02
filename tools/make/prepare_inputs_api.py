@@ -67,8 +67,8 @@ def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, 
     chunk_input["block_headers_array"] = blocks
     chunk_input["bytes_len_array"] = blocks_len 
 
-    chunk_output['block_n_plus_one_parent_hash']=block_n_plus_one_parent_hash_big
-    chunk_output['block_n_minus_r_plus_one_parent_hash']=block_n_minus_r_plus_one_parent_hash_big
+    chunk_output['block_n_plus_one_parent_hash_low'], chunk_output['block_n_plus_one_parent_hash_high']=block_n_plus_one_parent_hash_big
+    chunk_output['block_n_minus_r_plus_one_parent_hash_low'], chunk_output['block_n_minus_r_plus_one_parent_hash_high']=block_n_minus_r_plus_one_parent_hash_big
     chunk_output['mmr_last_root_poseidon'] = last_mmr_root['poseidon']
     chunk_output['mmr_last_root_keccak_low'], chunk_output['mmr_last_root_keccak_high'] = split_128(last_mmr_root['keccak'])
     chunk_output['mmr_last_len'] = last_mmr_size
