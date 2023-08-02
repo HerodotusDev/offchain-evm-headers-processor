@@ -103,6 +103,7 @@ func reverse_block_header_chunks_RC_inner{range_check_ptr}(
 func reverse_block_header_chunks_bitwise{bitwise_ptr: BitwiseBuiltin*}(
     n_felts: felt, block_header: felt*
 ) -> felt* {
+    alloc_locals;
     let (reversed_block_header: felt*) = alloc();
     reverse_block_header_chunks_bitwise_inner(
         index=n_felts - 1, block_header=block_header, reversed_block_header=reversed_block_header
