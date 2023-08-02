@@ -129,14 +129,14 @@ func word_reverse_endian_64_RC{range_check_ptr}(word: felt) -> felt {
     let b6 = [ap - 2];
     let b7 = [ap - 1];
 
-    assert [range_check_ptr] = b0;
-    assert [range_check_ptr + 1] = b1;
-    assert [range_check_ptr + 2] = b2;
-    assert [range_check_ptr + 3] = b3;
-    assert [range_check_ptr + 4] = b4;
-    assert [range_check_ptr + 5] = b5;
-    assert [range_check_ptr + 6] = b6;
-    assert [range_check_ptr + 7] = b7;
+    assert [range_check_ptr] = 255 - b0;
+    assert [range_check_ptr + 1] = 255 - b1;
+    assert [range_check_ptr + 2] = 255 - b2;
+    assert [range_check_ptr + 3] = 255 - b3;
+    assert [range_check_ptr + 4] = 255 - b4;
+    assert [range_check_ptr + 5] = 255 - b5;
+    assert [range_check_ptr + 6] = 255 - b6;
+    assert [range_check_ptr + 7] = 255 - b7;
 
     assert word = b0 * 256 ** 7 + b1 * 256 ** 6 + b2 * 256 ** 5 + b3 * 256 ** 4 + b4 * 256 ** 3 +
         b5 * 256 ** 2 + b6 * 256 + b7;
@@ -159,8 +159,8 @@ func word_reverse_endian_16_RC{range_check_ptr}(word: felt) -> felt {
     let b0 = [ap - 2];
     let b1 = [ap - 1];
 
-    assert [range_check_ptr] = b0;
-    assert [range_check_ptr + 1] = b1;
+    assert [range_check_ptr] = 255 - b0;
+    assert [range_check_ptr + 1] = 255 - b1;
 
     assert word = b0 * 256 + b1;
 
@@ -182,9 +182,9 @@ func word_reverse_endian_24_RC{range_check_ptr}(word: felt) -> felt {
     let b1 = [ap - 2];
     let b2 = [ap - 1];
 
-    assert [range_check_ptr] = b0;
-    assert [range_check_ptr + 1] = b1;
-    assert [range_check_ptr + 2] = b2;
+    assert [range_check_ptr] = 255 - b0;
+    assert [range_check_ptr + 1] = 255 - b1;
+    assert [range_check_ptr + 2] = 255 - b2;
 
     assert word = b0 * 256 ** 2 + b1 * 256 + b2;
 
@@ -207,10 +207,10 @@ func word_reverse_endian_32_RC{range_check_ptr}(word: felt) -> felt {
     let b2 = [ap - 2];
     let b3 = [ap - 1];
 
-    assert [range_check_ptr] = b0;
-    assert [range_check_ptr + 1] = b1;
-    assert [range_check_ptr + 2] = b2;
-    assert [range_check_ptr + 3] = b3;
+    assert [range_check_ptr] = 255 - b0;
+    assert [range_check_ptr + 1] = 255 - b1;
+    assert [range_check_ptr + 2] = 255 - b2;
+    assert [range_check_ptr + 3] = 255 - b3;
 
     assert word = b0 * 256 ** 3 + b1 * 256 ** 2 + b2 * 256 + b3;
 
@@ -234,11 +234,11 @@ func word_reverse_endian_40_RC{range_check_ptr}(word: felt) -> felt {
     let b3 = [ap - 2];
     let b4 = [ap - 1];
 
-    assert [range_check_ptr] = b0;
-    assert [range_check_ptr + 1] = b1;
-    assert [range_check_ptr + 2] = b2;
-    assert [range_check_ptr + 3] = b3;
-    assert [range_check_ptr + 4] = b4;
+    assert [range_check_ptr] = 255 - b0;
+    assert [range_check_ptr + 1] = 255 - b1;
+    assert [range_check_ptr + 2] = 255 - b2;
+    assert [range_check_ptr + 3] = 255 - b3;
+    assert [range_check_ptr + 4] = 255 - b4;
 
     assert word = b0 * 256 ** 4 + b1 * 256 ** 3 + b2 * 256 ** 2 + b3 * 256 + b4;
 
@@ -263,12 +263,12 @@ func word_reverse_endian_48_RC{range_check_ptr}(word: felt) -> felt {
     let b4 = [ap - 2];
     let b5 = [ap - 1];
 
-    assert [range_check_ptr] = b0;
-    assert [range_check_ptr + 1] = b1;
-    assert [range_check_ptr + 2] = b2;
-    assert [range_check_ptr + 3] = b3;
-    assert [range_check_ptr + 4] = b4;
-    assert [range_check_ptr + 5] = b5;
+    assert [range_check_ptr] = 255 - b0;
+    assert [range_check_ptr + 1] = 255 - b1;
+    assert [range_check_ptr + 2] = 255 - b2;
+    assert [range_check_ptr + 3] = 255 - b3;
+    assert [range_check_ptr + 4] = 255 - b4;
+    assert [range_check_ptr + 5] = 255 - b5;
 
     assert word = b0 * 256 ** 5 + b1 * 256 ** 4 + b2 * 256 ** 3 + b3 * 256 ** 2 + b4 * 256 + b5;
 
@@ -294,13 +294,13 @@ func word_reverse_endian_56_RC{range_check_ptr}(word: felt) -> felt {
     let b5 = [ap - 2];
     let b6 = [ap - 1];
 
-    assert [range_check_ptr] = b0;
-    assert [range_check_ptr + 1] = b1;
-    assert [range_check_ptr + 2] = b2;
-    assert [range_check_ptr + 3] = b3;
-    assert [range_check_ptr + 4] = b4;
-    assert [range_check_ptr + 5] = b5;
-    assert [range_check_ptr + 6] = b6;
+    assert [range_check_ptr] = 255 - b0;
+    assert [range_check_ptr + 1] = 255 - b1;
+    assert [range_check_ptr + 2] = 255 - b2;
+    assert [range_check_ptr + 3] = 255 - b3;
+    assert [range_check_ptr + 4] = 255 - b4;
+    assert [range_check_ptr + 5] = 255 - b5;
+    assert [range_check_ptr + 6] = 255 - b6;
 
     assert word = b0 * 256 ** 6 + b1 * 256 ** 5 + b2 * 256 ** 4 + b3 * 256 ** 3 + b4 * 256 ** 2 +
         b5 * 256 + b6;
