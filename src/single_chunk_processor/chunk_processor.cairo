@@ -321,7 +321,7 @@ func main{
     }
 
     %{ print("new root poseidon", ids.new_mmr_root_poseidon) %}
-    %{ print_u256(ids.new_mmr_root_keccak, "new root keccak") %}
+    %{ print("new root keccak", ids.new_mmr_root_keccak.low, ids.new_mmr_root_keccak.high) %}
     %{ print("new size", ids.mmr_array_len + ids.mmr_offset) %}
 
     default_dict_finalize(dict_start_poseidon, previous_peaks_dict_poseidon, 0);

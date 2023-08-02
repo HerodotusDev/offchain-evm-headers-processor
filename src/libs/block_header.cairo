@@ -16,9 +16,6 @@ func read_block_headers() -> (rlp_array: felt**, rlp_array_bytes_len: felt*) {
     %{
         block_headers_array = program_input['block_headers_array']
         bytes_len_array = program_input['bytes_len_array']
-        print(block_headers_array)
-        print(bytes_len_array)
-
         segments.write_arg(ids.block_headers_array, block_headers_array)
         segments.write_arg(ids.block_headers_array_bytes_len, bytes_len_array)
     %}
