@@ -126,8 +126,6 @@ def prepare_full_chain_inputs(from_block_number_high, batch_size=50):
 
     to_block_number_low = from_block_number_high - batch_size + 1 if from_block_number_high - batch_size + 1 >= 0 else 0
 
-    if to_block_number_low==0:
-        return
 
     while to_block_number_low >= 0:
         print("start while", to_block_number_low)
