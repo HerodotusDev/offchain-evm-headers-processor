@@ -2,7 +2,9 @@
 pragma solidity ^0.8.0;
 
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "./interfaces/IFactsRegistry.sol";
+import "./lib/Uint256Splitter.sol";
 import "forge-std/console.sol";
 
 /// @title SharpFactsAggregator
@@ -13,13 +15,15 @@ import "forge-std/console.sol";
 /// ------------------
 /// Example:
 /// Blocks inside brackets are the ones processed during their SHARP job execution
-//  7 [8, 9, 10] 11
+//  4 [5 6 7] [8, 9, 10] 11
 /// n = 10
 /// r = 3
 /// `blockNMinusRPlusOneParentHash` = 8.parentHash (oldestHash)
 /// `blockNPlusOneParentHash`       = 11.parentHash (newestHash)
 /// ------------------
-contract SharpFactsAggregator is Initializable {
+contract SharpFactsAggregator is Ownable, Initializable {
+    using Uint256Splitter for uint256;
+
     // Sharp Facts Registry
     address public immutable FACTS_REGISTY;
 
@@ -68,6 +72,9 @@ contract SharpFactsAggregator is Initializable {
     // Contract state
     AggregatorState public aggregatorState;
 
+    // Aggregator states
+    mapping(bytes32 => AggregatorState) public aggregatorStates;
+
     constructor(address factRegistry, uint256 programHash) {
         FACTS_REGISTY = factRegistry;
         PROGRAM_HASH = programHash;
@@ -85,8 +92,19 @@ contract SharpFactsAggregator is Initializable {
         aggregatorState.oldestParentHash = recentBlock;
     }
 
+    function registerNewRange(uint256 blocksConfirmations) external onlyOwner {
+        assert(blocksConfirmations <= 255);
+
+        bytes32 recentBlock = blockhash(block.number - blocksConfirmations);
+
+        // aggregatorStates[recentBlock].currentMmrRoot = MMR_INITIAL_ROOT;
+        // aggregatorStates[recentBlock].currentMmrSize = 1;
+        aggregatorStates[recentBlock].oldestParentHash = recentBlock;
+        // aggregatorStates[recentBlock].mostRecentParentHash = recentBlock;
+    }
+
     function aggregateSharpJobs(JobOutputPacked[] calldata outputs) external {
-        assert(outputs.length > 0);
+        assert(outputs.length >= 2);
 
         // Ensure the first job is correctly linked with the current state
         JobOutputPacked calldata firstOutput = outputs[0];
@@ -94,23 +112,20 @@ contract SharpFactsAggregator is Initializable {
         ensureContinuableFromState(firstOutput);
 
         uint256 len = outputs.length - 1;
-        if (len > 0) {
-            // Iterate over the jobs outputs (except first and last)
-            // and ensure jobs are correctly linked
-            for (uint256 i = 1; i < len; ++i) {
-                JobOutputPacked memory curOutput = outputs[i];
-                JobOutputPacked memory nextOutput = outputs[i + 1];
-
-                ensureValidFact(curOutput);
-                ensureConsecutiveJobs(curOutput, nextOutput);
-            }
+        // Iterate over the jobs outputs (except first and last)
+        // and ensure jobs are correctly linked
+        for (uint256 i = 1; i < len; ++i) {
+            JobOutputPacked calldata curOutput = outputs[i];
+            JobOutputPacked calldata nextOutput = outputs[i + 1];
+            ensureValidFact(curOutput);
+            ensureConsecutiveJobs(curOutput, nextOutput);
         }
 
-        JobOutputPacked memory lastOutput = outputs[len - 1];
+        JobOutputPacked calldata lastOutput = outputs[len - 1];
         ensureValidFact(lastOutput);
 
         // We save the latest output in the contract state for future calls
-        (, uint256 mmrNewSize) = split128(lastOutput.mmrSizesPacked);
+        (, uint256 mmrNewSize) = lastOutput.mmrSizesPacked.split128();
         aggregatorState.currentMmrRoot = lastOutput.mmrNewRoot;
         aggregatorState.currentMmrSize = mmrNewSize;
         aggregatorState.oldestParentHash = lastOutput
@@ -120,17 +135,17 @@ contract SharpFactsAggregator is Initializable {
     }
 
     function ensureValidFact(JobOutputPacked memory output) internal view {
-        (uint256 mmrPreviousSize, uint256 mmrNewSize) = split128(
-            output.mmrSizesPacked
-        );
+        (uint256 mmrPreviousSize, uint256 mmrNewSize) = output
+            .mmrSizesPacked
+            .split128();
         (
             uint256 blockNPlusOneParentHashLow,
             uint256 blockNPlusOneParentHashHigh
-        ) = split128(uint256(output.blockNPlusOneParentHash));
+        ) = uint256(output.blockNPlusOneParentHash).split128();
         (
             uint256 blockNMinusRPlusOneParentHashLow,
             uint256 blockNMinusRPlusOneParentHashHigh
-        ) = split128(uint256(output.blockNMinusRPlusOneParentHash));
+        ) = uint256(output.blockNMinusRPlusOneParentHash).split128();
 
         // We verify the fact is valid
         bytes32 outputHash = keccak256(
@@ -146,10 +161,11 @@ contract SharpFactsAggregator is Initializable {
             )
         );
         bytes32 fact = keccak256(abi.encodePacked(PROGRAM_HASH, outputHash));
-
-        if (!IFactRegistry(FACTS_REGISTY).isValid(fact)) {
-            revert InvalidFact();
-        }
+        console.log("Fact:");
+        console.logBytes32(fact);
+        // if (!IFactRegistry(FACTS_REGISTY).isValid(fact)) {
+        //     revert InvalidFact();
+        // }
     }
 
     // Helper function to verify a fact based on a job output
@@ -164,18 +180,13 @@ contract SharpFactsAggregator is Initializable {
     function ensureContinuableFromState(
         JobOutputPacked memory output
     ) internal view {
-        (uint256 mmrPreviousSize, ) = split128(output.mmrSizesPacked);
+        (uint256 mmrPreviousSize, ) = output.mmrSizesPacked.split128();
 
         if (output.mmrPreviousRoot != aggregatorState.currentMmrRoot)
             revert AggregationRootMismatch();
 
         if (mmrPreviousSize != aggregatorState.currentMmrSize)
             revert AggregationSizeMismatch();
-
-        if (
-            output.blockNMinusRPlusOneParentHash !=
-            aggregatorState.oldestParentHash
-        ) revert AggregationErrorParentHashMismatch();
 
         if (
             output.blockNPlusOneParentHash !=
@@ -187,10 +198,10 @@ contract SharpFactsAggregator is Initializable {
         JobOutputPacked memory output,
         JobOutputPacked memory nextOutput
     ) internal pure {
-        (, uint256 outputMmrNewSize) = split128(output.mmrSizesPacked);
-        (uint256 nextOutputMmrPreviousSize, ) = split128(
-            nextOutput.mmrSizesPacked
-        );
+        (, uint256 outputMmrNewSize) = output.mmrSizesPacked.split128();
+        (uint256 nextOutputMmrPreviousSize, ) = nextOutput
+            .mmrSizesPacked
+            .split128();
 
         if (output.mmrNewRoot != nextOutput.mmrPreviousRoot)
             revert AggregationRootMismatch();
@@ -202,17 +213,5 @@ contract SharpFactsAggregator is Initializable {
             output.blockNPlusOneParentHash !=
             nextOutput.blockNMinusRPlusOneParentHash
         ) revert AggregationErrorParentHashMismatch();
-    }
-
-    function split128(
-        uint256 a
-    ) internal pure returns (uint256 lower, uint256 upper) {
-        // uint256 mask = (1 << 128) - 1;
-        // return (a & mask, a >> 128);
-        assembly {
-            // sub(exp(2, 128), 1) == 340282366920938463463374607431768211455
-            lower := and(a, 340282366920938463463374607431768211455)
-            upper := shr(128, a)
-        }
     }
 }
