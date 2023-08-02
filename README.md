@@ -1,4 +1,4 @@
-#### Create a virtual environment and install the dependencies
+#### Create a virtual environment and install the dependencies (one time setup)
 
 ```bash
 make setup
@@ -10,10 +10,26 @@ make build
 ```
 
 #### Run and profile cairo programs of interest (interactive script) 
-
+_Profiling graphs will be stored under `build/profiling/`_
 ```bash
 make run-profile
 ```
+#### Run cairo programs of interest (interactive script) 
+
+```bash
+make run
+```
+#### Prepare inputs / Precompute outputs for SHARP 
+_Data will be stored under `src/single_chunk_processor/data`_
+```bash
+make prepare-processor-input
+```
+#### Get main program hash
+_Returns the program hash of the main program (chunk_processor.cairo)_
+```bash
+make get-program-hash
+```
+
 
 
 ## Processor simulated usage : 

@@ -8,9 +8,6 @@ build:
 setup:
 	./tools/make/setup.sh
 
-# test:
-# 	protostar test
-
 run-profile:
 	@echo "A script to select, compile, run & profile one Cairo file"
 	./tools/make/launch_cairo_files.py -profile
@@ -24,6 +21,10 @@ prepare-processor-input:
 	@echo "Prepare chunk_processor_input.json data with the parameters in tools/make/processor_input.json"
 	./tools/make/prepare_inputs_api.py
 
+get-program-hash:
+	@echo "Get chunk_processor.cairo program's hash."
+	cairo-compile ./src/single_chunk_processor/chunk_processor.cairo --output build/compiled_cairo_files/chunk_processor.json
+	cairo-hash-program --program build/compiled_cairo_files/chunk_processor.json
 clean:
 	rm -rf build/compiled_cairo_files
 	mkdir -p build
