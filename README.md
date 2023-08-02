@@ -48,4 +48,4 @@ Keccaks = 8192
 Poseidon = 524288  
 
 
-Current processor program hash : 0x6f5bf57fb6e3dc977f47985a3b5fcebdac6c52799a71efa83a3a12d063fe92b
+Current processor program hash : 0x273de4c1c69594e2234858d9cb39ccf107a5754d3dc98f0760c82efaa919891
