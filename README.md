@@ -30,3 +30,6 @@ RC = 1048576
 Bitwise = 262144  
 Keccaks = 8192  
 Poseidon = 524288  
+
+
+Current processor program hash : 0x258fbe9cbf11c87d1dd0ded5f70d494c6a2977076b672738cbdffddcab80581
