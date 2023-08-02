@@ -8,6 +8,12 @@ from src.libs.utils import (
     felt_divmod_2pow32,
     word_reverse_endian_64,
     word_reverse_endian_64_RC,
+    word_reverse_endian_16_RC,
+    word_reverse_endian_24_RC,
+    word_reverse_endian_32_RC,
+    word_reverse_endian_40_RC,
+    word_reverse_endian_48_RC,
+    word_reverse_endian_56_RC,
 )
 
 func read_block_headers() -> (rlp_array: felt**, rlp_array_bytes_len: felt*) {
@@ -52,27 +58,91 @@ func extract_parent_hash_little{range_check_ptr}(rlp: felt*) -> (res: Uint256) {
     return (res=Uint256(low=res_low, high=res_high));
 }
 
+// This function should only be called after the hash of the block header has been verified against the parent hash.
+// seed is used to divide resource allocation between range check and bitwise.
+// Returns the reversed block header and the number of felts in it.
 func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
-    n_felts: felt, block_header: felt*, block_index: felt
-) -> felt* {
+    n_bytes: felt, block_header: felt*, seed: felt
+) -> (reversed: felt*, n_felts: felt) {
     alloc_locals;
     let (reversed_block_header: felt*) = alloc();
-    let (_, rem) = felt_divmod(block_index, 2);
+    let (number_of_exact_8bytes_chunks, number_of_bytes_in_last_chunk) = felt_divmod(n_bytes, 8);
+    let (_, rem) = felt_divmod(seed, 2);
+
     if (rem == 0) {
         reverse_block_header_chunks_RC_inner(
-            index=n_felts - 1,
+            index=number_of_exact_8bytes_chunks - 1,
             block_header=block_header,
             reversed_block_header=reversed_block_header,
         );
-        return reversed_block_header;
+        tempvar range_check_ptr = range_check_ptr;
+        tempvar bitwise_ptr = bitwise_ptr;
     } else {
         reverse_block_header_chunks_bitwise_inner(
-            index=n_felts - 1,
+            index=number_of_exact_8bytes_chunks - 1,
             block_header=block_header,
             reversed_block_header=reversed_block_header,
         );
-        return reversed_block_header;
+        tempvar range_check_ptr = range_check_ptr;
+        tempvar bitwise_ptr = bitwise_ptr;
     }
+
+    if (number_of_bytes_in_last_chunk == 1) {
+        assert reversed_block_header[number_of_exact_8bytes_chunks] = block_header[
+            number_of_exact_8bytes_chunks
+        ];
+        return (reversed_block_header, number_of_exact_8bytes_chunks + 1);
+    }
+
+    if (number_of_bytes_in_last_chunk == 2) {
+        let last_reversed_chunk: felt = word_reverse_endian_16_RC(
+            block_header[number_of_exact_8bytes_chunks]
+        );
+        assert reversed_block_header[number_of_exact_8bytes_chunks] = last_reversed_chunk;
+        return (reversed_block_header, number_of_exact_8bytes_chunks + 1);
+    }
+
+    if (number_of_bytes_in_last_chunk == 3) {
+        let last_reversed_chunk: felt = word_reverse_endian_24_RC(
+            block_header[number_of_exact_8bytes_chunks]
+        );
+        assert reversed_block_header[number_of_exact_8bytes_chunks] = last_reversed_chunk;
+        return (reversed_block_header, number_of_exact_8bytes_chunks + 1);
+    }
+
+    if (number_of_bytes_in_last_chunk == 4) {
+        let last_reversed_chunk: felt = word_reverse_endian_32_RC(
+            block_header[number_of_exact_8bytes_chunks]
+        );
+        assert reversed_block_header[number_of_exact_8bytes_chunks] = last_reversed_chunk;
+        return (reversed_block_header, number_of_exact_8bytes_chunks + 1);
+    }
+
+    if (number_of_bytes_in_last_chunk == 5) {
+        let last_reversed_chunk: felt = word_reverse_endian_40_RC(
+            block_header[number_of_exact_8bytes_chunks]
+        );
+        assert reversed_block_header[number_of_exact_8bytes_chunks] = last_reversed_chunk;
+        return (reversed_block_header, number_of_exact_8bytes_chunks + 1);
+    }
+
+    if (number_of_bytes_in_last_chunk == 6) {
+        let last_reversed_chunk: felt = word_reverse_endian_48_RC(
+            block_header[number_of_exact_8bytes_chunks]
+        );
+        assert reversed_block_header[number_of_exact_8bytes_chunks] = last_reversed_chunk;
+        return (reversed_block_header, number_of_exact_8bytes_chunks + 1);
+    }
+
+    if (number_of_bytes_in_last_chunk == 7) {
+        let last_reversed_chunk: felt = word_reverse_endian_56_RC(
+            block_header[number_of_exact_8bytes_chunks]
+        );
+        assert reversed_block_header[number_of_exact_8bytes_chunks] = last_reversed_chunk;
+        return (reversed_block_header, number_of_exact_8bytes_chunks + 1);
+    }
+
+    return (reversed_block_header, number_of_exact_8bytes_chunks);
 }
 
 func reverse_block_header_chunks_RC{range_check_ptr}(n_felts: felt, block_header: felt*) -> felt* {

@@ -48,20 +48,16 @@ func verify_block_headers_and_hash_them{
     %{ print("\n") %}
     %{ print_u256(ids.rlp_keccak_hash,f"rlp_keccak_hash_{ids.index}") %}
     %{ print_u256(ids.parent_hash,f"prt_keccak_hash_{ids.index}") %}
-    // Poseidon Hash RLP of block i and store it in hash_array[i]:
-    local n_felts;
-    let (n_felts_temp, rem) = felt_divmod(bytes_len_array[index], 8);
-    if (rem != 0) {
-        assert n_felts = n_felts_temp + 1;
-    } else {
-        assert n_felts = n_felts_temp;
-    }
 
-    let reversed_block_header: felt* = reverse_block_header_chunks(
-        n_felts, block_headers_array[index], index
+    // Poseidon Hash (block_header_i) (in Big Endian)
+
+    let (reversed_block_header: felt*, n_felts: felt) = reverse_block_header_chunks(
+        n_bytes=bytes_len_array[index], block_header=block_headers_array[index], seed=index
     );
-    let (block_header_hash_big) = uint256_reverse_endian(rlp_keccak_hash);
     let (poseidon_hash) = poseidon_hash_many(n=n_felts, elements=reversed_block_header);
+
+    let (block_header_hash_big) = uint256_reverse_endian(rlp_keccak_hash);
+
     assert poseidon_hash_array[index] = poseidon_hash;
     assert keccak_hash_array[index].low = block_header_hash_big.low;
     assert keccak_hash_array[index].high = block_header_hash_big.high;

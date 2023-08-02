@@ -146,6 +146,170 @@ func word_reverse_endian_64_RC{range_check_ptr}(word: felt) -> felt {
         256 ** 6 + b7 * 256 ** 7;
 }
 
+func word_reverse_endian_16_RC{range_check_ptr}(word: felt) -> felt {
+    %{
+        word = ids.word
+        assert word < 2**16
+        word_bytes=word.to_bytes(2, byteorder='big')
+        for i in range(2):
+            memory[ap+i] = word_bytes[i]
+    %}
+    ap += 2;
+
+    let b0 = [ap - 2];
+    let b1 = [ap - 1];
+
+    assert [range_check_ptr] = b0;
+    assert [range_check_ptr + 1] = b1;
+
+    assert word = b0 * 256 + b1;
+
+    tempvar range_check_ptr = range_check_ptr + 2;
+    return b0 + b1 * 256;
+}
+
+func word_reverse_endian_24_RC{range_check_ptr}(word: felt) -> felt {
+    %{
+        word = ids.word
+        assert word < 2**24
+        word_bytes=word.to_bytes(3, byteorder='big')
+        for i in range(3):
+            memory[ap+i] = word_bytes[i]
+    %}
+    ap += 3;
+
+    let b0 = [ap - 3];
+    let b1 = [ap - 2];
+    let b2 = [ap - 1];
+
+    assert [range_check_ptr] = b0;
+    assert [range_check_ptr + 1] = b1;
+    assert [range_check_ptr + 2] = b2;
+
+    assert word = b0 * 256 ** 2 + b1 * 256 + b2;
+
+    tempvar range_check_ptr = range_check_ptr + 3;
+    return b0 + b1 * 256 + b2 * 256 ** 2;
+}
+
+func word_reverse_endian_32_RC{range_check_ptr}(word: felt) -> felt {
+    %{
+        word = ids.word
+        assert word < 2**32
+        word_bytes=word.to_bytes(4, byteorder='big')
+        for i in range(4):
+            memory[ap+i] = word_bytes[i]
+    %}
+    ap += 4;
+
+    let b0 = [ap - 4];
+    let b1 = [ap - 3];
+    let b2 = [ap - 2];
+    let b3 = [ap - 1];
+
+    assert [range_check_ptr] = b0;
+    assert [range_check_ptr + 1] = b1;
+    assert [range_check_ptr + 2] = b2;
+    assert [range_check_ptr + 3] = b3;
+
+    assert word = b0 * 256 ** 3 + b1 * 256 ** 2 + b2 * 256 + b3;
+
+    tempvar range_check_ptr = range_check_ptr + 4;
+    return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3;
+}
+
+func word_reverse_endian_40_RC{range_check_ptr}(word: felt) -> felt {
+    %{
+        word = ids.word
+        assert word < 2**40
+        word_bytes=word.to_bytes(5, byteorder='big')
+        for i in range(5):
+            memory[ap+i] = word_bytes[i]
+    %}
+    ap += 5;
+
+    let b0 = [ap - 5];
+    let b1 = [ap - 4];
+    let b2 = [ap - 3];
+    let b3 = [ap - 2];
+    let b4 = [ap - 1];
+
+    assert [range_check_ptr] = b0;
+    assert [range_check_ptr + 1] = b1;
+    assert [range_check_ptr + 2] = b2;
+    assert [range_check_ptr + 3] = b3;
+    assert [range_check_ptr + 4] = b4;
+
+    assert word = b0 * 256 ** 4 + b1 * 256 ** 3 + b2 * 256 ** 2 + b3 * 256 + b4;
+
+    tempvar range_check_ptr = range_check_ptr + 5;
+    return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4;
+}
+
+func word_reverse_endian_48_RC{range_check_ptr}(word: felt) -> felt {
+    %{
+        word = ids.word
+        assert word < 2**48
+        word_bytes=word.to_bytes(6, byteorder='big')
+        for i in range(6):
+            memory[ap+i] = word_bytes[i]
+    %}
+    ap += 6;
+
+    let b0 = [ap - 6];
+    let b1 = [ap - 5];
+    let b2 = [ap - 4];
+    let b3 = [ap - 3];
+    let b4 = [ap - 2];
+    let b5 = [ap - 1];
+
+    assert [range_check_ptr] = b0;
+    assert [range_check_ptr + 1] = b1;
+    assert [range_check_ptr + 2] = b2;
+    assert [range_check_ptr + 3] = b3;
+    assert [range_check_ptr + 4] = b4;
+    assert [range_check_ptr + 5] = b5;
+
+    assert word = b0 * 256 ** 5 + b1 * 256 ** 4 + b2 * 256 ** 3 + b3 * 256 ** 2 + b4 * 256 + b5;
+
+    tempvar range_check_ptr = range_check_ptr + 6;
+    return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4 + b5 * 256 ** 5;
+}
+
+func word_reverse_endian_56_RC{range_check_ptr}(word: felt) -> felt {
+    %{
+        word = ids.word
+        assert word < 2**56
+        word_bytes=word.to_bytes(7, byteorder='big')
+        for i in range(7):
+            memory[ap+i] = word_bytes[i]
+    %}
+    ap += 7;
+
+    let b0 = [ap - 7];
+    let b1 = [ap - 6];
+    let b2 = [ap - 5];
+    let b3 = [ap - 4];
+    let b4 = [ap - 3];
+    let b5 = [ap - 2];
+    let b6 = [ap - 1];
+
+    assert [range_check_ptr] = b0;
+    assert [range_check_ptr + 1] = b1;
+    assert [range_check_ptr + 2] = b2;
+    assert [range_check_ptr + 3] = b3;
+    assert [range_check_ptr + 4] = b4;
+    assert [range_check_ptr + 5] = b5;
+    assert [range_check_ptr + 6] = b6;
+
+    assert word = b0 * 256 ** 6 + b1 * 256 ** 5 + b2 * 256 ** 4 + b3 * 256 ** 3 + b4 * 256 ** 2 +
+        b5 * 256 + b6;
+
+    tempvar range_check_ptr = range_check_ptr + 7;
+    return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4 + b5 * 256 ** 5 + b6 *
+        256 ** 6;
+}
+
 func word_reverse_endian_32{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: felt) {
     // A function to reverse the endianness of a 4 bytes (32 bits) integer.
     // The result will not make sense if word > 2^32.
