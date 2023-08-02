@@ -10,8 +10,8 @@ library Uint256Splitter {
         // uint256 mask = (1 << 128) - 1;
         // return (a & mask, a >> 128);
         assembly {
-            // sub(exp(2, 128), 1) == 340282366920938463463374607431768211455
-            lower := and(a, 340282366920938463463374607431768211455)
+            // sub(exp(2, 128), 1) == 0xFFFFFFFFFFFFFFFF
+            lower := and(a, 0xFFFFFFFFFFFFFFFF)
             upper := shr(128, a)
         }
     }
