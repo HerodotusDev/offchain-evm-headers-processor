@@ -17,6 +17,18 @@ run:
 	@echo "Total number of steps will be shown at the end of the run." 
 	./tools/make/launch_cairo_files.py
 
+batch-cairo-pie:
+	@echo "Run processor with all inputs in src/single_chunk_processor/data/ and write pie objects"
+	./tools/make/sharp_submit.py -pie
+
+batch-sharp-submit:
+	@echo "Submits all pie objects in src/single_chunk_processor/data/ to SHARP"
+	./tools/make/sharp_submit.py -sharp
+
+batch-run-and-submit:
+	@echo "Run processor with all inputs in src/single_chunk_processor/data/ and submit to SHARP"
+	./tools/make/sharp_submit.py -pie -sharp
+
 prepare-processor-input:
 	@echo "Prepare chunk_processor_input.json data with the parameters in tools/make/processor_input.json"
 	./tools/make/prepare_inputs_api.py
