@@ -109,8 +109,8 @@ def prepare_full_chain_inputs(from_block_number_high, batch_size=50):
     from_block_number_high = from_block_number_high
     to_block_number_low = from_block_number_high - batch_size + 1
 
-    # 'brave new world' in Cairo, keccak(hex(511165008604479100545509010942618724))
-    last_peaks = {'poseidon':[511165008604479100545509010942618724], 'keccak':[93435818137180840214006077901347441834554899062844693462640230920378475721064]} 
+    # poseidon_hash_single('brave new world'), keccak(b"brave new world")
+    last_peaks = {'poseidon':[968420142673072399148736368629862114747721166432438466378474074601992041181], 'keccak':[93435818137180840214006077901347441834554899062844693462640230920378475721064]} 
     last_mmr_size = 1
     last_mmr_root = {'poseidon':last_peaks['poseidon'][0], 'keccak':last_peaks['keccak'][0]}
 
@@ -178,7 +178,8 @@ def prepare_full_chain_inputs(from_block_number_high, batch_size=50):
 
         
 
-prepare_full_chain_inputs(100,20)
+# prepare_full_chain_inputs(100, 20)
+prepare_full_chain_inputs(9433304,5)
 
 # chunk_process_api(last_peaks=[511165008604479100545509010942618724], 
 #                   last_mmr_size=1, 
