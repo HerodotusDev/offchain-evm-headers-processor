@@ -7,8 +7,12 @@
         "src/**/*.sol"
     ],
     "devDependencies": {
-        "prettier": "^3.0.0",
+        "prettier": "^3.0.1",
         "prettier-plugin-solidity": "^1.1.3"
     },
-    "private": true
+    "private": true,
+    "dependencies": {
+        "bn.js": "^5.2.1",
+        "ethers": "^5.7.2"
+    }
 }

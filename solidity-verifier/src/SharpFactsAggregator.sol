@@ -124,7 +124,7 @@ contract SharpFactsAggregator is Initializable, AccessControl {
             poseidonMmrRoot: POSEIDON_MMR_INITIAL_ROOT,
             keccakMmrRoot: KECCAK_MMR_INITIAL_ROOT,
             mmrSize: 1,
-            oldestParentHash: bytes32(0),
+            oldestParentHash: bytes32(0), // TODO: fix this
             mostRecentParentHash: bytes32(0),
             mostRecentBlockNumber: 0
         });
@@ -178,18 +178,21 @@ contract SharpFactsAggregator is Initializable, AccessControl {
             revert NotEnoughJobs();
         }
 
-        bytes32 rightBoundStartBlockParentHash = blockNumberToParentHash[
-            rightBoundStartBlock
-        ];
-        if (rightBoundStartBlockParentHash == bytes32(0)) {
-            revert UnknownParentHash();
+        // Start from a different block than the current state
+        if (rightBoundStartBlock != 0) {
+            bytes32 rightBoundStartBlockParentHash = blockNumberToParentHash[
+                rightBoundStartBlock
+            ];
+            if (rightBoundStartBlockParentHash == bytes32(0)) {
+                revert UnknownParentHash();
+            }
+
+            // TODO: Make it checked too in `ensureContinuableFromState`
         }
 
         // Ensure the first job is correctly linked with the current state
         JobOutputPacked calldata firstOutput = outputs[0];
         ensureContinuableFromState(firstOutput);
-
-        // uint256 last_idx = outputs.length - 1;
 
         // Iterate over the jobs outputs (aside from first and last)
         // and ensure jobs are correctly linked
@@ -239,33 +242,31 @@ contract SharpFactsAggregator is Initializable, AccessControl {
             output.mmrNewRootKeccak
         ).split128();
 
+        uint256[] memory outputs = new uint256[](12);
+        outputs[0] = blockNPlusOneParentHashLow;
+        outputs[1] = blockNPlusOneParentHashHigh;
+        outputs[2] = blockNMinusRPlusOneParentHashLow;
+        outputs[3] = blockNMinusRPlusOneParentHashHigh;
+        outputs[4] = uint256(output.mmrPreviousRootPoseidon);
+        outputs[5] = mmrPreviousRootKeccakLow;
+        outputs[6] = mmrPreviousRootKeccakHigh;
+        outputs[7] = mmrPreviousSize;
+        outputs[8] = uint256(output.mmrNewRootPoseidon);
+        outputs[9] = mmrNewRootKeccakLow;
+        outputs[10] = mmrNewRootKeccakHigh;
+        outputs[11] = mmrNewSize;
+
         // We hash the output
-        bytes32 outputHash = keccak256(
-            abi.encodePacked(
-                blockNPlusOneParentHashLow,
-                blockNPlusOneParentHashHigh,
-                blockNMinusRPlusOneParentHashLow,
-                blockNMinusRPlusOneParentHashHigh,
-                output.mmrPreviousRootPoseidon,
-                mmrPreviousRootKeccakLow,
-                mmrPreviousRootKeccakHigh,
-                mmrPreviousSize,
-                output.mmrNewRootPoseidon,
-                mmrNewRootKeccakLow,
-                mmrNewRootKeccakHigh,
-                mmrNewSize
-            )
-        );
+        bytes32 outputHash = keccak256(abi.encodePacked(outputs));
         // We compute the deterministic fact bytes32 value
-        bytes32 fact = keccak256(abi.encodePacked(PROGRAM_HASH, outputHash));
+        bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
         console.log("Fact:");
         console.logBytes32(fact);
 
-        // TODO: comment out below
-        // if (!IFactRegistry(FACTS_REGISTY).isValid(fact)) {
-        //     revert InvalidFact();
-        // }
+        if (!IFactRegistry(FACTS_REGISTY).isValid(fact)) {
+            revert InvalidFact();
+        }
     }
 
     /// @dev Helper function to verify a fact based on a job output

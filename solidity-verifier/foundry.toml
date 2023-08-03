@@ -6,6 +6,10 @@ gas_reports = ["*"]
 optimizer = true
 optimizer_runs = 20000
 viaIR =  true
+ffi = true
+
+[rpc_endpoints]
+goerli="http://3.10.105.11:8545"
 
 # Remappings in remappings.txt
 
