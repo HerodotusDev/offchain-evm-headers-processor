@@ -152,7 +152,6 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low = 0, b
         chunk_output['new_mmr_len'] = last_mmr_size
 
         # Save the chunk output data
-
         write_to_json(f"{PATH}blocks_{from_block_number_high}_{to_block_number_batch_low}_output.json", chunk_output)
 
         time.sleep(0.5)
@@ -164,11 +163,4 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low = 0, b
 
 
 prepare_full_chain_inputs(from_block_number_high=100, to_block_number_low=0, batch_size=20)
-# prepare_full_chain_inputs(9433304,9433255, 5)
-
-# chunk_process_api(last_peaks=[511165008604479100545509010942618724], 
-#                   last_mmr_size=1, 
-#                   from_block_number_high=100, 
-#                   to_block_number_low=80)
-
 
