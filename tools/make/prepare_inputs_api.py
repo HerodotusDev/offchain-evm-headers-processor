@@ -5,7 +5,6 @@ import os
 from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async, bytes_to_little_endian_ints
 import requests
 from tools.py.poseidon.poseidon_hash import poseidon_hash_many, poseidon_hash
-import sha3
 
 def mkdir_if_not_exists(path: str):
     isExist = os.path.exists(path)
@@ -36,6 +35,10 @@ def rpc_request(url, rpc_request):
     print(f"Response content: {response.content}")
     return response.json()
 
+def write_to_json(filename, data):
+    """Helper function to write data to a json file"""
+    with open(filename, 'w') as f:
+        json.dump(data, f, indent=4)
 
 def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, from_block_number_high:int, to_block_number_low) -> json:
     chunk_input={}
@@ -103,83 +106,76 @@ def chunk_process_api(last_peaks:dict, last_mmr_size:int, from_block_number_high
 
     return data
 
-def prepare_full_chain_inputs(from_block_number_high, batch_size=50):
+def process_chunk(last_peaks:dict, last_mmr_size:int, from_block_number_high:int, to_block_number_low) -> dict:
+    """Calls the chunk_process_api and processes the returned data."""
+    data = chunk_process_api(last_peaks, last_mmr_size, from_block_number_high, to_block_number_low)
+    return {
+        'last_peaks': {
+            'poseidon': data['poseidon_mmr_last_peaks'],
+            'keccak': data['keccak_mmr_last_peaks']
+        },
+        'last_mmr_size': data['mmr_last_len'],
+        'last_mmr_root': {
+            'poseidon': data['mmr_last_root_poseidon'],
+            'keccak': data['mmr_last_root_keccak']
+        }
+    }
+
+
+def prepare_full_chain_inputs(from_block_number_high, to_block_number_low = 0, batch_size=50):
+    """Main function to prepare the full chain inputs."""
+    # Error handling for input
+    if from_block_number_high < to_block_number_low:
+        raise ValueError("Start block should be higher than end block")
+    
+    if batch_size <= 0:
+        raise ValueError("Batch size should be greater than 0")
+
     PATH = "src/single_chunk_processor/data/"
     mkdir_if_not_exists(PATH)
-    from_block_number_high = from_block_number_high
-    to_block_number_low = from_block_number_high - batch_size + 1
 
-    # poseidon_hash_single('brave new world'), keccak(b"brave new world")
+    to_block_number_batch_low = max(from_block_number_high - batch_size + 1, to_block_number_low)
+
     last_peaks = {'poseidon':[968420142673072399148736368629862114747721166432438466378474074601992041181], 'keccak':[93435818137180840214006077901347441834554899062844693462640230920378475721064]} 
     last_mmr_size = 1
     last_mmr_root = {'poseidon':last_peaks['poseidon'][0], 'keccak':last_peaks['keccak'][0]}
 
-    print(f"Preparing input for blocks from {from_block_number_high} to {to_block_number_low}")
+    while from_block_number_high >= to_block_number_low:
+        print(f"Preparing input for blocks from {from_block_number_high} to {to_block_number_batch_low}")
 
-    chunk_input, chunk_output  = prepare_chunk_input(last_peaks, last_mmr_size, last_mmr_root, from_block_number_high, to_block_number_low)
-    with open(f"{PATH}blocks_{from_block_number_high}_{to_block_number_low}_input.json", 'w') as f:
-        json.dump(chunk_input, f, indent=4)
+        chunk_input, chunk_output  = prepare_chunk_input(last_peaks, last_mmr_size, last_mmr_root, from_block_number_high, to_block_number_batch_low)
 
-    previous_block_high = from_block_number_high
-    previous_block_low = to_block_number_low
-    from_block_number_high = to_block_number_low - 1
+        # Save the chunk input data
+        write_to_json(f"{PATH}blocks_{from_block_number_high}_{to_block_number_batch_low}_input.json", chunk_input)
 
-    to_block_number_low = from_block_number_high - batch_size + 1 if from_block_number_high - batch_size + 1 >= 0 else 0
+        try:
+            data = process_chunk(last_peaks, last_mmr_size, from_block_number_high, to_block_number_batch_low)
+        except Exception as e:
+            print(f"Failed to process chunk: {e}")
+            break
 
-
-    while to_block_number_low >= 0:
-        print("start while", to_block_number_low)
-        print(f"Preparing input for blocks from {from_block_number_high} to {to_block_number_low}")
-        previous_chunk_data = chunk_process_api(last_peaks, last_mmr_size, previous_block_high, previous_block_low)
-        last_peaks = {'poseidon':previous_chunk_data['poseidon_mmr_last_peaks'],
-                        'keccak':previous_chunk_data['keccak_mmr_last_peaks']}
-        
-        last_mmr_size = previous_chunk_data['mmr_last_len']
-        last_mmr_root = {'poseidon':previous_chunk_data['mmr_last_root_poseidon'],
-                        'keccak':previous_chunk_data['mmr_last_root_keccak']}
-        
+        last_peaks = data['last_peaks']
+        last_mmr_size = data['last_mmr_size']
+        last_mmr_root = data['last_mmr_root']
 
         chunk_output['new_mmr_root_poseidon'] = last_mmr_root['poseidon']
         chunk_output['new_mmr_root_keccak_low'], chunk_output['new_mmr_root_keccak_high'] = split_128(last_mmr_root['keccak'])
         chunk_output['new_mmr_len'] = last_mmr_size
 
-        print(f"Writing output for blocks from {previous_block_high} to {previous_block_low}")
-        with open(f"{PATH}blocks_{previous_block_high}_{previous_block_low}_output.json", 'w') as f:
-            json.dump(chunk_output, f, indent=4)
+        # Save the chunk output data
 
-        
+        write_to_json(f"{PATH}blocks_{from_block_number_high}_{to_block_number_batch_low}_output.json", chunk_output)
+
         time.sleep(0.5)
-        chunk_input, chunk_output = prepare_chunk_input(last_peaks, last_mmr_size, last_mmr_root, from_block_number_high, to_block_number_low)
-        with open(f"{PATH}blocks_{from_block_number_high}_{to_block_number_low}_input.json", 'w') as f:
-            json.dump(chunk_input, f, indent=4)
-        
-        if to_block_number_low==0:
-            previous_chunk_data = chunk_process_api(last_peaks, last_mmr_size, from_block_number_high, to_block_number_low)
-            last_mmr_size = previous_chunk_data['mmr_last_len']
-            last_mmr_root = {'poseidon':previous_chunk_data['mmr_last_root_poseidon'],
-                        'keccak':previous_chunk_data['mmr_last_root_keccak']}
-            
 
-            chunk_output['new_mmr_root_poseidon'] = last_mmr_root['poseidon']
-            chunk_output['new_mmr_root_keccak_low'], chunk_output['new_mmr_root_keccak_high'] = split_128(last_mmr_root['keccak'])
-            chunk_output['new_mmr_len'] = last_mmr_size
-            
-            print(f"Writing output for blocks from {from_block_number_high} to {to_block_number_low}")
-            with open(f"{PATH}blocks_{from_block_number_high}_{to_block_number_low}_output.json", 'w') as f:
-                json.dump(chunk_output, f, indent=4)
-            break
+        from_block_number_high -= batch_size
+        to_block_number_batch_low = max(from_block_number_high - batch_size + 1, to_block_number_low)
 
-        previous_block_high = from_block_number_high
-        previous_block_low = to_block_number_low
-        from_block_number_high = to_block_number_low - 1
-
-        to_block_number_low = from_block_number_high - batch_size + 1 if from_block_number_high - batch_size + 1 >= 0 else 0    
+    print("Full chain inputs prepared successfully")
 
 
-        
-
-# prepare_full_chain_inputs(100, 20)
-prepare_full_chain_inputs(9433304,5)
+prepare_full_chain_inputs(from_block_number_high=100, to_block_number_low=0, batch_size=20)
+# prepare_full_chain_inputs(9433304,9433255, 5)
 
 # chunk_process_api(last_peaks=[511165008604479100545509010942618724], 
 #                   last_mmr_size=1, 
