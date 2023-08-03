@@ -187,13 +187,13 @@ contract SharpFactsAggregator is Initializable, AccessControl {
 
         // Ensure the first job is correctly linked with the current state
         JobOutputPacked calldata firstOutput = outputs[0];
-        ensureValidFact(firstOutput);
         ensureContinuableFromState(firstOutput);
 
-        uint256 len = outputs.length - 1;
+        // uint256 last_idx = outputs.length - 1;
+
         // Iterate over the jobs outputs (aside from first and last)
         // and ensure jobs are correctly linked
-        for (uint256 i = 1; i < len; ++i) {
+        for (uint256 i = 0; i < outputs.length - 1; ++i) {
             JobOutputPacked calldata curOutput = outputs[i];
             JobOutputPacked calldata nextOutput = outputs[i + 1];
 
@@ -201,7 +201,7 @@ contract SharpFactsAggregator is Initializable, AccessControl {
             ensureConsecutiveJobs(curOutput, nextOutput);
         }
 
-        JobOutputPacked calldata lastOutput = outputs[len - 1];
+        JobOutputPacked calldata lastOutput = outputs[outputs.length - 1];
         ensureValidFact(lastOutput);
 
         // We save the latest output in the contract state for future calls
@@ -213,6 +213,8 @@ contract SharpFactsAggregator is Initializable, AccessControl {
             .blockNMinusRPlusOneParentHash;
         aggregatorState.mostRecentParentHash = lastOutput
             .blockNPlusOneParentHash;
+
+        // TODO: emit aggregation event
     }
 
     /// @notice Ensures the fact is registered on SHARP Facts Registry
@@ -316,8 +318,8 @@ contract SharpFactsAggregator is Initializable, AccessControl {
             revert AggregationSizeMismatch();
 
         if (
-            output.blockNPlusOneParentHash !=
-            nextOutput.blockNMinusRPlusOneParentHash
+            output.blockNMinusRPlusOneParentHash !=
+            nextOutput.blockNPlusOneParentHash
         ) revert AggregationErrorParentHashMismatch();
     }
 }
