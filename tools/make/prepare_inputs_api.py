@@ -80,46 +80,35 @@ def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, 
                  
     return chunk_input, chunk_output
 
-def chunk_process_api(last_peaks:dict, last_mmr_size:int, from_block_number_high:int, to_block_number_low) -> json:
-    data={}
-
-    params = {"chunk_size":50, 
-          "poseidon_last_elements_count":last_mmr_size,
-          "poseidon_last_peaks":[hex(x) for x in last_peaks['poseidon']], 
-          "keccak_last_elements_count":last_mmr_size,
-          "keccak_last_peaks":[hex(x) for x in last_peaks['keccak']],
-          "start_block": to_block_number_low, 
-          "end_block": from_block_number_high, 
-          'rpc_url':RPC_BACKEND_URL, 
-          "max_retries_per_request":3, 
-          "append_in_reverse":True}
-
-
-    test = rpc_request('http://3.10.105.11:8000/precompute-mmr',  params)
-    data['mmr_last_root_poseidon'] = int(test['poseidon_mmr']['root_hash'],16)
-    data['mmr_last_root_keccak'] = int(test['keccak_mmr']['root_hash'],16)
-    data['mmr_last_len'] = test['poseidon_mmr']['tree_size']
-    peaks_hashes_poseidon = [int(x, 16) for x in test['poseidon_mmr']['peaks']]
-    peaks_hashes_keccak = [int(x, 16) for x in test['keccak_mmr']['peaks']]
-    data['poseidon_mmr_last_peaks'] = peaks_hashes_poseidon
-    data['keccak_mmr_last_peaks'] = peaks_hashes_keccak
-
-    return data
-
 def process_chunk(last_peaks:dict, last_mmr_size:int, from_block_number_high:int, to_block_number_low) -> dict:
     """Calls the chunk_process_api and processes the returned data."""
-    data = chunk_process_api(last_peaks, last_mmr_size, from_block_number_high, to_block_number_low)
+    params = {
+        "chunk_size":50, 
+        "poseidon_last_elements_count":last_mmr_size,
+        "poseidon_last_peaks":[hex(x) for x in last_peaks['poseidon']], 
+        "keccak_last_elements_count":last_mmr_size,
+        "keccak_last_peaks":[hex(x) for x in last_peaks['keccak']],
+        "start_block": to_block_number_low, 
+        "end_block": from_block_number_high, 
+        'rpc_url':RPC_BACKEND_URL, 
+        "max_retries_per_request":3, 
+        "append_in_reverse":True
+    }
+
+    response = rpc_request('http://3.10.105.11:8000/precompute-mmr',  params)
+    
     return {
         'last_peaks': {
-            'poseidon': data['poseidon_mmr_last_peaks'],
-            'keccak': data['keccak_mmr_last_peaks']
+            'poseidon': [int(x, 16) for x in response['poseidon_mmr']['peaks']],
+            'keccak': [int(x, 16) for x in response['keccak_mmr']['peaks']]
         },
-        'last_mmr_size': data['mmr_last_len'],
+        'last_mmr_size': response['poseidon_mmr']['tree_size'],
         'last_mmr_root': {
-            'poseidon': data['mmr_last_root_poseidon'],
-            'keccak': data['mmr_last_root_keccak']
+            'poseidon': int(response['poseidon_mmr']['root_hash'], 16),
+            'keccak': int(response['keccak_mmr']['root_hash'], 16)
         }
     }
+
 
 
 def prepare_full_chain_inputs(from_block_number_high, to_block_number_low = 0, batch_size=50):
