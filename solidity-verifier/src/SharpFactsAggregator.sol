@@ -28,6 +28,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
     // Access control
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+    bytes32 public constant UNLOCKER_ROLE = keccak256("UNLOCKER_ROLE");
 
     // Sharp Facts Registry
     address public FACTS_REGISTY;
@@ -135,14 +136,29 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         // Grant operator role to the contract deployer
         // to be able to define new aggregate ranges
         _setupRole(OPERATOR_ROLE, _msgSender());
+        _setupRole(UNLOCKER_ROLE, _msgSender());
     }
 
     modifier ensureOperator() {
+        if(isOperatorRequired) {
+            require(
+                hasRole(OPERATOR_ROLE, _msgSender()),
+                "Caller has no Operator role"
+            );
+        }
+        _;
+    }
+
+    modifier ensureUnlocker() {
         require(
-            hasRole(OPERATOR_ROLE, _msgSender()),
-            "Caller has no Operator role"
+            hasRole(UNLOCKER_ROLE, _msgSender()),
+            "Caller has no Unlocker role"
         );
         _;
+    }
+
+    function setOperatorRequired(bool _isOperatorRequired) external ensureUnlocker {
+        isOperatorRequired = _isOperatorRequired;
     }
 
     /// @notice Extends the proving range to be able to process newer blocks
