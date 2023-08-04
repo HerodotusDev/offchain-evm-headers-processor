@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "openzeppelin-contracts/contracts/access/AccessControl.sol";
+import "openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 import "./interfaces/IFactsRegistry.sol";
 import "./lib/Uint256Splitter.sol";
@@ -22,12 +22,12 @@ import "./lib/Uint256Splitter.sol";
 /// `blockNMinusRPlusOneParentHash` = 8.parentHash (oldestHash)
 /// `blockNPlusOneParentHash`       = 11.parentHash (newestHash)
 /// ------------------
-contract SharpFactsAggregator is Initializable, AccessControl {
+contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     // Inline library to pack/unpack uin256 into 2 uint128 and vice versa
     using Uint256Splitter for uint256;
 
     // Access control
-    bytes32 public constant PROVER_ROLE = keccak256("PROVER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     // Sharp Facts Registry
     address public FACTS_REGISTY;
@@ -48,6 +48,8 @@ contract SharpFactsAggregator is Initializable, AccessControl {
 
     // Block number to parent hash tracker
     mapping(uint256 => bytes32) public blockNumberToParentHash;
+
+    bool public isOperatorRequired = true;
 
     // Cairo program's output
     struct JobOutput {
@@ -115,6 +117,7 @@ contract SharpFactsAggregator is Initializable, AccessControl {
         address factRegistry,
         uint256 programHash
     ) public initializer {
+        __AccessControl_init();
         // SHARP facts registry
         FACTS_REGISTY = factRegistry;
 
@@ -129,15 +132,15 @@ contract SharpFactsAggregator is Initializable, AccessControl {
             continuableParentHash: bytes32(0)
         });
 
-        // Grant prover role to the contract deployer
+        // Grant operator role to the contract deployer
         // to be able to define new aggregate ranges
-        _setupRole(PROVER_ROLE, _msgSender());
+        _setupRole(OPERATOR_ROLE, _msgSender());
     }
 
-    modifier ensureProver() {
+    modifier ensureOperator() {
         require(
-            hasRole(PROVER_ROLE, _msgSender()),
-            "Caller has no Prover role"
+            hasRole(OPERATOR_ROLE, _msgSender()),
+            "Caller has no Operator role"
         );
         _;
     }
@@ -145,7 +148,7 @@ contract SharpFactsAggregator is Initializable, AccessControl {
     /// @notice Extends the proving range to be able to process newer blocks
     function registerNewRange(
         uint256 blocksConfirmations
-    ) external ensureProver {
+    ) external ensureOperator {
         if (blocksConfirmations < 20) {
             revert NotEnoughBlockConfirmations();
         }
