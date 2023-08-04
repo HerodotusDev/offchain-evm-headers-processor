@@ -7,6 +7,15 @@ Pre-requisites:
 -   Foundry
 -   Solidity
 
+## Add RPC
+
+In `foundry.toml`, please define:
+
+```toml
+[rpc_endpoints]
+goerli=GOERLI_URL
+```
+
 ## Getting Started
 
 ```sh
@@ -23,7 +32,7 @@ forge install
 forge build
 
 #Test
-forge test --match-test testVerifyInvalidFact -vvv --rpc-url="http://GOERLI_RPC"
+forge test
 ```
 
 Herodotus Dev - 2023

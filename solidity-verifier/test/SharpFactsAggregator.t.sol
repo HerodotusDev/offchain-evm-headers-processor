@@ -55,13 +55,11 @@ contract SharpFactsAggregatorTest is Test {
             bytes32 poseidonMmrRoot,
             bytes32 keccakMmrRoot,
             uint256 mmrSize,
-            ,
-            bytes32 mostRecentParentHash,
-
+            bytes32 continuableParentHash
         ) = sharpFactsAggregator.aggregatorState(); // Get initialized tree state
 
         assert(mmrSize == 1); // New tree, with genesis element "brave new world" only
-        assert(mostRecentParentHash == blockhash(blockRightBound));
+        assert(continuableParentHash == blockhash(blockRightBound));
 
         bytes32 output0BlockNPlusOneParentHash = bytes32(
             Uint256Splitter.merge128(
@@ -69,7 +67,7 @@ contract SharpFactsAggregatorTest is Test {
                 230845892776573197306270179585336099707
             )
         );
-        assert(mostRecentParentHash == output0BlockNPlusOneParentHash);
+        assert(continuableParentHash == output0BlockNPlusOneParentHash);
 
         SharpFactsAggregator.JobOutputPacked[]
             memory outputs = new SharpFactsAggregator.JobOutputPacked[](2);
@@ -172,10 +170,7 @@ contract SharpFactsAggregatorTest is Test {
 
         vm.rollFork(latestBlockNumber);
 
-        sharpFactsAggregator.aggregateSharpJobs(
-            block.number - blocksConfirmations,
-            outputs
-        );
+        sharpFactsAggregator.aggregateSharpJobs(0, outputs);
     }
 
     function testRealAggregateThreeJobsManual() public {
@@ -194,13 +189,11 @@ contract SharpFactsAggregatorTest is Test {
             bytes32 poseidonMmrRoot,
             bytes32 keccakMmrRoot,
             uint256 mmrSize,
-            ,
-            bytes32 mostRecentParentHash,
-
+            bytes32 continuableParentHash
         ) = sharpFactsAggregator.aggregatorState(); // Get initialized tree state
 
         assert(mmrSize == 1); // New tree, with genesis element "brave new world" only
-        assert(mostRecentParentHash == blockhash(blockRightBound));
+        assert(continuableParentHash == blockhash(blockRightBound));
 
         bytes32 output0BlockNPlusOneParentHash = bytes32(
             Uint256Splitter.merge128(
@@ -208,7 +201,7 @@ contract SharpFactsAggregatorTest is Test {
                 230845892776573197306270179585336099707
             )
         );
-        assert(mostRecentParentHash == output0BlockNPlusOneParentHash);
+        assert(continuableParentHash == output0BlockNPlusOneParentHash);
 
         SharpFactsAggregator.JobOutputPacked[]
             memory outputs = new SharpFactsAggregator.JobOutputPacked[](3);
@@ -362,9 +355,8 @@ contract SharpFactsAggregatorTest is Test {
             })
         );
 
-        uint256 rightBoundStartBlock = block.number - blocksConfirmations;
         vm.rollFork(latestBlockNumber);
-        sharpFactsAggregator.aggregateSharpJobs(rightBoundStartBlock, outputs);
+        sharpFactsAggregator.aggregateSharpJobs(0, outputs);
     }
 
     function testRealAggregateJobsFFI() public {
@@ -383,9 +375,7 @@ contract SharpFactsAggregatorTest is Test {
             bytes32 poseidonMmrRoot,
             bytes32 keccakMmrRoot,
             uint256 mmrSize,
-            bytes32 oldestParentHash,
-            bytes32 mostRecentParentHash,
-            uint256 mostRecentBlockNumber
+            bytes32 continuableParentHash
         ) = sharpFactsAggregator.aggregatorState(); // Get initialized tree state
 
         string[] memory inputs = new string[](3);
@@ -401,8 +391,8 @@ contract SharpFactsAggregatorTest is Test {
 
         SharpFactsAggregator.JobOutputPacked memory firstOutput = outputs[0];
         assert(mmrSize == 1); // New tree, with genesis element "brave new world" only
-        assert(mostRecentParentHash == blockhash(blockRightBound));
-        assert(mostRecentParentHash == firstOutput.blockNPlusOneParentHash);
+        assert(continuableParentHash == blockhash(blockRightBound));
+        assert(continuableParentHash == firstOutput.blockNPlusOneParentHash);
         assert(poseidonMmrRoot == firstOutput.mmrPreviousRootPoseidon);
         assert(keccakMmrRoot == firstOutput.mmrPreviousRootKeccak);
 

@@ -5,7 +5,6 @@ libs = ['lib']
 gas_reports = ["*"]
 optimizer = true
 optimizer_runs = 20000
-viaIR =  true
 ffi = true
 
 [rpc_endpoints]

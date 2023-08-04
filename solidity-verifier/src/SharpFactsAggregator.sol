@@ -7,8 +7,6 @@ import "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import "./interfaces/IFactsRegistry.sol";
 import "./lib/Uint256Splitter.sol";
 
-import "forge-std/console.sol";
-
 ///------------------
 /// @title SharpFactsAggregator
 /// @author Herodotus Dev
@@ -42,13 +40,14 @@ contract SharpFactsAggregator is Initializable, AccessControl {
         bytes32 poseidonMmrRoot;
         bytes32 keccakMmrRoot;
         uint256 mmrSize;
-        bytes32 oldestParentHash;
-        bytes32 mostRecentParentHash;
-        uint256 mostRecentBlockNumber;
+        bytes32 continuableParentHash;
     }
 
     // Contract state
     AggregatorState public aggregatorState;
+
+    // Block number to parent hash tracker
+    mapping(uint256 => bytes32) public blockNumberToParentHash;
 
     // Cairo program's output
     struct JobOutput {
@@ -85,12 +84,6 @@ contract SharpFactsAggregator is Initializable, AccessControl {
     bytes32 public constant KECCAK_MMR_INITIAL_ROOT =
         0xce92cc894a17c107be8788b58092c22cd0634d1489ca0ce5b4a045a1ce31b168;
 
-    // Block number to parent hash tracker
-    mapping(uint256 => bytes32) public blockNumberToParentHash;
-
-    // Aggregator states
-    mapping(bytes32 => AggregatorState) public aggregatorStates;
-
     // Errors
     error AggregationPoseidonRootMismatch();
     error AggregationKeccakRootMismatch();
@@ -106,6 +99,15 @@ contract SharpFactsAggregator is Initializable, AccessControl {
     event NewRangeRegistered(
         uint256 targetBlock,
         bytes32 targetBlockParentHash
+    );
+
+    // Aggregation
+    event Aggregate(
+        uint256 rightBoundStartBlock,
+        bytes32 poseidonMmrRoot,
+        bytes32 keccakMmrRoot,
+        uint256 mmrSize,
+        bytes32 continuableParentHash
     );
 
     /// @notice Initialize the contract
@@ -124,9 +126,7 @@ contract SharpFactsAggregator is Initializable, AccessControl {
             poseidonMmrRoot: POSEIDON_MMR_INITIAL_ROOT,
             keccakMmrRoot: KECCAK_MMR_INITIAL_ROOT,
             mmrSize: 1,
-            oldestParentHash: bytes32(0), // TODO: fix this
-            mostRecentParentHash: bytes32(0),
-            mostRecentBlockNumber: 0
+            continuableParentHash: bytes32(0)
         });
 
         // Grant prover role to the contract deployer
@@ -161,9 +161,12 @@ contract SharpFactsAggregator is Initializable, AccessControl {
 
         blockNumberToParentHash[targetBlock] = targetBlockParentHash;
 
-        if (aggregatorState.mostRecentBlockNumber < targetBlock - 1) {
-            aggregatorState.mostRecentParentHash = targetBlockParentHash;
-            aggregatorState.mostRecentBlockNumber = targetBlock - 1;
+        // Initialize `continuableParentHash` if it's the very first aggregation
+        if (
+            aggregatorState.mmrSize == 1 &&
+            aggregatorState.continuableParentHash == bytes32(0)
+        ) {
+            aggregatorState.continuableParentHash = targetBlockParentHash;
         }
 
         emit NewRangeRegistered(targetBlock, targetBlockParentHash);
@@ -174,34 +177,35 @@ contract SharpFactsAggregator is Initializable, AccessControl {
         uint256 rightBoundStartBlock,
         JobOutputPacked[] calldata outputs
     ) external {
-        if (outputs.length < 2) {
+        if (outputs.length < 1) {
             revert NotEnoughJobs();
         }
 
-        // Start from a different block than the current state
+        bytes32 rightBoundStartBlockParentHash = bytes32(0);
+        // Start from a different block than the current state if `rightBoundStartBlock` is specified
         if (rightBoundStartBlock != 0) {
-            bytes32 rightBoundStartBlockParentHash = blockNumberToParentHash[
+            rightBoundStartBlockParentHash = blockNumberToParentHash[
                 rightBoundStartBlock
             ];
             if (rightBoundStartBlockParentHash == bytes32(0)) {
                 revert UnknownParentHash();
             }
-
-            // TODO: Make it checked too in `ensureContinuableFromState`
         }
 
         // Ensure the first job is correctly linked with the current state
         JobOutputPacked calldata firstOutput = outputs[0];
-        ensureContinuableFromState(firstOutput);
+        ensureContinuable(rightBoundStartBlockParentHash, firstOutput);
 
-        // Iterate over the jobs outputs (aside from first and last)
-        // and ensure jobs are correctly linked
-        for (uint256 i = 0; i < outputs.length - 1; ++i) {
-            JobOutputPacked calldata curOutput = outputs[i];
-            JobOutputPacked calldata nextOutput = outputs[i + 1];
+        if (outputs.length > 1) {
+            // Iterate over the jobs outputs (aside from first and last)
+            // and ensure jobs are correctly linked
+            for (uint256 i = 0; i < outputs.length - 1; ++i) {
+                JobOutputPacked calldata curOutput = outputs[i];
+                JobOutputPacked calldata nextOutput = outputs[i + 1];
 
-            ensureValidFact(curOutput);
-            ensureConsecutiveJobs(curOutput, nextOutput);
+                ensureValidFact(curOutput);
+                ensureConsecutiveJobs(curOutput, nextOutput);
+            }
         }
 
         JobOutputPacked calldata lastOutput = outputs[outputs.length - 1];
@@ -212,16 +216,23 @@ contract SharpFactsAggregator is Initializable, AccessControl {
         aggregatorState.poseidonMmrRoot = lastOutput.mmrNewRootKeccak;
         aggregatorState.keccakMmrRoot = lastOutput.mmrNewRootKeccak;
         aggregatorState.mmrSize = mmrNewSize;
-        aggregatorState.oldestParentHash = lastOutput
+        aggregatorState.continuableParentHash = lastOutput
             .blockNMinusRPlusOneParentHash;
-        aggregatorState.mostRecentParentHash = lastOutput
-            .blockNPlusOneParentHash;
 
-        // TODO: emit aggregation event
+        emit Aggregate(
+            rightBoundStartBlock,
+            // TODO: log end block
+            lastOutput.mmrNewRootPoseidon,
+            lastOutput.mmrNewRootKeccak,
+            mmrNewSize,
+            lastOutput.blockNMinusRPlusOneParentHash
+        );
     }
 
     /// @notice Ensures the fact is registered on SHARP Facts Registry
     function ensureValidFact(JobOutputPacked memory output) internal view {
+        // TODO: add block numbers (leftbound, rightbound) to outputs array
+
         (uint256 mmrPreviousSize, uint256 mmrNewSize) = output
             .mmrSizesPacked
             .split128();
@@ -261,9 +272,6 @@ contract SharpFactsAggregator is Initializable, AccessControl {
         // We compute the deterministic fact bytes32 value
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
-        console.log("Fact:");
-        console.logBytes32(fact);
-
         if (!IFactRegistry(FACTS_REGISTY).isValid(fact)) {
             revert InvalidFact();
         }
@@ -278,10 +286,13 @@ contract SharpFactsAggregator is Initializable, AccessControl {
         return isValidFact;
     }
 
-    /// @notice Ensures the job output is correctly linked with the current state
-    function ensureContinuableFromState(
+    /// @notice Ensures the job output is correctly linked with the current contract storage
+    function ensureContinuable(
+        bytes32 rightBoundStartParentHash,
         JobOutputPacked memory output
     ) internal view {
+        // TODO: add block number check
+
         (uint256 mmrPreviousSize, ) = output.mmrSizesPacked.split128();
 
         if (output.mmrPreviousRootPoseidon != aggregatorState.poseidonMmrRoot)
@@ -294,9 +305,16 @@ contract SharpFactsAggregator is Initializable, AccessControl {
             revert AggregationSizeMismatch();
 
         if (
-            output.blockNPlusOneParentHash !=
-            aggregatorState.mostRecentParentHash
-        ) revert AggregationErrorParentHashMismatch();
+            rightBoundStartParentHash != bytes32(0) &&
+            output.blockNPlusOneParentHash != rightBoundStartParentHash
+        ) {
+            revert AggregationErrorParentHashMismatch();
+        } else {
+            if (
+                output.blockNPlusOneParentHash !=
+                aggregatorState.continuableParentHash
+            ) revert AggregationErrorParentHashMismatch();
+        }
     }
 
     /// @notice Ensures the job outputs are correctly linked
@@ -304,6 +322,8 @@ contract SharpFactsAggregator is Initializable, AccessControl {
         JobOutputPacked memory output,
         JobOutputPacked memory nextOutput
     ) internal pure {
+        // TODO: add block numbers check
+
         (, uint256 outputMmrNewSize) = output.mmrSizesPacked.split128();
         (uint256 nextOutputMmrPreviousSize, ) = nextOutput
             .mmrSizesPacked
