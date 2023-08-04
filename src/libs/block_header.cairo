@@ -58,6 +58,86 @@ func extract_parent_hash_little{range_check_ptr}(rlp: felt*) -> (res: Uint256) {
     return (res=Uint256(low=res_low, high=res_high));
 }
 
+// Returns byte size of a Bigint inside a rlp using the first byte to decode
+// Assume 0<= byte <= 183 (single byte or 55 byte long max)
+func get_bigint_byte_size{range_check_ptr}(byte: felt) -> felt {
+    %{ memory[ap]=1 if ids.byte<=127 else 0 %}
+    ap += 1;
+    let is_single_byte = [ap - 1];
+
+    if (is_single_byte != 0) {
+        assert [range_check_ptr] = 127 - byte;
+        tempvar range_check_ptr = range_check_ptr + 1;
+        return 0;
+    } else {
+        assert [range_check_ptr] = 183 - byte;
+        tempvar range_check_ptr = range_check_ptr + 1;
+        return byte - 128;
+    }
+}
+func extract_block_number_big{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*}(
+    rlp: felt*
+) -> felt {
+    alloc_locals;
+    let rlp_difficulty = rlp[56];
+    let next_word = rlp[57];
+
+    let (first_byte, remaining_7) = felt_divmod(rlp_difficulty, 2 ** 56);
+    let difficulty_offset = get_bigint_byte_size(first_byte);
+    // MAX Difficulty recorded is 15911382925018176 so max difficulty offset is 7, and will alway fit in the remaining_7.
+
+    if (difficulty_offset != 7) {
+        // It means 0 <= difficulty_offset < 7 and the first byte of block number is inside remaining_7
+        let mask = pow2_array[8 * (7 - difficulty_offset)] - 1;
+        // The mask is setting '0x'+(7-difficulty_offset)*'ff'
+        // For example,
+        // If difficulty offset is 0, mask is 0xffffffffffffff (7 bytes)
+        // If difficulty offset is 6, mask is 0xff (1 byte)
+        assert bitwise_ptr[0].x = remaining_7;
+        assert bitwise_ptr[0].y = mask;
+        tempvar block_number_item_start = bitwise_ptr[0].x_and_y;
+        tempvar bitwise_ptr = bitwise_ptr + BitwiseBuiltin.SIZE;
+
+        let block_number_item = block_number_item_start * 2 ** 64 + next_word;
+
+        let (first_byte, remainder) = felt_divmod(
+            block_number_item, pow2_array[(7 - difficulty_offset) * 8 + 56]
+        );
+
+        let block_number_offset = get_bigint_byte_size(first_byte);
+
+        if (block_number_offset == 0) {
+            if (first_byte == 128) {
+                return 0;
+            } else {
+                return first_byte;
+            }
+        } else {
+            let (block_number, _) = felt_divmod(
+                remainder, pow2_array[56 + (7 - difficulty_offset) * 8 - block_number_offset * 8]
+            );
+            return block_number;
+        }
+    } else {
+        // It means difficulty_offset == 7 and the block number item starts at the next word
+        let block_number_item = next_word;
+        let (first_byte, remaining_7) = felt_divmod(block_number_item, 2 ** 56);
+        let block_number_offset = get_bigint_byte_size(first_byte);
+        if (block_number_offset == 0) {
+            if (first_byte == 128) {
+                return 0;
+            } else {
+                return first_byte;
+            }
+        } else {
+            let (block_number, _) = felt_divmod(
+                remaining_7, pow2_array[56 - block_number_offset * 8]
+            );
+            return block_number;
+        }
+    }
+}
+
 // This function should only be called after the hash of the block header has been verified against the parent hash.
 // seed is used to divide resource allocation between range check and bitwise.
 // Returns the reversed block header and the number of felts in it.

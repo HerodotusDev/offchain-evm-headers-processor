@@ -2,21 +2,21 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, KeccakBuiltin, PoseidonBuiltin
+from starkware.cairo.common.registers import get_fp_and_pc
 
 from starkware.cairo.common.uint256 import Uint256, uint256_reverse_endian
-from starkware.cairo.common.math import unsigned_div_rem as felt_divmod
 from starkware.cairo.common.builtin_keccak.keccak import keccak
 from starkware.cairo.common.keccak_utils.keccak_utils import keccak_add_uint256
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash, poseidon_hash_many
 from starkware.cairo.common.default_dict import default_dict_new, default_dict_finalize
 from starkware.cairo.common.dict_access import DictAccess
 from starkware.cairo.common.dict import dict_write
-from starkware.cairo.common.registers import get_fp_and_pc
 
 from src.libs.block_header import (
     extract_parent_hash_little,
     read_block_headers,
     reverse_block_header_chunks,
+    extract_block_number_big,
 )
 from src.libs.utils import pow2alloc127
 
@@ -37,7 +37,9 @@ func verify_block_headers_and_hash_them{
     keccak_hash_array: Uint256*,
     block_headers_array: felt**,
     bytes_len_array: felt*,
-}(index: felt, parent_hash: Uint256) -> Uint256 {
+}(index: felt, parent_hash: Uint256) -> (
+    block_n_minus_r_plus_one_parent_hash: Uint256, last_block_header_big: felt*
+) {
     alloc_locals;
     // Keccak Hash RLP of block i and verify it matches the parent hash of block i+1
     let (rlp_keccak_hash: Uint256) = keccak(
@@ -65,7 +67,10 @@ func verify_block_headers_and_hash_them{
     let (block_i_parent_hash: Uint256) = extract_parent_hash_little(block_headers_array[index]);
 
     if (index == 0) {
-        return block_i_parent_hash;
+        return (
+            block_n_minus_r_plus_one_parent_hash=block_i_parent_hash,
+            last_block_header_big=reversed_block_header,
+        );
     } else {
         return verify_block_headers_and_hash_them(index=index - 1, parent_hash=block_i_parent_hash);
     }
@@ -294,9 +299,19 @@ func main{
 
     // (1) Validate chain of block headers for blocks [n, n-1, n-2, n-1, ..., n-r]:
     with poseidon_hash_array, keccak_hash_array, block_headers_array, bytes_len_array {
-        let block_n_minus_r_plus_one_parent_hash_little: Uint256 = verify_block_headers_and_hash_them(
-            index=n, parent_hash=block_n_plus_one_parent_hash_little);
+        let (
+            block_n_minus_r_plus_one_parent_hash_little: Uint256, last_block_header: felt*
+        ) = verify_block_headers_and_hash_them(
+            index=n, parent_hash=block_n_plus_one_parent_hash_little
+        );
     }
+
+    with pow2_array {
+        let block_n_minus_r_plus_one_number = extract_block_number_big(last_block_header);
+    }
+
+    assert to_block_number_low = block_n_minus_r_plus_one_number;
+
     %{ print(f"RLP successfully validated!") %}
     // (2) Build Poseidon/Keccak MMR by appending all poseidon/keccak hashes of block headers stored in poseidon_hash_array/keccak_hash_array:
     %{ print(f"Building MMR...") %}
@@ -333,53 +348,62 @@ func main{
     // Returns "private" input as public output, as well as output of interest.
 
     // Output :
-    // 0+1 : block_n_plus_one_parent_hash
-    // 2+3 : block_n_minus_r_plus_one_parent_hash
-    // 4 : MMR last root poseidon
-    // 5 : New MMR root poseidon
-    // 6+7 : MMR last root keccak
-    // 8+9 : New MMR root keccak
-    // 10 : MMR last size (<=> mmr_offset)
-    // 11 : New MMR size (<=> mmr_array_len + mmr_offset)
+    // 0 : from_block_number_high
+    // 1 : to_block_number_low
+    // 2+3 : block_n_plus_one_parent_hash
+    // 4+5 : block_n_minus_r_plus_one_parent_hash
+    // 4 : block_n_minus_r_plus_one_number
+    // 5 : MMR last root poseidon
+    // 6 : New MMR root poseidon
+    // 7+8 : MMR last root keccak
+    // 9+10 : New MMR root keccak
+    // 11 : MMR last size (<=> mmr_offset)
+    // 12 : New MMR size (<=> mmr_array_len + mmr_offset)
 
-    [ap] = block_n_plus_one_parent_hash.low;
+    [ap] = from_block_number_high;
     [ap] = [output_ptr], ap++;
 
-    [ap] = block_n_plus_one_parent_hash.high;
+    [ap] = to_block_number_low;
     [ap] = [output_ptr + 1], ap++;
 
-    [ap] = block_n_minus_r_plus_one_parent_hash.low;
+    [ap] = block_n_plus_one_parent_hash.low;
     [ap] = [output_ptr + 2], ap++;
 
-    [ap] = block_n_minus_r_plus_one_parent_hash.high;
+    [ap] = block_n_plus_one_parent_hash.high;
     [ap] = [output_ptr + 3], ap++;
 
-    [ap] = mmr_last_root_poseidon;
+    [ap] = block_n_minus_r_plus_one_parent_hash.low;
     [ap] = [output_ptr + 4], ap++;
 
-    [ap] = mmr_last_root_keccak.low;
+    [ap] = block_n_minus_r_plus_one_parent_hash.high;
     [ap] = [output_ptr + 5], ap++;
 
-    [ap] = mmr_last_root_keccak.high;
+    [ap] = mmr_last_root_poseidon;
     [ap] = [output_ptr + 6], ap++;
 
-    [ap] = mmr_offset;
+    [ap] = mmr_last_root_keccak.low;
     [ap] = [output_ptr + 7], ap++;
 
-    [ap] = new_mmr_root_poseidon;
+    [ap] = mmr_last_root_keccak.high;
     [ap] = [output_ptr + 8], ap++;
 
-    [ap] = new_mmr_root_keccak.low;
+    [ap] = mmr_offset;
     [ap] = [output_ptr + 9], ap++;
 
-    [ap] = new_mmr_root_keccak.high;
+    [ap] = new_mmr_root_poseidon;
     [ap] = [output_ptr + 10], ap++;
 
-    [ap] = mmr_array_len + mmr_offset;
+    [ap] = new_mmr_root_keccak.low;
     [ap] = [output_ptr + 11], ap++;
 
-    [ap] = output_ptr + 12, ap++;
-    let output_ptr = output_ptr + 12;
+    [ap] = new_mmr_root_keccak.high;
+    [ap] = [output_ptr + 12], ap++;
+
+    [ap] = mmr_array_len + mmr_offset;
+    [ap] = [output_ptr + 13], ap++;
+
+    [ap] = output_ptr + 14, ap++;
+    let output_ptr = output_ptr + 14;
 
     return ();
 }
