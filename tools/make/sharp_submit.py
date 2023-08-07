@@ -51,7 +51,7 @@ def run_cairo_program(input_file_path):
 
 def submit_pie_to_sharp(filename):
     result = subprocess.run(
-        ["cairo-sharp", "submit", "--cairo_pie", f"{INPUT_PATH}{filename.removesuffix('_input')}_pie.zip"], 
+        ["cairo-sharp", "submit", "--cairo_pie", f"{INPUT_PATH}{filename.removesuffix('_input.json')}_pie.zip"], 
         text=True,
         capture_output=True
     )
