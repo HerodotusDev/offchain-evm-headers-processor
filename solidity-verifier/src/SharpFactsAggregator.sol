@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import {Initializable} from "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import {AccessControlUpgradeable} from "openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
-import "./interfaces/IFactsRegistry.sol";
-import "./lib/Uint256Splitter.sol";
+import {IFactsRegistry} from "./interfaces/IFactsRegistry.sol";
+import {Uint256Splitter} from "./lib/Uint256Splitter.sol";
 
 ///------------------
 /// @title SharpFactsAggregator
@@ -29,12 +29,13 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     // Access control
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant UNLOCKER_ROLE = keccak256("UNLOCKER_ROLE");
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // Sharp Facts Registry
     address public FACTS_REGISTY;
 
     // Proving program hash
-    uint256 public PROGRAM_HASH;
+    bytes32 public PROGRAM_HASH;
 
     // Global aggregator state
     struct AggregatorState {
@@ -79,14 +80,6 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         uint256 mmrSizesPacked;
     }
 
-    // poseidon_hash("brave new world")
-    bytes32 public constant POSEIDON_MMR_INITIAL_ROOT =
-        0x02241b3b7f1c4b9cf63e670785891de91f7237b1388f6635c1898ae397ad32dd;
-
-    // keccak_hash("brave new world")
-    bytes32 public constant KECCAK_MMR_INITIAL_ROOT =
-        0xce92cc894a17c107be8788b58092c22cd0634d1489ca0ce5b4a045a1ce31b168;
-
     // Errors
     error AggregationPoseidonRootMismatch();
     error AggregationKeccakRootMismatch();
@@ -116,55 +109,58 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     /// @notice Initialize the contract
     function initialize(
         address factRegistry,
-        uint256 programHash
+        bytes32 programHash,
+        AggregatorState calldata initialAggregatorState
     ) public initializer {
         __AccessControl_init();
+
         // SHARP facts registry
         FACTS_REGISTY = factRegistry;
 
         // Proving program hash
         PROGRAM_HASH = programHash;
 
-        // Initial aggregator state
-        aggregatorState = AggregatorState({
-            poseidonMmrRoot: POSEIDON_MMR_INITIAL_ROOT,
-            keccakMmrRoot: KECCAK_MMR_INITIAL_ROOT,
-            mmrSize: 1,
-            continuableParentHash: bytes32(0)
-        });
+        aggregatorState = initialAggregatorState;
+
+        _setRoleAdmin(OPERATOR_ROLE, OPERATOR_ROLE);
+        _setRoleAdmin(UNLOCKER_ROLE, OPERATOR_ROLE);
+        _setRoleAdmin(UPGRADER_ROLE, OPERATOR_ROLE);
 
         // Grant operator role to the contract deployer
         // to be able to define new aggregate ranges
-        _setupRole(OPERATOR_ROLE, _msgSender());
-        _setupRole(UNLOCKER_ROLE, _msgSender());
+        _grantRole(OPERATOR_ROLE, _msgSender());
+        _grantRole(UNLOCKER_ROLE, _msgSender());
+        _grantRole(UPGRADER_ROLE, _msgSender());
     }
 
-    modifier ensureOperator() {
-        if(isOperatorRequired) {
+    modifier onlyOperator() {
+        if (isOperatorRequired) {
             require(
                 hasRole(OPERATOR_ROLE, _msgSender()),
-                "Caller has no Operator role"
+                "Caller is not an operator"
             );
         }
         _;
     }
 
-    modifier ensureUnlocker() {
+    modifier onlyUnlocker() {
         require(
             hasRole(UNLOCKER_ROLE, _msgSender()),
-            "Caller has no Unlocker role"
+            "Caller is not an unlocker"
         );
         _;
     }
 
-    function setOperatorRequired(bool _isOperatorRequired) external ensureUnlocker {
+    function setOperatorRequired(
+        bool _isOperatorRequired
+    ) external onlyUnlocker {
         isOperatorRequired = _isOperatorRequired;
     }
 
     /// @notice Extends the proving range to be able to process newer blocks
     function registerNewRange(
         uint256 blocksConfirmations
-    ) external ensureOperator {
+    ) external onlyOperator {
         if (blocksConfirmations < 20) {
             revert NotEnoughBlockConfirmations();
         }
@@ -232,7 +228,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
         // We save the latest output in the contract state for future calls
         (, uint256 mmrNewSize) = lastOutput.mmrSizesPacked.split128();
-        aggregatorState.poseidonMmrRoot = lastOutput.mmrNewRootKeccak;
+        aggregatorState.poseidonMmrRoot = lastOutput.mmrNewRootPoseidon;
         aggregatorState.keccakMmrRoot = lastOutput.mmrNewRootKeccak;
         aggregatorState.mmrSize = mmrNewSize;
         aggregatorState.continuableParentHash = lastOutput
@@ -291,18 +287,9 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         // We compute the deterministic fact bytes32 value
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
-        if (!IFactRegistry(FACTS_REGISTY).isValid(fact)) {
+        if (!IFactsRegistry(FACTS_REGISTY).isValid(fact)) {
             revert InvalidFact();
         }
-    }
-
-    /// @dev Helper function to verify a fact based on a job output
-    function verifyFact(uint256[] memory outputs) public view returns (bool) {
-        bytes32 outputHash = keccak256(abi.encodePacked(outputs));
-        bytes32 fact = keccak256(abi.encodePacked(PROGRAM_HASH, outputHash));
-
-        bool isValidFact = IFactRegistry(FACTS_REGISTY).isValid(fact);
-        return isValidFact;
     }
 
     /// @notice Ensures the job output is correctly linked with the current contract storage
@@ -361,5 +348,18 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             output.blockNMinusRPlusOneParentHash !=
             nextOutput.blockNPlusOneParentHash
         ) revert AggregationErrorParentHashMismatch();
+    }
+
+    /// @dev Helper function to verify a fact based on a job output
+    function verifyFact(uint256[] memory outputs) public view returns (bool) {
+        bytes32 outputHash = keccak256(abi.encodePacked(outputs));
+        bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
+
+        bool isValidFact = IFactsRegistry(FACTS_REGISTY).isValid(fact);
+        return isValidFact;
+    }
+
+    function getAggregatorState() public view returns (AggregatorState memory) {
+        return aggregatorState;
     }
 }
