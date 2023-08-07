@@ -18,15 +18,12 @@ contract AggregatorsFactoryTest is Test {
     uint256 constant PROPOSAL_DELAY = 3 days;
 
     // Important events
-    event TemplateProposal(address newTemplate);
-    event TemplateUpdate(address oldTemplate, address newTemplate);
+    event UpgradeProposal(address newTemplate);
+    event Upgrade(address oldTemplate, address newTemplate);
     event AggregatorCreation(address aggregator, uint256 aggregatorId);
 
     function setUp() public {
-        factory = new AggregatorsFactory(
-            address(aggregatorTemplate),
-            PROPOSAL_DELAY
-        );
+        factory = new AggregatorsFactory(address(aggregatorTemplate));
 
         vm.expectEmit(false, false, false, false);
         emit AggregatorCreation(address(aggregator), 0);
@@ -97,7 +94,7 @@ contract AggregatorsFactoryTest is Test {
         );
 
         vm.expectEmit(true, false, false, true);
-        emit TemplateProposal(address(newAggregator));
+        emit UpgradeProposal(address(newAggregator));
         factory.proposeUpgrade(address(newAggregator));
 
         vm.expectRevert("Invalid updateId");
@@ -109,10 +106,7 @@ contract AggregatorsFactoryTest is Test {
         vm.warp(block.timestamp + PROPOSAL_DELAY);
 
         vm.expectEmit(true, true, false, true);
-        emit TemplateUpdate(
-            address(aggregatorTemplate),
-            address(newAggregator)
-        );
+        emit Upgrade(address(aggregatorTemplate), address(newAggregator));
         factory.upgrade(1);
 
         vm.expectRevert("TimeLock not set");
