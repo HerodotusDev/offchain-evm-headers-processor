@@ -113,23 +113,35 @@ def process_chunk(last_peaks:dict, last_mmr_size:int, from_block_number_high:int
 
 
 
-def prepare_full_chain_inputs(from_block_number_high, to_block_number_low = 0, batch_size=50):
+def prepare_full_chain_inputs(from_block_number_high, to_block_number_low=0, batch_size=50, 
+                              initial_peaks=None, initial_mmr_size=None, initial_mmr_root=None):
     """Main function to prepare the full chain inputs."""
     # Error handling for input
     if from_block_number_high < to_block_number_low:
         raise ValueError("Start block should be higher than end block")
-    
+
     if batch_size <= 0:
         raise ValueError("Batch size should be greater than 0")
+
+    # Default initialization values
+    if initial_peaks is None:
+        initial_peaks = {'poseidon': [968420142673072399148736368629862114747721166432438466378474074601992041181], 
+                         'keccak': [93435818137180840214006077901347441834554899062844693462640230920378475721064]}
+
+    if initial_mmr_size is None:
+        initial_mmr_size = 1
+
+    if initial_mmr_root is None:
+        initial_mmr_root = {'poseidon': initial_peaks['poseidon'][0], 'keccak': initial_peaks['keccak'][0]}
 
     PATH = "src/single_chunk_processor/data/"
     mkdir_if_not_exists(PATH)
 
     to_block_number_batch_low = max(from_block_number_high - batch_size + 1, to_block_number_low)
 
-    last_peaks = {'poseidon':[968420142673072399148736368629862114747721166432438466378474074601992041181], 'keccak':[93435818137180840214006077901347441834554899062844693462640230920378475721064]} 
-    last_mmr_size = 1
-    last_mmr_root = {'poseidon':last_peaks['poseidon'][0], 'keccak':last_peaks['keccak'][0]}
+    last_peaks = initial_peaks
+    last_mmr_size = initial_mmr_size
+    last_mmr_root = initial_mmr_root
 
     while from_block_number_high >= to_block_number_low:
         print(f"Preparing input for blocks from {from_block_number_high} to {to_block_number_batch_low}")
@@ -163,6 +175,10 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low = 0, b
 
     print("Full chain inputs prepared successfully")
 
+    return last_peaks, last_mmr_size, last_mmr_root
 
-prepare_full_chain_inputs(from_block_number_high=100, to_block_number_low=0, batch_size=20)
+
+peaks, size, roots = prepare_full_chain_inputs(from_block_number_high=20, to_block_number_low=0, batch_size=5)
+
+prepare_full_chain_inputs(from_block_number_high=30, to_block_number_low=21, batch_size=5, initial_peaks=peaks, initial_mmr_size=size, initial_mmr_root=roots)
 
