@@ -34,7 +34,7 @@ contract AggregatorsFactoryTest is Test {
                 // Program hash (prover)
                 bytes32(
                     uint256(
-                        0x273de4c1c69594e2234858d9cb39ccf107a5754d3dc98f0760c82efaa919891
+                        0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
                     )
                 ),
                 // Create a new one (past aggregator ID = 0 for non-existing)
@@ -85,7 +85,7 @@ contract AggregatorsFactoryTest is Test {
                 // Program hash (prover)
                 bytes32(
                     uint256(
-                        0x273de4c1c69594e2234858d9cb39ccf107a5754d3dc98f0760c82efaa919891
+                        0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
                     )
                 ),
                 // Create a new one (past aggregator ID = 0 for non-existing)

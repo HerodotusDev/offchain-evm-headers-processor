@@ -52,6 +52,8 @@ function loadJSONFile(filePath) {
     var jsonString = fs.readFileSync(filePath, "utf-8");
     var jsonData = JSON.parse(jsonString);
     return jsonData.map(function (output) { return ({
+        fromBlockNumberHigh: output.from_block_number_high.toString(),
+        toBlockNumberLow: output.to_block_number_low.toString(),
         blockNPlusOneParentHashLow: output.block_n_plus_one_parent_hash_low.toString(),
         blockNPlusOneParentHashHigh: output.block_n_plus_one_parent_hash_high.toString(),
         blockNMinusRPlusOneParentHashLow: output.block_n_minus_r_plus_one_parent_hash_low.toString(),
@@ -89,21 +91,15 @@ function bigNumberToHex32(value) {
     var hex = ethers_1.utils.hexlify(paddedValueBytes);
     return hex;
 }
-function numberStringToBytes32(numberAsString) {
-    // Convert the number string to a BigNumber
-    var numberAsBigNumber = ethers_1.BigNumber.from(numberAsString);
-    // Convert the BigNumber to a zero-padded hex string
-    var hexString = ethers_1.utils.hexZeroPad(numberAsBigNumber.toHexString(), 32);
-    return hexString;
-}
 function main() {
     return __awaiter(this, void 0, void 0, function () {
-        var outputsFileName, outputs, jobsOutputsPacked, jobsOutputs, types, encoder;
+        var outputsFileName, outputs, jobsOutputsPacked, zeroBytes32, jobsOutputs, types, encoder;
         return __generator(this, function (_a) {
             outputsFileName = parseArgs(process.argv).outputsFileName;
             outputs = loadJSONFile(outputsFileName);
             jobsOutputsPacked = outputs.map(function (output) {
                 return ({
+                    blockNumbersPacked: merge128(output.fromBlockNumberHigh, output.toBlockNumberLow),
                     blockNPlusOneParentHash: merge128(output.blockNPlusOneParentHashLow, output.blockNPlusOneParentHashHigh),
                     blockNMinusRPlusOneParentHash: merge128(output.blockNMinusRPlusOneParentHashLow, output.blockNMinusRPlusOneParentHashHigh),
                     mmrPreviousRootPoseidon: bigNumberToHex32(ethers_1.BigNumber.from(output.mmrLastRootPoseidon)),
@@ -113,15 +109,21 @@ function main() {
                     mmrSizesPacked: merge128(output.mmrLastLen, output.newMmrLen),
                 });
             });
-            jobsOutputs = jobsOutputsPacked.map(function (output) { return Object.values(output); });
+            zeroBytes32 = "0x" + "0".repeat(64);
+            jobsOutputs = jobsOutputsPacked
+                .map(function (output) { return Object.values(output); })
+                .map(function (x) {
+                return x.map(function (val) { return (val === "0x00" ? zeroBytes32 : val); });
+            });
             types = [
+                "uint256",
                 "bytes32",
                 "bytes32",
                 "bytes32",
                 "bytes32",
                 "bytes32",
                 "bytes32",
-                "uint256", // mmrLastLen + newMmrLen
+                "uint256", // mmrLastLen | newMmrLen
             ];
             encoder = new ethers_1.utils.AbiCoder();
             console.log(encoder.encode(["tuple(".concat(types.join(), ")[]")], [jobsOutputs]));

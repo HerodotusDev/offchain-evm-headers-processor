@@ -1,8 +1,10 @@
 const fs = require("fs")
 const BN = require("bn.js")
-import { utils, BigNumber } from "ethers"
+import { constants, utils, BigNumber } from "ethers"
 
 type JobOutputRawJSON = {
+    from_block_number_high: BigInt
+    to_block_number_low: BigInt
     block_n_plus_one_parent_hash_low: BigInt
     block_n_plus_one_parent_hash_high: BigInt
     block_n_minus_r_plus_one_parent_hash_low: BigInt
@@ -18,6 +20,8 @@ type JobOutputRawJSON = {
 }
 
 type JobOutputRawJS = {
+    fromBlockNumberHigh: string
+    toBlockNumberLow: string
     blockNPlusOneParentHashLow: string
     blockNPlusOneParentHashHigh: string
     blockNMinusRPlusOneParentHashLow: string
@@ -33,6 +37,7 @@ type JobOutputRawJS = {
 }
 
 type JobOutputPackedJS = {
+    blockNumbersPacked: string
     blockNPlusOneParentHash: string
     blockNMinusRPlusOneParentHash: string
     mmrPreviousRootPoseidon: string
@@ -58,6 +63,8 @@ function loadJSONFile(filePath: string): JobOutputRawJS[] {
     const jsonData = JSON.parse(jsonString)
 
     return (jsonData as JobOutputRawJSON[]).map((output) => ({
+        fromBlockNumberHigh: output.from_block_number_high.toString(),
+        toBlockNumberLow: output.to_block_number_low.toString(),
         blockNPlusOneParentHashLow:
             output.block_n_plus_one_parent_hash_low.toString(),
         blockNPlusOneParentHashHigh:
@@ -108,16 +115,6 @@ function bigNumberToHex32(value: BigNumber): string {
     return hex
 }
 
-function numberStringToBytes32(numberAsString) {
-    // Convert the number string to a BigNumber
-    const numberAsBigNumber = BigNumber.from(numberAsString)
-
-    // Convert the BigNumber to a zero-padded hex string
-    const hexString = utils.hexZeroPad(numberAsBigNumber.toHexString(), 32)
-
-    return hexString
-}
-
 async function main() {
     const { outputsFileName } = parseArgs(process.argv)
     const outputs = loadJSONFile(outputsFileName)
@@ -125,6 +122,10 @@ async function main() {
     const jobsOutputsPacked: JobOutputPackedJS[] = outputs.map(
         (output: JobOutputRawJS) =>
             ({
+                blockNumbersPacked: merge128(
+                    output.fromBlockNumberHigh,
+                    output.toBlockNumberLow
+                ),
                 blockNPlusOneParentHash: merge128(
                     output.blockNPlusOneParentHashLow,
                     output.blockNPlusOneParentHashHigh
@@ -151,17 +152,24 @@ async function main() {
             }) as JobOutputPackedJS
     )
 
-    const jobsOutputs = jobsOutputsPacked.map((output) => Object.values(output))
+    const zeroBytes32 = "0x" + "0".repeat(64)
+    const jobsOutputs = jobsOutputsPacked
+        .map((output) => Object.values(output))
+        .map((x: string[]) =>
+            x.map((val) => (val === "0x00" ? zeroBytes32 : val))
+        )
 
     const types = [
-        "bytes32", // blockNPlusOneParentHashLow + blockNPlusOneParentHashHigh
-        "bytes32", // blockNMinusRPlusOneParentHashLow + blockNMinusRPlusOneParentHashHigh
+        "uint256", // toBlockNumberLow | fromBlockNumberHigh
+        "bytes32", // blockNPlusOneParentHashLow | blockNPlusOneParentHashHigh
+        "bytes32", // blockNMinusRPlusOneParentHashLow | blockNMinusRPlusOneParentHashHigh
         "bytes32", // mmrLastRootPoseidon
-        "bytes32", // mmrLastRootKeccakLow + mmrLastRootKeccakHigh
+        "bytes32", // mmrLastRootKeccakLow | mmrLastRootKeccakHigh
         "bytes32", // newMmrRootPoseidon
-        "bytes32", // newMmrRootKeccakLow + newMmrRootKeccakHigh
-        "uint256", // mmrLastLen + newMmrLen
+        "bytes32", // newMmrRootKeccakLow | newMmrRootKeccakHigh
+        "uint256", // mmrLastLen | newMmrLen
     ]
+
     // Pass back to foundry
     const encoder = new utils.AbiCoder()
     console.log(encoder.encode([`tuple(${types.join()})[]`], [jobsOutputs]))

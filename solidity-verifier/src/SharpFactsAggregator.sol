@@ -55,6 +55,8 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
     // Cairo program's output
     struct JobOutput {
+        uint256 fromBlockNumberHigh;
+        uint256 toBlockNumberLow;
         bytes32 blockNPlusOneParentHashLow;
         bytes32 blockNPlusOneParentHashHigh;
         bytes32 blockNMinusRPlusOneParentHashLow;
@@ -71,6 +73,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
     // Cairo program's output (packed)
     struct JobOutputPacked {
+        uint256 blockNumbersPacked;
         bytes32 blockNPlusOneParentHash;
         bytes32 blockNMinusRPlusOneParentHash;
         bytes32 mmrPreviousRootPoseidon;
@@ -90,6 +93,8 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     error NotEnoughJobs();
     error NotEnoughBlockConfirmations();
     error TooMuchBlockConfirmations();
+    error AggregationBlockMismatch();
+    error GenesisBlockReached();
 
     // Events
     event NewRangeRegistered(
@@ -99,7 +104,8 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
     // Aggregation
     event Aggregate(
-        uint256 rightBoundStartBlock,
+        uint256 fromBlockNumberHigh,
+        uint256 toBlockNumberLow,
         bytes32 poseidonMmrRoot,
         bytes32 keccakMmrRoot,
         uint256 mmrSize,
@@ -234,9 +240,12 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         aggregatorState.continuableParentHash = lastOutput
             .blockNMinusRPlusOneParentHash;
 
+        (uint256 fromBlock, ) = firstOutput.blockNumbersPacked.split128();
+        (, uint256 toBlock) = lastOutput.blockNumbersPacked.split128();
+
         emit Aggregate(
-            rightBoundStartBlock,
-            // TODO: log end block
+            fromBlock,
+            toBlock,
             lastOutput.mmrNewRootPoseidon,
             lastOutput.mmrNewRootKeccak,
             mmrNewSize,
@@ -246,7 +255,9 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
     /// @notice Ensures the fact is registered on SHARP Facts Registry
     function ensureValidFact(JobOutputPacked memory output) internal view {
-        // TODO: add block numbers (leftbound, rightbound) to outputs array
+        (uint256 fromBlock, uint256 toBlock) = output
+            .blockNumbersPacked
+            .split128();
 
         (uint256 mmrPreviousSize, uint256 mmrNewSize) = output
             .mmrSizesPacked
@@ -268,25 +279,28 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             output.mmrNewRootKeccak
         ).split128();
 
-        uint256[] memory outputs = new uint256[](12);
-        outputs[0] = blockNPlusOneParentHashLow;
-        outputs[1] = blockNPlusOneParentHashHigh;
-        outputs[2] = blockNMinusRPlusOneParentHashLow;
-        outputs[3] = blockNMinusRPlusOneParentHashHigh;
-        outputs[4] = uint256(output.mmrPreviousRootPoseidon);
-        outputs[5] = mmrPreviousRootKeccakLow;
-        outputs[6] = mmrPreviousRootKeccakHigh;
-        outputs[7] = mmrPreviousSize;
-        outputs[8] = uint256(output.mmrNewRootPoseidon);
-        outputs[9] = mmrNewRootKeccakLow;
-        outputs[10] = mmrNewRootKeccakHigh;
-        outputs[11] = mmrNewSize;
+        uint256[] memory outputs = new uint256[](14);
+        outputs[0] = fromBlock;
+        outputs[1] = toBlock;
+        outputs[2] = blockNPlusOneParentHashLow;
+        outputs[3] = blockNPlusOneParentHashHigh;
+        outputs[4] = blockNMinusRPlusOneParentHashLow;
+        outputs[5] = blockNMinusRPlusOneParentHashHigh;
+        outputs[6] = uint256(output.mmrPreviousRootPoseidon);
+        outputs[7] = mmrPreviousRootKeccakLow;
+        outputs[8] = mmrPreviousRootKeccakHigh;
+        outputs[9] = mmrPreviousSize;
+        outputs[10] = uint256(output.mmrNewRootPoseidon);
+        outputs[11] = mmrNewRootKeccakLow;
+        outputs[12] = mmrNewRootKeccakHigh;
+        outputs[13] = mmrNewSize;
 
         // We hash the output
         bytes32 outputHash = keccak256(abi.encodePacked(outputs));
         // We compute the deterministic fact bytes32 value
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
+        // We ensure this fact has been registered on SHARP Facts Registry
         if (!IFactsRegistry(FACTS_REGISTY).isValid(fact)) {
             revert InvalidFact();
         }
@@ -297,8 +311,6 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 rightBoundStartParentHash,
         JobOutputPacked memory output
     ) internal view {
-        // TODO: add block number check
-
         (uint256 mmrPreviousSize, ) = output.mmrSizesPacked.split128();
 
         if (output.mmrPreviousRootPoseidon != aggregatorState.poseidonMmrRoot)
@@ -315,7 +327,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             output.blockNPlusOneParentHash != rightBoundStartParentHash
         ) {
             revert AggregationErrorParentHashMismatch();
-        } else {
+        } else if (rightBoundStartParentHash == bytes32(0)) {
             if (
                 output.blockNPlusOneParentHash !=
                 aggregatorState.continuableParentHash
@@ -328,7 +340,16 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         JobOutputPacked memory output,
         JobOutputPacked memory nextOutput
     ) internal pure {
-        // TODO: add block numbers check
+        (, uint256 toBlock) = output.blockNumbersPacked.split128();
+
+        // Cannot aggregate further than the genesis block
+        if (toBlock == 0) {
+            revert GenesisBlockReached();
+        }
+
+        (uint256 nextFromBlock, ) = nextOutput.blockNumbersPacked.split128();
+
+        if (toBlock - 1 != nextFromBlock) revert AggregationBlockMismatch();
 
         (, uint256 outputMmrNewSize) = output.mmrSizesPacked.split128();
         (uint256 nextOutputMmrPreviousSize, ) = nextOutput
@@ -359,6 +380,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         return isValidFact;
     }
 
+    /// @notice Returns the current aggregator state
     function getAggregatorState() public view returns (AggregatorState memory) {
         return aggregatorState;
     }
