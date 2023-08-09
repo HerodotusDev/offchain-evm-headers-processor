@@ -90,12 +90,13 @@ contract AggregatorsFactory is AccessControl {
                 poseidonMmrRoot: POSEIDON_MMR_INITIAL_ROOT,
                 keccakMmrRoot: KECCAK_MMR_INITIAL_ROOT,
                 mmrSize: 1,
-                continuableParentHash: bytes32(0)
+                continuableParentHash: bytes32(0),
+                initialized: false
             });
         }
 
         bytes memory data = abi.encodeWithSignature(
-            "initialize(address,bytes32,(bytes32,bytes32,uint256,bytes32))",
+            "initialize(address,bytes32,(bytes32,bytes32,uint256,bytes32,bool))",
             sharpFactsRegistry,
             programHash,
             initialAggregatorState

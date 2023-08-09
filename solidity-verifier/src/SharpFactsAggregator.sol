@@ -7,26 +7,24 @@ import {AccessControlUpgradeable} from "openzeppelin-contracts-upgradeable/contr
 import {IFactsRegistry} from "./interfaces/IFactsRegistry.sol";
 import {Uint256Splitter} from "./lib/Uint256Splitter.sol";
 
-///------------------
 /// @title SharpFactsAggregator
+/// @dev Aggregator contract to handle SHARP job outputs and update the global aggregator state.
 /// @author Herodotus Dev
-/// @notice Terminology:
-/// `n` is the highest block number within the proving range
-/// `r` is the number of blocks processed on a single SHARP job execution
 /// ------------------
 /// Example:
 /// Blocks inside brackets are the ones processed during their SHARP job execution
 //  7 [8 9 10] 11
 /// n = 10
 /// r = 3
+/// `r` is the number of blocks processed on a single SHARP job execution
 /// `blockNMinusRPlusOneParentHash` = 8.parentHash (oldestHash)
 /// `blockNPlusOneParentHash`       = 11.parentHash (newestHash)
 /// ------------------
 contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
-    // Inline library to pack/unpack uin256 into 2 uint128 and vice versa
+    // Using inline library for efficient splitting and joining of uint256 values
     using Uint256Splitter for uint256;
 
-    // Access control
+    // Role definitions for access control
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant UNLOCKER_ROLE = keccak256("UNLOCKER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -34,7 +32,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     // Sharp Facts Registry
     address public FACTS_REGISTY;
 
-    // Proving program hash
+    // Cairo program hash (i.e., the off-chain block headers accumulators program)
     bytes32 public PROGRAM_HASH;
 
     // Global aggregator state
@@ -43,17 +41,19 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 keccakMmrRoot;
         uint256 mmrSize;
         bytes32 continuableParentHash;
+        bool initialized;
     }
 
-    // Contract state
+    // Current __global__ state of this aggregator
     AggregatorState public aggregatorState;
 
-    // Block number to parent hash tracker
+    // Mapping to keep track of block number to its parent hash
     mapping(uint256 => bytes32) public blockNumberToParentHash;
 
+    // Flag to control operator role requirements
     bool public isOperatorRequired = true;
 
-    // Cairo program's output
+    // Representation of the Cairo program's output (raw unpacked)
     struct JobOutput {
         uint256 fromBlockNumberHigh;
         uint256 toBlockNumberLow;
@@ -71,7 +71,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         uint256 mmrNewSize;
     }
 
-    // Cairo program's output (packed)
+    // Packed representation of the Cairo program's output (for gas efficiency)
     struct JobOutputPacked {
         uint256 blockNumbersPacked;
         bytes32 blockNPlusOneParentHash;
@@ -83,26 +83,27 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         uint256 mmrSizesPacked;
     }
 
-    // Errors
+    // Custom errors for better error handling and clarity
+    error NotEnoughBlockConfirmations();
+    error TooManyBlocksConfirmations();
+    error NotEnoughJobs();
+    error UnknownParentHash();
     error AggregationPoseidonRootMismatch();
     error AggregationKeccakRootMismatch();
     error AggregationSizeMismatch();
     error AggregationErrorParentHashMismatch();
-    error InvalidFact();
-    error UnknownParentHash();
-    error NotEnoughJobs();
-    error NotEnoughBlockConfirmations();
-    error TooMuchBlockConfirmations();
     error AggregationBlockMismatch();
     error GenesisBlockReached();
+    error InvalidFact();
 
-    // Events
+    // Event emitted when a new range is registered
+    // (i.e, when we want to allow aggregating from a more recent block)
     event NewRangeRegistered(
         uint256 targetBlock,
         bytes32 targetBlockParentHash
     );
 
-    // Aggregation
+    // Event emitted when __at least__ one SHARP job is aggregated
     event Aggregate(
         uint256 fromBlockNumberHigh,
         uint256 toBlockNumberLow,
@@ -112,7 +113,12 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 continuableParentHash
     );
 
-    /// @notice Initialize the contract
+    /**
+     * @notice Initializes the contract with given parameters.
+     * @param factRegistry Address of the SHARP Facts Registry.
+     * @param programHash The hash of the Cairo program.
+     * @param initialAggregatorState Initial state of the aggregator (i.e., initial trees state).
+     */
     function initialize(
         address factRegistry,
         bytes32 programHash,
@@ -128,6 +134,9 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
         aggregatorState = initialAggregatorState;
 
+        // Force the initial aggregator state to not have been priorly initialized
+        aggregatorState.initialized = false;
+
         _setRoleAdmin(OPERATOR_ROLE, OPERATOR_ROLE);
         _setRoleAdmin(UNLOCKER_ROLE, OPERATOR_ROLE);
         _setRoleAdmin(UPGRADER_ROLE, OPERATOR_ROLE);
@@ -139,6 +148,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         _grantRole(UPGRADER_ROLE, _msgSender());
     }
 
+    /// @notice Reverts if the caller is not an operator
     modifier onlyOperator() {
         if (isOperatorRequired) {
             require(
@@ -149,6 +159,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         _;
     }
 
+    /// @notice Reverts if the caller is not an unlocker
     modifier onlyUnlocker() {
         require(
             hasRole(UNLOCKER_ROLE, _msgSender()),
@@ -157,69 +168,102 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         _;
     }
 
+    /// @dev Modifies the contract's operator requirement
     function setOperatorRequired(
         bool _isOperatorRequired
     ) external onlyUnlocker {
         isOperatorRequired = _isOperatorRequired;
     }
 
-    /// @notice Extends the proving range to be able to process newer blocks
+    /// Registers a new range to aggregate from
+    /// @notice Caches a recent block hash (-20 to -255 from present), relying on the global `blockhash` Solidity function
+    /// @param blocksConfirmations Number of blocks preceding the current block
     function registerNewRange(
         uint256 blocksConfirmations
     ) external onlyOperator {
+        // Minimum 20 blocks confirmations to avoid reorgs
         if (blocksConfirmations < 20) {
             revert NotEnoughBlockConfirmations();
         }
+
+        // Maximum 255 blocks confirmations to capture
+        // an available block hash with Solidity `blockhash()`
         if (blocksConfirmations > 255) {
-            revert TooMuchBlockConfirmations();
+            revert TooManyBlocksConfirmations();
         }
 
+        // Determine the target block number (i.e. the child block)
         uint256 targetBlock = block.number - blocksConfirmations;
+
+        // Extract its parent hash.
         bytes32 targetBlockParentHash = blockhash(targetBlock - 1);
+
+        // If the parent hash is not available, revert
+        // (This should never happen under the current EVM rules)
         if (targetBlockParentHash == bytes32(0)) {
             revert UnknownParentHash();
         }
 
+        // Cache the parent hash so that we can later on continue accumlating from it
         blockNumberToParentHash[targetBlock] = targetBlockParentHash;
 
         // Initialize `continuableParentHash` if it's the very first aggregation
-        if (
-            aggregatorState.mmrSize == 1 &&
-            aggregatorState.continuableParentHash == bytes32(0)
-        ) {
+        if (!aggregatorState.initialized) {
+            // Set the aggregator state's `continuableParentHash` to the target block's parent hash
+            // so we can easily continue aggregating from it without specifying `rightBoundStartBlock` in `aggregateSharpJobs`
             aggregatorState.continuableParentHash = targetBlockParentHash;
+            // Mark the aggregator state as initialized
+            aggregatorState.initialized = true;
         }
 
         emit NewRangeRegistered(targetBlock, targetBlockParentHash);
     }
 
-    /// @notice Aggregate SHARP jobs outputs (min. 2) to update the global aggregator state
+    /// @notice Aggregate SHARP jobs outputs (min. 1) to update the global aggregator state
+    /// @param rightBoundStartBlock The reference block to start from. Defaults to continuing from the global state if set to `0`
+    /// @param outputs Array of SHARP jobs outputs (packed for Solidity)
     function aggregateSharpJobs(
         uint256 rightBoundStartBlock,
         JobOutputPacked[] calldata outputs
     ) external {
+        // Ensuring at least one job output is provided
         if (outputs.length < 1) {
             revert NotEnoughJobs();
         }
 
         bytes32 rightBoundStartBlockParentHash = bytes32(0);
+
         // Start from a different block than the current state if `rightBoundStartBlock` is specified
         if (rightBoundStartBlock != 0) {
+            // Retrieve from cache the parent hash of the block to start from
             rightBoundStartBlockParentHash = blockNumberToParentHash[
                 rightBoundStartBlock
             ];
+
+            // If not present in the cache, hash is not authenticated and we cannot continue from it
             if (rightBoundStartBlockParentHash == bytes32(0)) {
                 revert UnknownParentHash();
             }
         }
 
-        // Ensure the first job is correctly linked with the current state
         JobOutputPacked calldata firstOutput = outputs[0];
+        // Ensure the first job is continuable
         ensureContinuable(rightBoundStartBlockParentHash, firstOutput);
 
+        if (rightBoundStartBlockParentHash != bytes32(0)) {
+            (uint256 fromBlockHighStart, ) = firstOutput
+                .blockNumbersPacked
+                .split128();
+
+            // We check that block numbers are consecutives
+            if (fromBlockHighStart != rightBoundStartBlock - 1) {
+                revert AggregationBlockMismatch();
+            }
+        }
+
         if (outputs.length > 1) {
-            // Iterate over the jobs outputs (aside from first and last)
-            // and ensure jobs are correctly linked
+            // Iterate over the jobs outputs (aside from the first and the last one)
+            // and ensure jobs are correctly linked and valid
             for (uint256 i = 0; i < outputs.length - 1; ++i) {
                 JobOutputPacked calldata curOutput = outputs[i];
                 JobOutputPacked calldata nextOutput = outputs[i + 1];
@@ -254,6 +298,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     }
 
     /// @notice Ensures the fact is registered on SHARP Facts Registry
+    /// @param output SHARP job output (packed for Solidity)
     function ensureValidFact(JobOutputPacked memory output) internal view {
         (uint256 fromBlock, uint256 toBlock) = output
             .blockNumbersPacked
@@ -266,6 +311,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             uint256 blockNPlusOneParentHashLow,
             uint256 blockNPlusOneParentHashHigh
         ) = uint256(output.blockNPlusOneParentHash).split128();
+
         (
             uint256 blockNMinusRPlusOneParentHashLow,
             uint256 blockNMinusRPlusOneParentHashHigh
@@ -275,10 +321,12 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             uint256 mmrPreviousRootKeccakLow,
             uint256 mmrPreviousRootKeccakHigh
         ) = uint256(output.mmrPreviousRootKeccak).split128();
+
         (uint256 mmrNewRootKeccakLow, uint256 mmrNewRootKeccakHigh) = uint256(
             output.mmrNewRootKeccak
         ).split128();
 
+        // We assemble the outputs in a uint256 array
         uint256[] memory outputs = new uint256[](14);
         outputs[0] = fromBlock;
         outputs[1] = toBlock;
@@ -295,8 +343,9 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         outputs[12] = mmrNewRootKeccakHigh;
         outputs[13] = mmrNewSize;
 
-        // We hash the output
+        // We hash the outputs
         bytes32 outputHash = keccak256(abi.encodePacked(outputs));
+
         // We compute the deterministic fact bytes32 value
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
@@ -306,49 +355,62 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         }
     }
 
-    /// @notice Ensures the job output is correctly linked with the current contract storage
+    /// @notice Ensures the job output is cryptographically sound to continue from
+    /// @param rightBoundStartParentHash The parent hash of the block to start from
+    /// @param output The job output to check
     function ensureContinuable(
         bytes32 rightBoundStartParentHash,
         JobOutputPacked memory output
     ) internal view {
         (uint256 mmrPreviousSize, ) = output.mmrSizesPacked.split128();
 
+        // Check that the job's previous Poseidon MMR root is the same as the one stored in the contract state
         if (output.mmrPreviousRootPoseidon != aggregatorState.poseidonMmrRoot)
             revert AggregationPoseidonRootMismatch();
 
+        // Check that the job's previous Keccak MMR root is the same as the one stored in the contract state
         if (output.mmrPreviousRootKeccak != aggregatorState.keccakMmrRoot)
             revert AggregationKeccakRootMismatch();
 
+        // Check that the job's previous MMR size is the same as the one stored in the contract state
         if (mmrPreviousSize != aggregatorState.mmrSize)
             revert AggregationSizeMismatch();
 
-        if (
-            rightBoundStartParentHash != bytes32(0) &&
-            output.blockNPlusOneParentHash != rightBoundStartParentHash
-        ) {
-            revert AggregationErrorParentHashMismatch();
-        } else if (rightBoundStartParentHash == bytes32(0)) {
+        if (rightBoundStartParentHash == bytes32(0)) {
+            // If the right bound start parent hash __is not__ specified,
+            // we check that the job's `blockN + 1 parent hash` is matching with the previously stored parent hash
             if (
                 output.blockNPlusOneParentHash !=
                 aggregatorState.continuableParentHash
-            ) revert AggregationErrorParentHashMismatch();
+            ) {
+                revert AggregationErrorParentHashMismatch();
+            }
+        } else {
+            // If the right bound start parent hash __is__ specified,
+            // we check that the job's `blockN + 1 parent hash` is matching with a previously stored parent hash
+            if (output.blockNPlusOneParentHash != rightBoundStartParentHash) {
+                revert AggregationErrorParentHashMismatch();
+            }
         }
     }
 
     /// @notice Ensures the job outputs are correctly linked
+    /// @param output The job output to check
+    /// @param nextOutput The next job output to check
     function ensureConsecutiveJobs(
         JobOutputPacked memory output,
         JobOutputPacked memory nextOutput
     ) internal pure {
         (, uint256 toBlock) = output.blockNumbersPacked.split128();
 
-        // Cannot aggregate further than the genesis block
+        // We cannot aggregate further past the genesis block
         if (toBlock == 0) {
             revert GenesisBlockReached();
         }
 
         (uint256 nextFromBlock, ) = nextOutput.blockNumbersPacked.split128();
 
+        // We check that the next job's `from block` is the same as the previous job's `to block + 1`
         if (toBlock - 1 != nextFromBlock) revert AggregationBlockMismatch();
 
         (, uint256 outputMmrNewSize) = output.mmrSizesPacked.split128();
@@ -356,15 +418,19 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             .mmrSizesPacked
             .split128();
 
+        // We check that the previous job's new Poseidon MMR root matches the next job's previous Poseidon MMR root
         if (output.mmrNewRootPoseidon != nextOutput.mmrPreviousRootPoseidon)
             revert AggregationPoseidonRootMismatch();
 
+        // We check that the previous job's new Keccak MMR root matches the next job's previous Keccak MMR root
         if (output.mmrNewRootKeccak != nextOutput.mmrPreviousRootKeccak)
             revert AggregationKeccakRootMismatch();
 
+        // We check that the previous job's new MMR size matches the next job's previous MMR size
         if (outputMmrNewSize != nextOutputMmrPreviousSize)
             revert AggregationSizeMismatch();
 
+        // We check that the previous job's lowest block hash matches the next job's highest block hash
         if (
             output.blockNMinusRPlusOneParentHash !=
             nextOutput.blockNPlusOneParentHash
@@ -372,7 +438,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     }
 
     /// @dev Helper function to verify a fact based on a job output
-    function verifyFact(uint256[] memory outputs) public view returns (bool) {
+    function verifyFact(uint256[] memory outputs) external view returns (bool) {
         bytes32 outputHash = keccak256(abi.encodePacked(outputs));
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
@@ -381,7 +447,11 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     }
 
     /// @notice Returns the current aggregator state
-    function getAggregatorState() public view returns (AggregatorState memory) {
+    function getAggregatorState()
+        external
+        view
+        returns (AggregatorState memory)
+    {
         return aggregatorState;
     }
 }

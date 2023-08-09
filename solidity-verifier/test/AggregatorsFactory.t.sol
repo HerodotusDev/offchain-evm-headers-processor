@@ -25,7 +25,7 @@ contract AggregatorsFactoryTest is Test {
     function setUp() public {
         factory = new AggregatorsFactory(address(aggregatorTemplate));
 
-        vm.expectEmit(false, false, false, false);
+        vm.expectEmit(false, true, false, false);
         emit AggregatorCreation(address(aggregator), 0);
         aggregator = SharpFactsAggregator(
             factory.createAggregator(
@@ -41,6 +41,7 @@ contract AggregatorsFactoryTest is Test {
                 0
             )
         );
+        assertEq(factory.aggregatorsById(1), address(aggregator));
     }
 
     function testDeployment() public {
@@ -92,6 +93,7 @@ contract AggregatorsFactoryTest is Test {
                 1
             )
         );
+        assertEq(factory.aggregatorsById(2), address(newAggregator));
 
         vm.expectEmit(true, false, false, true);
         emit UpgradeProposal(address(newAggregator));
