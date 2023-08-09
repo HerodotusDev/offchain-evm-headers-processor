@@ -11,16 +11,14 @@ func main{output_ptr: felt*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}() {
 
     %{
         from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async, bytes_to_8_bytes_chunks
+        from dotenv import load_dotenv
+        import os
+        load_dotenv()
+        API_KEY = os.getenv('API_KEY')
         GOERLI = 'goerli'
         MAINNET = 'mainnet'
-
         NETWORK = MAINNET
-        ALCHEMY_RPC = f'https://eth-{NETWORK}.g.alchemy.com/v2/powIIZZbxPDT4bm1SODbzrDH9dE9f_q9'
-
-        if NETWORK == GOERLI:
-            RPC_BACKEND_URL = "http://localhost:8545"
-        else:
-            RPC_BACKEND_URL = ALCHEMY_RPC
+        ALCHEMY_RPC = f'https://eth-{NETWORK}.g.alchemy.com/v2/{API_KEY}'
     %}
     let (pow2_array: felt*) = pow2alloc127();
     with pow2_array {

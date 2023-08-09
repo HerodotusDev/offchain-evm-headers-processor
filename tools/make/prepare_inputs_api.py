@@ -4,7 +4,7 @@ import time
 import os
 from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async, bytes_to_little_endian_ints
 import requests
-from tools.py.poseidon.poseidon_hash import poseidon_hash_many, poseidon_hash
+from dotenv import load_dotenv
 
 def mkdir_if_not_exists(path: str):
     isExist = os.path.exists(path)
@@ -12,11 +12,14 @@ def mkdir_if_not_exists(path: str):
         os.makedirs(path)
         print(f"Directory created : {path} ")
 
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
+
 GOERLI = 'goerli'
 MAINNET = 'mainnet'
 
 NETWORK = GOERLI
-ALCHEMY_RPC = f'https://eth-{NETWORK}.g.alchemy.com/v2/powIIZZbxPDT4bm1SODbzrDH9dE9f_q9'
+ALCHEMY_RPC = f'https://eth-{NETWORK}.g.alchemy.com/v2/{API_KEY}'
 
 if NETWORK == GOERLI:
     RPC_BACKEND_URL = "http://localhost:8545"
