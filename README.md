@@ -58,16 +58,16 @@ make get-program-hash
 
 
 
-Current processor program hash : 0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
-
-See [src/single_chunk_processor/README.md](src/single_chunk_processor/README.md) for more details.
+See [src/single_chunk_processor/README.md](src/single_chunk_processor/README.md) for more details about the single chunk processor.
 
 ## Solidity verifier (SHARP verifier)
 
 See [solidity-verifier/README.md](solidity-verifier/README.md) for more details.
 
 
-#### Notice : Max Resources Per SHARP Job:
+### Additional data 
+
+#### Max Resources Per SHARP Job:
 
 | Resource  | Value     |
 |-----------|-----------|
@@ -77,7 +77,8 @@ See [solidity-verifier/README.md](solidity-verifier/README.md) for more details.
 | Keccaks   | 8,192     |
 | Poseidon  | 524,288   |
 
-
+#### Current processor program hash : 
+`0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784`
 
 
 Herodotus Dev - 2023. 
