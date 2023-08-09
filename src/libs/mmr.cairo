@@ -54,14 +54,14 @@ func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -
     // Computes N=2^bit_length and n=2^(bit_length-1)
     // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
 
-    tempvar N = pow2_array[bit_length];
-    tempvar n = pow2_array[bit_length - 1];
+    let N = pow2_array[bit_length];
+    let n = pow2_array[bit_length - 1];
 
     assert [range_check_ptr] = N - mmr_len - 1;
     assert [range_check_ptr + 1] = mmr_len - n;
     tempvar range_check_ptr = range_check_ptr + 2;
 
-    let all_ones = N - 1;
+    let all_ones = pow2_array[bit_length] - 1;
     if (mmr_len == all_ones) {
         return mmr_len;
     } else {
