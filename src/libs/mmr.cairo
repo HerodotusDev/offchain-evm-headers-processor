@@ -54,14 +54,14 @@ func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -
     // Computes N=2^bit_length and n=2^(bit_length-1)
     // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
 
-    let N = pow2_array[bit_length];
-    let n = pow2_array[bit_length - 1];
+    tempvar N = pow2_array[bit_length];
+    tempvar n = pow2_array[bit_length - 1];
 
     assert [range_check_ptr] = N - mmr_len - 1;
     assert [range_check_ptr + 1] = mmr_len - n;
     tempvar range_check_ptr = range_check_ptr + 2;
 
-    let all_ones = pow2_array[bit_length] - 1;
+    let all_ones = N - 1;
     if (mmr_len == all_ones) {
         return mmr_len;
     } else {
@@ -79,7 +79,7 @@ func compute_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_len: felt) 
     with mmr_len {
         let first_peak_pos = compute_first_peak_pos(mmr_len);
         assert peaks[0] = first_peak_pos;
-        let peaks_len = compute_peaks_inner(peaks, 1, first_peak_pos);
+        let peaks_len = compute_peaks_inner(peaks=peaks, peaks_len=1, mmr_pos=first_peak_pos);
     }
 
     return (peaks, peaks_len);
@@ -132,11 +132,11 @@ func get_full_mmr_peak_values{
     previous_peaks_dict_keccak: DictAccess*,
 }(position: felt) -> (peak_poseidon: felt, peak_keccak: Uint256) {
     alloc_locals;
-    %{ print(f"Asked position : {ids.position}, mmr_offset : {ids.mmr_offset}") %}
+    // %{ print(f"Asked position : {ids.position}, mmr_offset : {ids.mmr_offset}") %}
     local is_position_in_mmr_array: felt;
     %{ ids.is_position_in_mmr_array= 1 if ids.position > ids.mmr_offset else 0 %}
     if (is_position_in_mmr_array != 0) {
-        %{ print(f'getting from mmr_array at index {ids.position-ids.mmr_offset -1}') %}
+        // %{ print(f'getting from mmr_array at index {ids.position-ids.mmr_offset -1}') %}
         // ensure position > mmr_offset
         assert [range_check_ptr] = position - mmr_offset - 1;
         tempvar range_check_ptr = range_check_ptr + 1;
@@ -144,9 +144,8 @@ func get_full_mmr_peak_values{
         let peak_keccak = mmr_array_keccak[position - mmr_offset - 1];
         return (peak_poseidon, peak_keccak);
     } else {
-        %{ print('getting from dict') %}
+        // %{ print('getting from dict') %}
         // ensure position <= mmr_offset
-
         assert [range_check_ptr] = mmr_offset - position;
         tempvar range_check_ptr = range_check_ptr + 1;
         let (peak_poseidon: felt) = dict_read{dict_ptr=previous_peaks_dict_poseidon}(key=position);
@@ -157,10 +156,10 @@ func get_full_mmr_peak_values{
         local peak_keccak: Uint256;
         assert peak_keccak.low = peak_keccak_ptr.low;
         assert peak_keccak.high = peak_keccak_ptr.high;
-        %{
-            print(f"dict_peak poseidon value at {ids.position} = {ids.peak_poseidon}") 
-            print(f"dict_peak keccak value at {ids.position} = {ids.peak_keccak.low} {ids.peak_keccak.high}")
-        %}
+        // %{
+        //     print(f"dict_peak poseidon value at {ids.position} = {ids.peak_poseidon}")
+        //     print(f"dict_peak keccak value at {ids.position} = {ids.peak_keccak.low} {ids.peak_keccak.high}")
+        // %}
         return (peak_poseidon, peak_keccak);
     }
 }

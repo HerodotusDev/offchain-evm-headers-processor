@@ -92,14 +92,8 @@ func construct_mmr{
     pow2_array: felt*,
 }(index: felt) {
     alloc_locals;
-    // // 2. Compute node
-    // %{ print(f"Hash index for node : {ids.mmr_array_len+ids.mmr_offset+1}") %}
 
-    // let node_poseidon: felt = poseidon_hash(
-    //     x=mmr_array_len + mmr_offset + 1, y=poseidon_hash_array[index]
-    // );
-
-    // // 3. Append nodes to mmr_array
+    // Append nodes to mmr arrays. These are already hashed.
 
     assert mmr_array_poseidon[mmr_array_len] = poseidon_hash_array[index];
     assert mmr_array_keccak[mmr_array_len].low = keccak_hash_array[index].low;
@@ -153,7 +147,7 @@ func merge_subtrees_if_applicable{
         local left_pos = next_pos - pow2_array[height + 1];
         local right_pos = left_pos + pow2_array[height + 1] - 1;
 
-        %{ print(f"Merging {ids.left_pos} + {ids.right_pos} at index {ids.next_pos} and height {ids.height_next_pos} ") %}
+        // %{ print(f"Merging {ids.left_pos} + {ids.right_pos} at index {ids.next_pos} and height {ids.height_next_pos} ") %}
 
         let (x_poseidon: felt, x_keccak: Uint256) = get_full_mmr_peak_values(left_pos);
         let (y_poseidon: felt, y_keccak: Uint256) = get_full_mmr_peak_values(right_pos);
@@ -289,7 +283,7 @@ func main{
     let mmr_array_len = 0;
     %{
         #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n)
-        # print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n-1)
+        #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n-1)
         #print_block_header(ids.block_headers_array, ids.bytes_len_array, 0)
     %}
 
@@ -312,16 +306,16 @@ func main{
 
     assert to_block_number_low = block_n_minus_r_plus_one_number;
 
-    %{ print(f"RLP successfully validated!") %}
+    // %{ print(f"RLP successfully validated!") %}
     // (2) Build Poseidon/Keccak MMR by appending all poseidon/keccak hashes of block headers stored in poseidon_hash_array/keccak_hash_array:
-    %{ print(f"Building MMR...") %}
+    // %{ print(f"Building MMR...") %}
     with poseidon_hash_array, keccak_hash_array, mmr_array_poseidon, mmr_array_keccak, mmr_array_len, pow2_array, mmr_offset, previous_peaks_dict_poseidon, previous_peaks_dict_keccak {
         construct_mmr(index=n);
     }
-    %{
-        print('Final Poseidon MMR') 
-        print_mmr(ids.mmr_array_poseidon,ids.mmr_array_len)
-    %}
+    // %{
+    //     print('Final Poseidon MMR')
+    //     print_mmr(ids.mmr_array_poseidon,ids.mmr_array_len)
+    // %}
 
     // -----------------------------------------------------
 

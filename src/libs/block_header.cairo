@@ -28,9 +28,9 @@ func read_block_headers() -> (rlp_array: felt**, rlp_array_bytes_len: felt*) {
     return (block_headers_array, block_headers_array_bytes_len);
 }
 
-// Assumes all words in rlp are 8 bytes little endian values.
-// Returns the keccak hash in little endian representation, to be asserter directly
-// against the hash of cairo keccak.
+// Assumes all words in block header are 8 bytes little endian values.
+// Returns the keccak hash in little endian representation, to be asserted directly
+// against the cairo keccak hash of block header
 func extract_parent_hash_little{range_check_ptr}(rlp: felt*) -> (res: Uint256) {
     alloc_locals;
     let rlp_0 = rlp[0];
@@ -44,16 +44,6 @@ func extract_parent_hash_little{range_check_ptr}(rlp: felt*) -> (res: Uint256) {
 
     let res_low = rlp_2_right * 2 ** 96 + rlp_1 * 2 ** 32 + rlp_0;
     let res_high = rlp_4 * 2 ** 96 + rlp_3 * 2 ** 32 + rlp_2_left;
-
-    // %{ print_felt_info(ids.rlp_0, 'rlp_0',4) %}
-    // %{ print_felt_info(ids.rlp_1, 'rlp_1',8) %}
-    // %{ print_felt_info(ids.rlp_2, 'rlp_2',8) %}
-    // %{ print_felt_info(ids.rlp_2_left, 'rlp_2_left', 4) %}
-    // %{ print_felt_info(ids.rlp_2_right, 'rlp_2_right',4) %}
-    // %{ print_felt_info(ids.rlp_3, 'rlp_3',8) %}
-    // %{ print_felt_info(ids.rlp_4, 'rlp_4',4) %}
-    // %{ print_felt_info(ids.res_low, 'res_low', 16) %}
-    // %{ print_felt_info(ids.res_high, 'res_high', 16) %}
 
     return (res=Uint256(low=res_low, high=res_high));
 }
