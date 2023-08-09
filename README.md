@@ -6,7 +6,7 @@
 make setup
 ```
 The repository is using RPC providers to fetch block data.  
-You will need to the RPC urls for mainnet and goerli by creating a `.env` file in the root directory of the repository and adding the following lines to it:
+You will need to store the RPC urls for mainnet and goerli by creating a `.env` file in the root directory of the repository and adding the following lines to it:
 
 ```plaintext
 RPC_URL_MAINNET=<RPC_URL_MAINNET>
@@ -51,7 +51,7 @@ make get-program-hash
 
 
 #### One chunk simulated usage : 
- 1) Modify last line of `tools/make/prepare_inputs_api.py` 's to choose the start block number and batch size.  
+1) Modify the last line of `tools/make/prepare_inputs_api.py` to choose the start block number and batch size. 
  2) Run `make prepare-processor-input` to generate all the cairo .json inputs under `src/single_chunk_processor/data`.
  3) Run `make run` and choose `chunk_processor.cairo`. 
  4) Select which input to run. 
