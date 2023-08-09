@@ -1,6 +1,7 @@
 const fs = require("fs")
 const BN = require("bn.js")
-import { constants, utils, BigNumber } from "ethers"
+
+import { utils, BigNumber } from "ethers"
 
 type JobOutputRawJSON = {
     from_block_number_high: BigInt

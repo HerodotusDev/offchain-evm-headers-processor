@@ -41,7 +41,6 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 keccakMmrRoot;
         uint256 mmrSize;
         bytes32 continuableParentHash;
-        bool initialized;
     }
 
     // Current __global__ state of this aggregator
@@ -134,9 +133,6 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
         aggregatorState = initialAggregatorState;
 
-        // Force the initial aggregator state to not have been priorly initialized
-        aggregatorState.initialized = false;
-
         _setRoleAdmin(OPERATOR_ROLE, OPERATOR_ROLE);
         _setRoleAdmin(UNLOCKER_ROLE, OPERATOR_ROLE);
         _setRoleAdmin(UPGRADER_ROLE, OPERATOR_ROLE);
@@ -207,13 +203,11 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         // Cache the parent hash so that we can later on continue accumlating from it
         blockNumberToParentHash[targetBlock] = targetBlockParentHash;
 
-        // Initialize `continuableParentHash` if it's the very first aggregation
-        if (!aggregatorState.initialized) {
+        // If we cannot aggregate further in the past (e.g., genesis block is reached or it's a new tree)
+        if (aggregatorState.continuableParentHash == bytes32(0)) {
             // Set the aggregator state's `continuableParentHash` to the target block's parent hash
             // so we can easily continue aggregating from it without specifying `rightBoundStartBlock` in `aggregateSharpJobs`
             aggregatorState.continuableParentHash = targetBlockParentHash;
-            // Mark the aggregator state as initialized
-            aggregatorState.initialized = true;
         }
 
         emit NewRangeRegistered(targetBlock, targetBlockParentHash);

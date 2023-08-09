@@ -8,7 +8,7 @@ optimizer_runs = 20000
 ffi = true
 
 [rpc_endpoints]
-goerli="http://3.10.105.11:8545"
+goerli = "https://rpc.ankr.com/eth_goerli"
 
 # Remappings in remappings.txt
 

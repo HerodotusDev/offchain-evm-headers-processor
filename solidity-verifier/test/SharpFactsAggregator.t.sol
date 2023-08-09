@@ -45,8 +45,7 @@ contract SharpFactsAggregatorTest is Test {
                     poseidonMmrRoot: POSEIDON_MMR_INITIAL_ROOT,
                     keccakMmrRoot: KECCAK_MMR_INITIAL_ROOT,
                     mmrSize: 1,
-                    continuableParentHash: bytes32(0),
-                    initialized: false
+                    continuableParentHash: bytes32(0)
                 });
 
         sharpFactsAggregator = new SharpFactsAggregator();
@@ -120,8 +119,7 @@ contract SharpFactsAggregatorTest is Test {
             bytes32 poseidonMmrRoot,
             bytes32 keccakMmrRoot,
             uint256 mmrSize,
-            bytes32 continuableParentHash,
-            bool initialized
+            bytes32 continuableParentHash
         ) = sharpFactsAggregator.aggregatorState();
 
         (, uint256 mmrNewSize) = output.mmrSizesPacked.split128();
@@ -130,7 +128,6 @@ contract SharpFactsAggregatorTest is Test {
         assert(keccakMmrRoot == output.mmrNewRootKeccak);
         assert(mmrSize == mmrNewSize);
         assert(continuableParentHash == output.blockNMinusRPlusOneParentHash);
-        assert(initialized == true);
     }
 
     function testRealAggregateJobsFFI() public {
@@ -142,8 +139,6 @@ contract SharpFactsAggregatorTest is Test {
         uint256 pastBlockStart = firstRangeStartChildBlock + 50;
         // Start at block no. 70
         vm.rollFork(pastBlockStart);
-
-        assertFalse(sharpFactsAggregator.getAggregatorState().initialized);
 
         sharpFactsAggregator.registerNewRange(
             pastBlockStart - firstRangeStartChildBlock - 1
@@ -157,8 +152,7 @@ contract SharpFactsAggregatorTest is Test {
             bytes32 poseidonMmrRoot,
             bytes32 keccakMmrRoot,
             uint256 mmrSize,
-            bytes32 continuableParentHash,
-            bool initialized
+            bytes32 continuableParentHash
         ) = sharpFactsAggregator.aggregatorState(); // Get initialized tree state
 
         string[] memory inputs = new string[](3);
@@ -173,7 +167,6 @@ contract SharpFactsAggregatorTest is Test {
         );
 
         SharpFactsAggregator.JobOutputPacked memory firstOutput = outputs[0];
-        assertTrue(initialized);
         assert(mmrSize == 1); // New tree, with genesis element "brave new world" only
         assert(continuableParentHash == firstOutput.blockNPlusOneParentHash);
         assert(poseidonMmrRoot == firstOutput.mmrPreviousRootPoseidon);

@@ -6,8 +6,12 @@ import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessContr
 
 import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
 
+/// @title AggregatorsFactory
+/// @author Herodotus Dev
+/// @notice A factory contract for creating new SharpFactsAggregator contracts
+///         and upgrading new one's starter template
 contract AggregatorsFactory is AccessControl {
-    // Blank contract template
+    // Blank contract template address
     address public _template;
 
     // Timelock mechanism for upgrades proposals
@@ -20,7 +24,7 @@ contract AggregatorsFactory is AccessControl {
     mapping(uint256 => UpgradeProposalTimelock) public upgrades;
 
     // Upgrades tracker
-    uint256 upgradesCount;
+    uint256 public upgradesCount;
 
     // Delay before an upgrade can be performed
     uint256 public constant DELAY = 3 days;
@@ -28,7 +32,7 @@ contract AggregatorsFactory is AccessControl {
     // Aggregators indexing
     uint256 public aggregatorsCount;
 
-    // Aggregators by index
+    // Aggregators by id
     mapping(uint256 => address) public aggregatorsById;
 
     // Access control
@@ -48,6 +52,8 @@ contract AggregatorsFactory is AccessControl {
     event Upgrade(address oldTemplate, address newTemplate);
     event AggregatorCreation(address aggregator, uint256 aggregatorId);
 
+    /// Creates a new Factory contract and grants OPERATOR_ROLE to the deployer
+    /// @param template The address of the template contract to clone
     constructor(address template) {
         _template = template;
 
@@ -55,6 +61,7 @@ contract AggregatorsFactory is AccessControl {
         _grantRole(OPERATOR_ROLE, _msgSender());
     }
 
+    /// @notice Reverts if the caller is not an operator
     modifier onlyOperator() {
         require(
             hasRole(OPERATOR_ROLE, _msgSender()),
@@ -63,6 +70,12 @@ contract AggregatorsFactory is AccessControl {
         _;
     }
 
+    /**
+     * Creates a new aggregator contract by cloning the template contract
+     * @param sharpFactsRegistry The address of the SharpFactsRegistry contract
+     * @param programHash The hash of the program to compute facts from
+     * @param aggregatorId The id of an existing aggregator to attach to (0 for none)
+     */
     function createAggregator(
         address sharpFactsRegistry,
         bytes32 programHash,
@@ -90,21 +103,22 @@ contract AggregatorsFactory is AccessControl {
                 poseidonMmrRoot: POSEIDON_MMR_INITIAL_ROOT,
                 keccakMmrRoot: KECCAK_MMR_INITIAL_ROOT,
                 mmrSize: 1,
-                continuableParentHash: bytes32(0),
-                initialized: false
+                continuableParentHash: bytes32(0)
             });
         }
 
+        // Initialize the newly created aggregator
         bytes memory data = abi.encodeWithSignature(
-            "initialize(address,bytes32,(bytes32,bytes32,uint256,bytes32,bool))",
+            "initialize(address,bytes32,(bytes32,bytes32,uint256,bytes32))",
             sharpFactsRegistry,
             programHash,
             initialAggregatorState
         );
 
+        // Clone the template contract
         address clone = Clones.clone(_template);
 
-        // The data is the encoded initialize function (with any initial parameters)
+        // The data is the encoded initialize function (with initial parameters)
         (bool success, ) = clone.call(data);
 
         require(success, "Aggregator initialization failed");
@@ -116,6 +130,10 @@ contract AggregatorsFactory is AccessControl {
         return clone;
     }
 
+    /**
+     * Proposes an upgrade to the template (blank aggregator) contract
+     * @param newTemplate The address of the new template contract to use for future aggregators
+     */
     function proposeUpgrade(address newTemplate) external onlyOperator {
         upgrades[++upgradesCount] = UpgradeProposalTimelock(
             block.timestamp + DELAY,
@@ -125,6 +143,10 @@ contract AggregatorsFactory is AccessControl {
         emit UpgradeProposal(newTemplate);
     }
 
+    /**
+     * Upgrades the template (blank aggregator) contract
+     * @param updateId The id of the upgrade proposal to execute
+     */
     function upgrade(uint256 updateId) external onlyOperator {
         require(updateId <= upgradesCount, "Invalid updateId");
 
