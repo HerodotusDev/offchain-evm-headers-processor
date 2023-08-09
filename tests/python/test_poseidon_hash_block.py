@@ -2,19 +2,19 @@ from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async, bytes_t
 from tools.py.poseidon.poseidon_hash import poseidon_hash_many, poseidon_hash
 from dotenv import load_dotenv
 import os
-API_KEY = os.getenv('API_KEY')
+
 
 GOERLI = 'goerli'
 MAINNET = 'mainnet'
 
 NETWORK = GOERLI
-ALCHEMY_RPC = f'https://eth-{NETWORK}.g.alchemy.com/v2/{API_KEY}'
 
+RPC_URL = os.getenv("RPC_URL_GOERLI") if NETWORK == GOERLI else os.getenv("RPC_URL_MAINNET")
 
 block_n = 9433302
 
 def get_block_header(number:int):
-    blocks = fetch_blocks_from_rpc_no_async(number+1, number-1, ALCHEMY_RPC)
+    blocks = fetch_blocks_from_rpc_no_async(number+1, number-1, RPC_URL)
     block = blocks[1]
     assert block.number == number, f"Block number mismatch {block.number} != {number}"
     return block

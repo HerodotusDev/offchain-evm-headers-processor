@@ -14,11 +14,7 @@ func main{output_ptr: felt*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}() {
         from dotenv import load_dotenv
         import os
         load_dotenv()
-        API_KEY = os.getenv('API_KEY')
-        GOERLI = 'goerli'
-        MAINNET = 'mainnet'
-        NETWORK = MAINNET
-        ALCHEMY_RPC = f'https://eth-{NETWORK}.g.alchemy.com/v2/{API_KEY}'
+        RPC_URL = os.getenv('RPC_URL_MAINNET')
     %}
     let (pow2_array: felt*) = pow2alloc127();
     with pow2_array {
@@ -43,7 +39,7 @@ func test_batch_block_numbers{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow
     local len: felt;
 
     %{
-        fetch_block_call = fetch_blocks_from_rpc_no_async(ids.from_block_number_high, ids.to_block_number_low-1, ALCHEMY_RPC)
+        fetch_block_call = fetch_blocks_from_rpc_no_async(ids.from_block_number_high, ids.to_block_number_low-1, RPC_URL)
         block_numbers=[block.number for block in fetch_block_call]
         print(f'block_numbers={block_numbers}')
         block_headers_raw_rlp = [block.raw_rlp() for block in fetch_block_call]

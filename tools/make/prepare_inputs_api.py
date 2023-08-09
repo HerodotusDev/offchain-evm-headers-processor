@@ -13,18 +13,17 @@ def mkdir_if_not_exists(path: str):
         print(f"Directory created : {path} ")
 
 load_dotenv()
-API_KEY = os.getenv("API_KEY")
 
 GOERLI = 'goerli'
 MAINNET = 'mainnet'
 
 NETWORK = GOERLI
-ALCHEMY_RPC = f'https://eth-{NETWORK}.g.alchemy.com/v2/{API_KEY}'
+RPC_URL = os.getenv("RPC_URL_GOERLI") if NETWORK == GOERLI else os.getenv("RPC_URL_MAINNET")
 
 if NETWORK == GOERLI:
     RPC_BACKEND_URL = "http://localhost:8545"
 else:
-    RPC_BACKEND_URL = ALCHEMY_RPC
+    RPC_BACKEND_URL = RPC_URL
 
 
 def split_128(a):
@@ -46,7 +45,7 @@ def write_to_json(filename, data):
 def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, from_block_number_high:int, to_block_number_low) -> json:
     chunk_input={}
     chunk_output={}
-    blocks = fetch_blocks_from_rpc_no_async(from_block_number_high+1, to_block_number_low-1, ALCHEMY_RPC)
+    blocks = fetch_blocks_from_rpc_no_async(from_block_number_high+1, to_block_number_low-1, RPC_URL)
     blocks.reverse()
     block_n_plus_one = blocks[-1]
     block_n_minus_r_plus_one = blocks[0]
