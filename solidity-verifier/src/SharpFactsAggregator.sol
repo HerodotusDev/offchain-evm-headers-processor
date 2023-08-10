@@ -448,4 +448,14 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     {
         return aggregatorState;
     }
+
+    /// @notice Returns the current root hash of the Keccak Merkle Mountain Range (MMR) tree
+    function getMMRKeccakRoot() external view returns (bytes32) {
+        return aggregatorState.keccakMmrRoot;
+    }
+
+    /// @notice Returns the current root hash of the Poseidon Merkle Mountain Range (MMR) tree
+    function getMMRPoseidonRoot() external view returns (bytes32) {
+        return aggregatorState.poseidonMmrRoot;
+    }
 }
