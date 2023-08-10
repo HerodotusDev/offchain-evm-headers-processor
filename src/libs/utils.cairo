@@ -57,6 +57,9 @@ func word_reverse_endian_64{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: f
     return (res=word / 2 ** (8 + 16 + 32));
 }
 
+// A function to reverse the endianness of a 8 bytes (64 bits) integer.
+// Asuumes 0 <= word < 2^64.
+// This is guaranteed if word comes from a validated block header that has been keccak-hashed and verified against a parent hash.
 func word_reverse_endian_64_RC{range_check_ptr}(word: felt) -> felt {
     %{
         word = ids.word

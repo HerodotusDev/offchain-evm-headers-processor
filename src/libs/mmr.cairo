@@ -16,6 +16,7 @@ from starkware.cairo.common.keccak_utils.keccak_utils import keccak_add_uint256
 // 1     3     6
 //      / \   / \
 // 0   1   2 4   5
+// ref : https://github.com/mimblewimble/grin/blob/0ff6763ee64e5a14e70ddd4642b99789a1648a32/core/src/core/pmmr.rs#L606
 func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) -> felt {
     alloc_locals;
     local bit_length;
@@ -40,10 +41,13 @@ func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) 
         assert [range_check_ptr + 1] = x - n;
         tempvar range_check_ptr = range_check_ptr + 2;
         // Jump left on the MMR and continue until it's all ones.
+        // This is done by substracting (2^(bit_length-1) - 1) from x.
         return compute_height_pre_alloc_pow2(x - n + 1);
     }
 }
 
+// Computes the position of the leftmost peak of the MMR.
+// Ref: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
 func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> felt {
     alloc_locals;
     local bit_length;
@@ -70,7 +74,8 @@ func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -
     }
 }
 
-// returns peaks position from left to right
+// Returns peaks position indexes from left to right and the number of peaks given the size of the MMR
+// Ref: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
 func compute_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> (
     peaks: felt*, peaks_len: felt
 ) {
@@ -100,6 +105,8 @@ func compute_peaks_inner{range_check_ptr, pow2_array: felt*, mmr_len: felt}(
     }
 }
 
+// Jump to the left children from a position (by subtracting 2^height) until we are inside the MMR.
+// Ref: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
 func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_len}(
     left_child: felt
 ) -> felt {
@@ -122,7 +129,9 @@ func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_le
         return left_child_jump_until_inside_mmr(left_child);
     }
 }
-// Position must be a peak position
+
+// Returns the value of peaks for both MMRs at a given position
+// The values are taken either from the MMR array or from the previous peaks dictionary depending on the position
 func get_full_mmr_peak_values{
     range_check_ptr,
     mmr_array_poseidon: felt*,
@@ -164,6 +173,7 @@ func get_full_mmr_peak_values{
     }
 }
 
+// Compute the roots of both MMRs by bagging their peaks (see bag peaks function)
 func get_roots{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
@@ -191,6 +201,7 @@ func get_roots{
     return (bagged_peaks_poseidon, bagged_peaks_keccak);
 }
 
+// Returns the peaks values from left to right for both MMRs given the peaks positions
 func get_peaks_from_positions{
     range_check_ptr,
     mmr_array_poseidon: felt*,
@@ -235,6 +246,8 @@ func get_peaks_from_positions_inner{
     }
 }
 
+// Hashes the peaks of both MMRs together by computing H(peak1, H(peak2, H(peak3, ...))).
+// peak1 is the leftmost peak, peakN is the rightmost peak.
 func bag_peaks{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,

@@ -65,10 +65,35 @@ func get_bigint_byte_size{range_check_ptr}(byte: felt) -> felt {
         return byte - 128;
     }
 }
+
+// Returns the block number of a block header
+// Assumes the block header is properly RLP encoded, and its words are 64 bit big endian values
+// This is guaranteed if the block header has been previously keccak hashed and compared to a parent hash.
 func extract_block_number_big{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*}(
     rlp: felt*
 ) -> felt {
     alloc_locals;
+    // Ethereum block header RLP encoding is as follows for the first 7 items:
+    // parent hash prefix: \xf9\x02B\xa0 (4 bytes)
+    // parent hash: 32 bytes
+    // unclesHash prefix: \xa0 (1 byte)
+    // unclesHash: 32 bytes
+    // coinbase prefix: \x94 (1 byte)
+    // coinbase: 20 bytes
+    // stateRoot prefix: \xa0 (1 byte)
+    // stateRoot: 32 bytes
+    // transactionsRoot prefix: \xa0 (1 byte)
+    // transactionsRoot: 32 bytes
+    // receiptsRoot prefix: \xa0 (1 byte)
+    // receiptsRoot: 32 bytes
+    // logsBloom prefix: \xb9\x01\x00 (3 bytes)
+    // logsBloom: 256 bytes
+
+    // Next items : difficulty (variable length), number (variable length)
+    // So we can skip the first 7 items, and start reading the difficulty field, by using the following offset :
+    // 4 + 32 + 1 + 32 + 1 + 20 + 1 + 32 + 1 + 32 + 1 + 32 + 3 = 448 bytes
+    // Since words are 8 bytes, we can skip 448/8==56 words, and start reading the difficulty field at word 57 (index 56)
+
     let rlp_difficulty = rlp[56];
     let next_word = rlp[57];
 
