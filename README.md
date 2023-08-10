@@ -26,7 +26,7 @@ The Starkware SHARP generates the proofs, and the proof verification happens on-
 ```bash
 make setup
 ```
-Next times, you will need to activate the virtual environment by doing 
+After that and every time you get back to the repo, you will need to activate the virtual environment by doing:
 
 ```bash
 source venv/bin/activate
