@@ -458,4 +458,9 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     function getMMRPoseidonRoot() external view returns (bytes32) {
         return aggregatorState.poseidonMmrRoot;
     }
+
+    /// @notice Returns the current size of the Merkle Mountain Range (MMR) trees
+    function getMMRSize() external view returns (uint256) {
+        return aggregatorState.mmrSize;
+    }
 }

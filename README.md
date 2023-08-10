@@ -1,6 +1,6 @@
 # Scope
 
-This repository implements the logic of building and maintaining two Merkle Mountain Ranges(MMRs) containing only provably valid Ethereum block headers.
+This repository implements the logic of building and maintaining two Merkle Mountain Ranges (MMRs) containing only provably valid Ethereum block headers.
 
 Visualization of an MMR
 ![merkle mountain range tree](.github/mmr.png)
