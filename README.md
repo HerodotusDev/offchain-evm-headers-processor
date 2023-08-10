@@ -3,13 +3,13 @@
 This repository implements the logic of building and maintaining two Merkle Mountain Ranges(MMRs) containing only provably valid Ethereum block headers.
 
 Visualization of an MMR
-![alt text](https://github.com/HerodotusDev/offchain-evm-headers-processor/tree/main/.github/images/mmr.png?raw=true)
+![alt text](https://github.com/HerodotusDev/offchain-evm-headers-processor/tree/main/.github/mmr.png?raw=true)
 
 Building the MMRs happens offchain and is proven using a cairo program in the `src` directory.
 The CAIRO program takes as an input a blockhash passed by the verifier, to then provide preimages to the given blockhash or a decoded parent hash that must be valid block headers.
 
 Visualization of the linkage between blocks.
-![alt text](https://github.com/HerodotusDev/offchain-evm-headers-processor/tree/main/.github/images/blocks-linkage.png?raw=true)
+![alt text](https://github.com/HerodotusDev/offchain-evm-headers-processor/tree/main/.github/blocks-linkage.png?raw=true)
 
 The 2 MMRs store the same data and have the same size however are built with two different hash functions:
 
