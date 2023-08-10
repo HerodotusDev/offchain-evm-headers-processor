@@ -26,6 +26,11 @@ The Starkware SHARP generates the proofs, and the proof verification happens on-
 ```bash
 make setup
 ```
+Next times, you will need to activate the virtual environment by doing 
+
+```bash
+source venv/bin/activate
+```
 
 The repository uses RPC providers to fetch block data.  
 You will need to store the RPC urls for Mainnet and Goerli by creating a `.env` file in the root directory of the repository and adding the following lines to it:
