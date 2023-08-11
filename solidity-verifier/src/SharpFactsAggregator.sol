@@ -27,13 +27,18 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     // Role definitions for access control
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant UNLOCKER_ROLE = keccak256("UNLOCKER_ROLE");
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // Sharp Facts Registry
-    address public FACTS_REGISTY;
+    address public constant FACTS_REGISTRY =
+        0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168; // Goërli
 
-    // Cairo program hash (i.e., the off-chain block headers accumulators program)
-    bytes32 public PROGRAM_HASH;
+    // Cairo program hash (i.e., the off-chain block headers accumulator program)
+    bytes32 public constant PROGRAM_HASH =
+        bytes32(
+            uint256(
+                0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
+            )
+        );
 
     // Global aggregator state
     struct AggregatorState {
@@ -114,34 +119,22 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
     /**
      * @notice Initializes the contract with given parameters.
-     * @param factRegistry Address of the SHARP Facts Registry.
-     * @param programHash The hash of the Cairo program.
      * @param initialAggregatorState Initial state of the aggregator (i.e., initial trees state).
      */
     function initialize(
-        address factRegistry,
-        bytes32 programHash,
         AggregatorState calldata initialAggregatorState
     ) public initializer {
         __AccessControl_init();
-
-        // SHARP facts registry
-        FACTS_REGISTY = factRegistry;
-
-        // Proving program hash
-        PROGRAM_HASH = programHash;
 
         aggregatorState = initialAggregatorState;
 
         _setRoleAdmin(OPERATOR_ROLE, OPERATOR_ROLE);
         _setRoleAdmin(UNLOCKER_ROLE, OPERATOR_ROLE);
-        _setRoleAdmin(UPGRADER_ROLE, OPERATOR_ROLE);
 
         // Grant operator role to the contract deployer
         // to be able to define new aggregate ranges
         _grantRole(OPERATOR_ROLE, _msgSender());
         _grantRole(UNLOCKER_ROLE, _msgSender());
-        _grantRole(UPGRADER_ROLE, _msgSender());
     }
 
     /// @notice Reverts if the caller is not an operator
@@ -219,7 +212,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     function aggregateSharpJobs(
         uint256 rightBoundStartBlock,
         JobOutputPacked[] calldata outputs
-    ) external {
+    ) external onlyOperator {
         // Ensuring at least one job output is provided
         if (outputs.length < 1) {
             revert NotEnoughJobs();
@@ -255,10 +248,11 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             }
         }
 
+        uint256 limit = outputs.length - 1;
         if (outputs.length > 1) {
             // Iterate over the jobs outputs (aside from the first and the last one)
             // and ensure jobs are correctly linked and valid
-            for (uint256 i = 0; i < outputs.length - 1; ++i) {
+            for (uint256 i = 0; i < limit; ++i) {
                 JobOutputPacked calldata curOutput = outputs[i];
                 JobOutputPacked calldata nextOutput = outputs[i + 1];
 
@@ -267,7 +261,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             }
         }
 
-        JobOutputPacked calldata lastOutput = outputs[outputs.length - 1];
+        JobOutputPacked calldata lastOutput = outputs[limit];
         ensureValidFact(lastOutput);
 
         // We save the latest output in the contract state for future calls
@@ -344,7 +338,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
         // We ensure this fact has been registered on SHARP Facts Registry
-        if (!IFactsRegistry(FACTS_REGISTY).isValid(fact)) {
+        if (!IFactsRegistry(FACTS_REGISTRY).isValid(fact)) {
             revert InvalidFact();
         }
     }
@@ -436,7 +430,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 outputHash = keccak256(abi.encodePacked(outputs));
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
-        bool isValidFact = IFactsRegistry(FACTS_REGISTY).isValid(fact);
+        bool isValidFact = IFactsRegistry(FACTS_REGISTRY).isValid(fact);
         return isValidFact;
     }
 
