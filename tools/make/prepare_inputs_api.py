@@ -2,7 +2,8 @@
 import json
 import time
 import os
-from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async, bytes_to_little_endian_ints
+from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async
+from tools.py.utils import split_128, bytes_to_little_endian_ints
 import requests
 from dotenv import load_dotenv
 
@@ -26,15 +27,12 @@ else:
     RPC_BACKEND_URL = RPC_URL
 
 
-def split_128(a):
-    """Takes in value, returns uint256-ish tuple."""
-    return (a & ((1 << 128) - 1), a >> 128)
 
 def rpc_request(url, rpc_request):
     headers = {'Content-Type': 'application/json'}
     response = requests.post(url=url, headers=headers, data=json.dumps(rpc_request))
-    print(f"Status code: {response.status_code}")
-    print(f"Response content: {response.content}")
+    # print(f"Status code: {response.status_code}")
+    # print(f"Response content: {response.content}")
     return response.json()
 
 def write_to_json(filename, data):
@@ -126,27 +124,30 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low=0, bat
         raise ValueError("Batch size should be greater than 0")
 
     # Default initialization values
-    if initial_peaks is None:
+    if initial_peaks is None or initial_mmr_size is None or initial_mmr_root is None:
         initial_peaks = {'poseidon': [968420142673072399148736368629862114747721166432438466378474074601992041181], 
                          'keccak': [93435818137180840214006077901347441834554899062844693462640230920378475721064]}
-
-    if initial_mmr_size is None:
         initial_mmr_size = 1
-
-    if initial_mmr_root is None:
         initial_mmr_root = {'poseidon': initial_peaks['poseidon'][0], 'keccak': initial_peaks['keccak'][0]}
+
+    assert set(initial_peaks.keys()) == {'poseidon', 'keccak'}, f"Initial peaks should be a dict with keys 'poseidon' and 'keccak', got {initial_peaks.keys()}"
+    assert set(initial_mmr_root.keys()) == {'poseidon', 'keccak'}, f"Initial mmr root should be a dict with keys 'poseidon' and 'keccak', got {initial_mmr_root.keys()}"
+    assert len(initial_peaks['poseidon']) == len(initial_peaks['keccak'])
+    assert type(initial_mmr_size) == int
+    
+    last_peaks = initial_peaks
+    last_mmr_size = initial_mmr_size
+    last_mmr_root = initial_mmr_root
 
     PATH = "src/single_chunk_processor/data/"
     mkdir_if_not_exists(PATH)
 
     to_block_number_batch_low = max(from_block_number_high - batch_size + 1, to_block_number_low)
 
-    last_peaks = initial_peaks
-    last_mmr_size = initial_mmr_size
-    last_mmr_root = initial_mmr_root
+    print(f"Preparing inputs and precomputing outputs for blocks from {from_block_number_high} to {to_block_number_low} with batch size {batch_size}")
 
     while from_block_number_high >= to_block_number_low:
-        print(f"Preparing input for blocks from {from_block_number_high} to {to_block_number_batch_low}")
+        print(f"\tPreparing input and pre-computing output for blocks from {from_block_number_high} to {to_block_number_batch_low}")
 
         chunk_input, chunk_output  = prepare_chunk_input(last_peaks, last_mmr_size, last_mmr_root, from_block_number_high, to_block_number_batch_low)
 
@@ -172,15 +173,17 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low=0, bat
 
         time.sleep(0.5)
 
-        from_block_number_high -= batch_size
+        from_block_number_high = from_block_number_high - batch_size
         to_block_number_batch_low = max(from_block_number_high - batch_size + 1, to_block_number_low)
 
-    print("Full chain inputs prepared successfully")
+    print(f"Inputs and outputs for requested blocks are ready and saved to {PATH}\n")
 
     return last_peaks, last_mmr_size, last_mmr_root
 
 
-peaks, size, roots = prepare_full_chain_inputs(from_block_number_high=20, to_block_number_low=0, batch_size=5)
-
-prepare_full_chain_inputs(from_block_number_high=30, to_block_number_low=21, batch_size=5, initial_peaks=peaks, initial_mmr_size=size, initial_mmr_root=roots)
+if __name__ == "__main__":
+    # Prepare _inputs.json and pre-compute _outputs.json for blocks 20 to 0:
+    peaks, size, roots = prepare_full_chain_inputs(from_block_number_high=20, to_block_number_low=0, batch_size=5)
+    # Prepare _inputs.json and pre-compute _outputs.json for blocks 30 to 21, using the last peaks, size and roots from the previous run:
+    prepare_full_chain_inputs(from_block_number_high=30, to_block_number_low=21, batch_size=5, initial_peaks=peaks, initial_mmr_size=size, initial_mmr_root=roots)
 

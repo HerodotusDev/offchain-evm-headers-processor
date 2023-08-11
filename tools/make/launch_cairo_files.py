@@ -3,15 +3,11 @@ import os
 from os import listdir
 from os.path import isfile, join
 import readline
-import blake3
-import json
-from tinydb import TinyDB, Query
-import subprocess
 import argparse
 import inquirer
 
 # Create an ArgumentParser object
-parser = argparse.ArgumentParser(description="A simple script to demonstrate argparse")
+parser = argparse.ArgumentParser(description="A tool for running cairo programs.")
 
 # Define command-line arguments
 parser.add_argument("-profile", action="store_true", help="force pprof profile")
@@ -33,23 +29,11 @@ DEP_FOLDERS = ["src/"]
 CAIRO_PROGRAMS = []
 for folder in CAIRO_PROGRAMS_FOLDERS:
     CAIRO_PROGRAMS+= [join(folder, f) for f in listdir(folder) if isfile(join(folder, f)) if f.endswith('.cairo')]
-# print(CAIRO_PROGRAMS)
 
 # Get all dependency files
 DEP_FILES = []
 for dep_folder in DEP_FOLDERS:
     DEP_FILES += [join(dep_folder, f) for f in listdir(dep_folder) if isfile(join(dep_folder, f)) if f.endswith('.cairo')]
-# print(DEP_FILES)
-
-def get_hash_if_file_exists(file_path: str) -> str:
-    isExist = os.path.exists(file_path)
-    if isExist == False:
-        return None
-    else:
-        json_bytes = open(file_path, "rb")
-        bytes = json_bytes.read()
-        hash = blake3.blake3(bytes).digest()
-        return str(hash)
 
 def mkdir_if_not_exists(path: str):
     isExist = os.path.exists(path)
@@ -111,45 +95,15 @@ print(f"Selected Cairo file: {FILENAME_DOT_CAIRO_PATH}")
 
 FILENAME = FILENAME_DOT_CAIRO.removesuffix('.cairo')
 
-# JSON_INPUT_PATH = FILENAME_DOT_CAIRO_PATH.replace('.cairo', '_input.json')
-
 input_exists = os.path.exists(JSON_INPUT_PATH)
 if input_exists:
     print(f"Input file found! : {JSON_INPUT_PATH} ")
+
 mkdir_if_not_exists(f"build/profiling/{FILENAME}")
 
 # Combine main and dependency files
 ALL_FILES = CAIRO_PROGRAMS + DEP_FILES
 
-def write_all_hash(db:TinyDB):
-    for FILE in ALL_FILES:
-        db.insert({'name':FILE, 'hash':get_hash_if_file_exists(FILE)})
-
-def get_all_hash():
-    r = []
-    for FILE in ALL_FILES:
-        r.append(get_hash_if_file_exists(FILE))
-    return r 
-
-
-db = TinyDB(f"build/programs_hash.json")
-
-if len(db)!=(len(ALL_FILES)):
-    db.remove(Query().name!=0)
-    write_all_hash(db)
-
-hash_table = db.all()
-current_hash_table = get_all_hash()
-
-
-def did_some_file_changed():
-    for f,h in zip(hash_table,current_hash_table):
-        # print(f, h )
-        if f["hash"]!=h:
-            return True
-    return False
-
-prev_hash = get_hash_if_file_exists(f"build/compiled_cairo_files/{FILENAME}.json")
 
 compile_success = False
 while not compile_success:
@@ -164,9 +118,6 @@ while not compile_success:
         find_file_recurse()
 
 
-
-
-new_hash = get_hash_if_file_exists(f"build/compiled_cairo_files/{FILENAME}.json")
 profile_arg = f" --profile_output ./build/profiling/{FILENAME}/profile.pb.gz"
 pie_arg = f" --cairo_pie_output ./build/profiling/{FILENAME}/{FILENAME}_pie.zip"
 if input_exists:
@@ -177,7 +128,6 @@ if input_exists:
         cmd+=profile_arg
     else:
         cmd+=" --print_info"
-        cmd+=pie_arg
     if args.pie:
         cmd+=pie_arg
 
@@ -200,6 +150,4 @@ else:
 if args.profile:
     print(f"Running profiling tool for {FILENAME_DOT_CAIRO} ... ")
     os.system(f"cd ./build/profiling/{FILENAME} && go tool pprof -png profile.pb.gz ")
-
-
 
