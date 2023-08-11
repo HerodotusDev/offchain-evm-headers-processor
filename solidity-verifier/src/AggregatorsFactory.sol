@@ -12,7 +12,7 @@ import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
 ///         and upgrading new one's starter template
 contract AggregatorsFactory is AccessControl {
     // Blank contract template address
-    address public _template;
+    address public template;
 
     // Timelock mechanism for upgrades proposals
     struct UpgradeProposalTimelock {
@@ -53,9 +53,9 @@ contract AggregatorsFactory is AccessControl {
     event AggregatorCreation(address aggregator, uint256 aggregatorId);
 
     /// Creates a new Factory contract and grants OPERATOR_ROLE to the deployer
-    /// @param template The address of the template contract to clone
-    constructor(address template) {
-        _template = template;
+    /// @param initialTemplate The address of the template contract to clone
+    constructor(address initialTemplate) {
+        template = initialTemplate;
 
         _setRoleAdmin(OPERATOR_ROLE, OPERATOR_ROLE);
         _grantRole(OPERATOR_ROLE, _msgSender());
@@ -72,13 +72,9 @@ contract AggregatorsFactory is AccessControl {
 
     /**
      * Creates a new aggregator contract by cloning the template contract
-     * @param sharpFactsRegistry The address of the SharpFactsRegistry contract
-     * @param programHash The hash of the program to compute facts from
      * @param aggregatorId The id of an existing aggregator to attach to (0 for none)
      */
     function createAggregator(
-        address sharpFactsRegistry,
-        bytes32 programHash,
         uint256 aggregatorId
     ) external onlyOperator returns (address) {
         SharpFactsAggregator.AggregatorState memory initialAggregatorState;
@@ -109,14 +105,12 @@ contract AggregatorsFactory is AccessControl {
 
         // Initialize the newly created aggregator
         bytes memory data = abi.encodeWithSignature(
-            "initialize(address,bytes32,(bytes32,bytes32,uint256,bytes32))",
-            sharpFactsRegistry,
-            programHash,
+            "initialize((bytes32,bytes32,uint256,bytes32))",
             initialAggregatorState
         );
 
         // Clone the template contract
-        address clone = Clones.clone(_template);
+        address clone = Clones.clone(template);
 
         // The data is the encoded initialize function (with initial parameters)
         (bool success, ) = clone.call(data);
@@ -126,6 +120,16 @@ contract AggregatorsFactory is AccessControl {
         aggregatorsById[++aggregatorsCount] = clone;
 
         emit AggregatorCreation(clone, aggregatorsCount);
+
+        // Grant roles to the caller so that roles are not stuck in the Factory
+        SharpFactsAggregator(clone).grantRole(
+            keccak256("OPERATOR_ROLE"),
+            _msgSender()
+        );
+        SharpFactsAggregator(clone).grantRole(
+            keccak256("UNLOCKER_ROLE"),
+            _msgSender()
+        );
 
         return clone;
     }
@@ -154,12 +158,12 @@ contract AggregatorsFactory is AccessControl {
         require(timeLockTimestamp != 0, "TimeLock not set");
         require(block.timestamp >= timeLockTimestamp, "TimeLock not expired");
 
-        address oldTemplate = _template;
-        _template = upgrades[updateId].newTemplate;
+        address oldTemplate = template;
+        template = upgrades[updateId].newTemplate;
 
         // Clear timelock
         upgrades[updateId] = UpgradeProposalTimelock(0, address(0));
 
-        emit Upgrade(oldTemplate, _template);
+        emit Upgrade(oldTemplate, template);
     }
 }

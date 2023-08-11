@@ -29,14 +29,6 @@ contract AggregatorsFactoryTest is Test {
         emit AggregatorCreation(address(aggregator), 0);
         aggregator = SharpFactsAggregator(
             factory.createAggregator(
-                // Sharp Facts Registry (Goërli)
-                0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168,
-                // Program hash (prover)
-                bytes32(
-                    uint256(
-                        0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
-                    )
-                ),
                 // Create a new one (past aggregator ID = 0 for non-existing)
                 0
             )
@@ -52,28 +44,16 @@ contract AggregatorsFactoryTest is Test {
             aggregator.hasRole(keccak256("OPERATOR_ROLE"), address(factory))
         );
 
-        // Aggregator checks
-        vm.startPrank(address(factory));
-        aggregator.grantRole(keccak256("OPERATOR_ROLE"), address(this));
-        aggregator.grantRole(keccak256("UPGRADER_ROLE"), address(this));
-        aggregator.grantRole(keccak256("UNLOCKER_ROLE"), address(this));
-        vm.stopPrank();
-
+        // Aggregator roles checks
         assertTrue(
             aggregator.hasRole(keccak256("OPERATOR_ROLE"), address(this))
         );
         assertTrue(
             aggregator.hasRole(keccak256("UNLOCKER_ROLE"), address(this))
         );
-        assertTrue(
-            aggregator.hasRole(keccak256("UPGRADER_ROLE"), address(this))
-        );
 
-        vm.startPrank(address(factory));
-        aggregator.revokeRole(keccak256("OPERATOR_ROLE"), address(this));
-        aggregator.revokeRole(keccak256("UPGRADER_ROLE"), address(this));
         aggregator.revokeRole(keccak256("UNLOCKER_ROLE"), address(this));
-        vm.stopPrank();
+        aggregator.revokeRole(keccak256("OPERATOR_ROLE"), address(this));
     }
 
     function testUpgrade() public {
@@ -81,15 +61,7 @@ contract AggregatorsFactoryTest is Test {
         emit AggregatorCreation(address(aggregator), 1);
         SharpFactsAggregator newAggregator = SharpFactsAggregator(
             factory.createAggregator(
-                // Sharp Facts Registry (Goërli)
-                0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168,
-                // Program hash (prover)
-                bytes32(
-                    uint256(
-                        0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
-                    )
-                ),
-                // Create a new one (past aggregator ID = 0 for non-existing)
+                // Attach to existing aggregator (id = 1)
                 1
             )
         );
