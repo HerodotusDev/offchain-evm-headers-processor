@@ -3,7 +3,7 @@ import json
 import time
 import os
 from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async
-from tools.py.utils import split_128, bytes_to_little_endian_ints
+from tools.py.utils import split_128, bytes_to_8_bytes_chunks_little
 import requests
 from dotenv import load_dotenv
 
@@ -56,7 +56,7 @@ def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, 
     # print([x.number for x in blocks])
     blocks = [block.raw_rlp() for block in blocks]
     blocks_len = [len(block) for block in blocks]
-    blocks = [bytes_to_little_endian_ints(block) for block in blocks]
+    blocks = [bytes_to_8_bytes_chunks_little(block) for block in blocks]
 
     chunk_input['mmr_last_root_poseidon'] = last_mmr_root['poseidon']
     chunk_input['mmr_last_root_keccak_low'], chunk_input['mmr_last_root_keccak_high']= split_128(last_mmr_root['keccak'])

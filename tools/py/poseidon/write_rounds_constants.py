@@ -12,7 +12,7 @@ def split(x, degree=DEGREE, base=BASE):
     coeffs.append(x)
     return coeffs[::-1]
 
-def write_round_constants():
+def write_round_constants()->str:
     p = PoseidonParams.get_default_poseidon_params()
     ark = p.ark
     out="r0:\n"
@@ -26,7 +26,8 @@ def write_round_constants():
         out += ';\n'.join("dw " + str(x) for x in split(ark[i][2])) + ';\n'
     return out
 
-print(write_round_constants())
-out = write_round_constants()
-p = PoseidonParams.get_default_poseidon_params()
-ark = p.ark
+if __name__ == '__main__':
+    print(write_round_constants())
+    out = write_round_constants()
+    p = PoseidonParams.get_default_poseidon_params()
+    ark = p.ark

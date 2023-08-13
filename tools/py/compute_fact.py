@@ -1,10 +1,13 @@
+"""
+Simple script to show how to compute the fact for a given program hash and program output.
+"""
 from web3 import Web3
-
+from typing import List
 # Pedersen hash of the compiled program
 program_hash = 0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
 
 # output of field elements from the cairo program run
-def get_program_output_values_from_output_dict(output:dict) -> list:
+def get_program_output_values_from_output_dict(output:dict) -> List[int]:
   program_output = [output['from_block_number_high'],
                     output['to_block_number_low'],
                     output['block_n_plus_one_parent_hash_low'], 
@@ -40,14 +43,15 @@ sample_output = {
 }
 
 
-def compute_fact(program_hash:int, program_output):
+def compute_fact(program_hash:int, program_output:List[int]):
     kecOutput = Web3.solidityKeccak(["uint256[]"], [program_output])
     fact = Web3.solidityKeccak(["uint256", "bytes32"], [program_hash, kecOutput])
     return fact.hex()
 
-fact = compute_fact(program_hash, get_program_output_values_from_output_dict(sample_output))
+if __name__ == '__main__':
+  fact = compute_fact(program_hash, get_program_output_values_from_output_dict(sample_output))
 
-print(fact)
+  print(fact)
 
 
 
