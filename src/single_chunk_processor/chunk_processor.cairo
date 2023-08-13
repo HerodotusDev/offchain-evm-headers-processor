@@ -28,6 +28,25 @@ from src.libs.mmr import (
     get_full_mmr_peak_values,
 )
 
+// Recursively verifies that Cairo_Keccak(block_header_i) = parent_hash(block_header_i+1)_little_endian for all from i=index to i=0
+// Reverses each block_header_i back to big endian and hashes it with poseidon_hash_many
+// Stores the poseidon hash of each block header in poseidon_hash_array
+// Reverses endianness of the keccak hash of each block header back to big endian and stores it in keccak_hash_array
+//
+// Implicit arguments :
+// - poseidon_hash_array: felt* - array of poseidon hashes of block headers to fill
+// - keccak_hash_array: Uint256* - array of keccak hashes of block headers to fill
+// - block_headers_array: felt** - array of block headers to verify
+// -bytes_len_array: felt* - array of lengths of block headers to verify
+// Ie : block_headers_array[i] is of length bytes_len_array[i]
+//
+// Params:
+// - index: felt - index of block header to verify in block_headers_array
+// - parent_hash: Uint256 - parent hash of block header i+1 (little endian)
+//
+// Returns:
+// - block_n_minus_r_plus_one_parent_hash: Uint256 - extracted parent hash of block_headers_array[0] (little endian)
+// - last_block_header_big: felt* - reversed block header of block_headers_array[0] (big endian)
 func verify_block_headers_and_hash_them{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
@@ -41,41 +60,60 @@ func verify_block_headers_and_hash_them{
     block_n_minus_r_plus_one_parent_hash: Uint256, last_block_header_big: felt*
 ) {
     alloc_locals;
-    // Keccak Hash RLP of block i and verify it matches the parent hash of block i+1
     let (rlp_keccak_hash: Uint256) = keccak(
         inputs=block_headers_array[index], n_bytes=bytes_len_array[index]
     );
     assert rlp_keccak_hash.low = parent_hash.low;
     assert rlp_keccak_hash.high = parent_hash.high;
+
     %{ print("\n") %}
     %{ print_u256(ids.rlp_keccak_hash,f"rlp_keccak_hash_{ids.index}") %}
     %{ print_u256(ids.parent_hash,f"prt_keccak_hash_{ids.index}") %}
 
-    // Poseidon Hash (block_header_i) (in Big Endian)
-
+    // Reverse block header chunks back to big endian values and hash it with poseidon
     let (reversed_block_header: felt*, n_felts: felt) = reverse_block_header_chunks(
         n_bytes=bytes_len_array[index], block_header=block_headers_array[index], seed=index
     );
     let (poseidon_hash) = poseidon_hash_many(n=n_felts, elements=reversed_block_header);
 
+    // Reverse keccak hash back to big endian
     let (block_header_hash_big) = uint256_reverse_endian(rlp_keccak_hash);
 
+    // Store poseidon hash and keccak hash in their respective arrays
     assert poseidon_hash_array[index] = poseidon_hash;
     assert keccak_hash_array[index].low = block_header_hash_big.low;
     assert keccak_hash_array[index].high = block_header_hash_big.high;
-    // Get parent hash of block i
+
+    // Get parent hash of block i (little endian)
     let (block_i_parent_hash: Uint256) = extract_parent_hash_little(block_headers_array[index]);
 
     if (index == 0) {
+        // If we are at the last block header in the batch, return the parent hash of block 0 and the reversed block header
         return (
             block_n_minus_r_plus_one_parent_hash=block_i_parent_hash,
             last_block_header_big=reversed_block_header,
         );
     } else {
+        // Otherwise, verify the (previous) block header at index (index-1)
         return verify_block_headers_and_hash_them(index=index - 1, parent_hash=block_i_parent_hash);
     }
 }
 
+// Appends block headers hashes to both MMR using the previous MMR information
+//
+// Implicit arguments :
+// - poseidon_hash_array: felt* - array of poseidon hashes of block headers
+// - keccak_hash_array: Uint256* - array of keccak hashes of block headers
+// - mmr_array_poseidon: felt* - array of new nodes to fill for the Poseidon MMR
+// - mmr_array_keccak: Uint256* - array of new nodes to fill for the Keccak MMR
+// - mmr_array_len: felt - length of mmr arrays
+// - mmr_offset: felt - offset of mmr arrays. ie : mmr_array_poseidon[i] is the i+mmr_offset-th+1 node of the MMR
+// - previous_peaks_dict_poseidon: DictAccess* - previous peaks of the Poseidon MMR
+// - previous_peaks_dict_keccak: DictAccess* - previous peaks of the Keccak MMR
+// - pow2_array: felt* - array of powers of 2
+//
+// Params:
+// - index: felt - index of block header hash to append to MMR
 func construct_mmr{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
@@ -93,13 +131,15 @@ func construct_mmr{
 }(index: felt) {
     alloc_locals;
 
-    // Append nodes to mmr arrays. These are already hashed.
+    // Append leaves to mmr arrays. They are already hashed.
 
     assert mmr_array_poseidon[mmr_array_len] = poseidon_hash_array[index];
     assert mmr_array_keccak[mmr_array_len].low = keccak_hash_array[index].low;
     assert mmr_array_keccak[mmr_array_len].high = keccak_hash_array[index].high;
 
     let mmr_array_len = mmr_array_len + 1;
+
+    // Append extra nodes to mmr arrays if merging is needed
     merge_subtrees_if_applicable(height=0);
     if (index == 0) {
         return ();
@@ -107,6 +147,7 @@ func construct_mmr{
         return construct_mmr(index=index - 1);
     }
 }
+
 // 3              15
 //              /    \
 //             /      \
@@ -117,6 +158,18 @@ func construct_mmr{
 // 1     3     6      10    13     18
 //      / \   / \    / \   /  \   /  \
 // 0   1   2 4   5  8   9 11  12 16  17 19
+// Recursively append nodes to MMR arrays if merging is needed (ie : checks if the height of the next position is higher than the current one)
+// Implicit arguments :
+// - mmr_array_poseidon: felt* - array of new nodes to fill for the Poseidon MMR
+// -mmr_array_keccak: Uint256* - array of new nodes to fill for the Keccak MMR
+//  -mmr_array_len: felt - length of mmr arrays
+// - mmr_offset: felt - offset of mmr arrays. ie : mmr_array_poseidon[i] is the i+mmr_offset-th+1 node of the MMR
+// - previous_peaks_dict_poseidon: DictAccess* - previous peaks of the Poseidon MMR
+// - previous_peaks_dict_keccak: DictAccess* - previous peaks of the Keccak MMR
+// - pow2_array: felt* - array of powers of 2
+//
+// Params:
+// - height: felt - current height of the node at the last position of the MMR
 func merge_subtrees_if_applicable{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
@@ -144,13 +197,17 @@ func merge_subtrees_if_applicable{
         assert [range_check_ptr] = height_next_pos - height - 1;
         tempvar range_check_ptr = range_check_ptr + 1;
 
+        // Compute left and right positions of the subtree to merge
         local left_pos = next_pos - pow2_array[height + 1];
         local right_pos = left_pos + pow2_array[height + 1] - 1;
 
         // %{ print(f"Merging {ids.left_pos} + {ids.right_pos} at index {ids.next_pos} and height {ids.height_next_pos} ") %}
 
+        // Get the values of the left and right children at those positions:
         let (x_poseidon: felt, x_keccak: Uint256) = get_full_mmr_peak_values(left_pos);
         let (y_poseidon: felt, y_keccak: Uint256) = get_full_mmr_peak_values(right_pos);
+
+        // Compute H(left, right) for both hash functions
         let (hash_poseidon) = poseidon_hash(x_poseidon, y_poseidon);
         let (keccak_input: felt*) = alloc();
         let inputs_start = keccak_input;
@@ -159,11 +216,13 @@ func merge_subtrees_if_applicable{
         let (res_keccak_little: Uint256) = keccak(inputs=inputs_start, n_bytes=2 * 32);
         let (res_keccak) = uint256_reverse_endian(res_keccak_little);
 
+        // Append each parent to the corresponding MMR arrays
         assert mmr_array_poseidon[mmr_array_len] = hash_poseidon;
         assert mmr_array_keccak[mmr_array_len].low = res_keccak.low;
         assert mmr_array_keccak[mmr_array_len].high = res_keccak.high;
 
         let mmr_array_len = mmr_array_len + 1;
+        // Continue merging if needed:
         return merge_subtrees_if_applicable(height=height + 1);
     } else {
         // We need to assert heigt_next_pos <= height
@@ -172,6 +231,9 @@ func merge_subtrees_if_applicable{
         return ();
     }
 }
+
+// Main processor function.
+// See readme for more details.
 func main{
     output_ptr: felt*,
     range_check_ptr,
@@ -235,7 +297,7 @@ func main{
     let n = number_of_blocks - 1;  // index of last block
     let pow2_array: felt* = pow2alloc127();
 
-    // Ask all the block headers RLPs into Cairo variables from the Prover
+    // Load block headers from the program's input:
     let (block_headers_array: felt**, bytes_len_array: felt*) = read_block_headers();
 
     // Write previous peaks values and compute root of previous MMR:
@@ -247,14 +309,16 @@ func main{
         write_uint256_array(ids.previous_peaks_values_keccak, program_input['keccak_mmr_last_peaks'])
     %}
 
-    // Compute previous_peaks_positions given the previous MMR size (from left to right):
+    // Compute previous_peaks_positions given the previous MMR size (from left to right), as well:
     let (
         previous_peaks_positions: felt*, previous_peaks_positions_len: felt
     ) = compute_peaks_positions{pow2_array=pow2_array}(mmr_offset);
+
+    // Based on the previous peaks positions, compute the previous root:
     let (expected_previous_root_poseidon, expected_previous_root_keccak) = bag_peaks(
         previous_peaks_values_poseidon, previous_peaks_values_keccak, previous_peaks_positions_len
     );
-
+    // Check that the previous roots matche the ones provided in the program's input:
     assert expected_previous_root_poseidon = mmr_last_root_poseidon;
     assert expected_previous_root_keccak.low = mmr_last_root_keccak.low;
     assert expected_previous_root_keccak.high = mmr_last_root_keccak.high;
@@ -274,11 +338,23 @@ func main{
     );
 
     // Initialize Poseidon MMR:
-    let (poseidon_hash_array: felt*) = alloc();  // Poseidon(block_header)
+    // poseidon_hash_array will contain the poseidon_hash of each block header, with the block headers reversed back to big endian
+    // More precisely: poseidon_hash_array[i] = poseidon_hash_many(reversed_block_headers_chunks(block_headers_array[i]))
+    //
+    // mmr_array_poseidon will contain the flattened continuation of the Poseidon MMR
+    // More precisely : mmr_array_poseidon[i] = The value of the Poseidon MMR at position i+mmr_offset+1
+    let (poseidon_hash_array: felt*) = alloc();
     let (mmr_array_poseidon: felt*) = alloc();
+
     // Initialize Keccak MMR :
+    // keccak_hash_array will contain the keccak_hash of each block header, in big endian
+    // More precisely: keccak_hash_array[0] = uint256_reverse_endian(keccak_hash(block_headers_array[0]))
+    //
+    // mmr_array_keccak will contain the flattened continuation of the Keccak MMR
+    // More precisely : mmr_array_keccak[i] = The value of the Keccak MMR at position i+mmr_offset+1
     let (keccak_hash_array: Uint256*) = alloc();
     let (mmr_array_keccak: Uint256*) = alloc();
+
     // Common variable for both MMR :
     let mmr_array_len = 0;
     %{
@@ -304,6 +380,7 @@ func main{
         let block_n_minus_r_plus_one_number = extract_block_number_big(last_block_header);
     }
 
+    // Checks that to_block_number_low from the program's input matches the extracted block number from the last block header:
     assert to_block_number_low = block_n_minus_r_plus_one_number;
 
     // %{ print(f"RLP successfully validated!") %}
@@ -402,8 +479,22 @@ func main{
     return ();
 }
 
-// Stores the values of the previous peaks in a dictionary.
-// The key is the peak position, and the value is the peak value.
+// Stores the values inside peaks_values_poseidon and peaks_values_keccak in two dictionaries represented by their end pointers,
+// such that:
+// - dict_poseidon[peak_positions[i]] = peaks_values_poseidon[i]
+// - dict_keccak[peak_positions[i]] = &peaks_values_keccak[i].
+// Since cairo dicts only allow felts values, for keccak, the Uint256 is stored by casting a pointer of the value to a felt.
+// See the function get_full_mmr_peak_values for the reverse operation.
+//
+// Implicit arguments:
+// - dict_end_poseidon: DictAccess* - the end of the dictionary for the Poseidon MMR
+// - dict_end_keccak: DictAccess* - the end of the dictionary for the Keccak MMR
+//
+// Params:
+// - index: felt - the index of the array to be stored in the dictionary
+// - peaks_positions: felt* - the array of positions of the peaks
+// - peaks_values_poseidon: felt* - the array of values of the peaks for the Poseidon MMR
+// - peaks_values_keccak: Uint256* - the array of values of the peaks for the Keccak MMR
 func initialize_peaks_dicts{dict_end_poseidon: DictAccess*, dict_end_keccak: DictAccess*}(
     index: felt, peaks_positions: felt*, peaks_values_poseidon: felt*, peaks_values_keccak: Uint256*
 ) {
