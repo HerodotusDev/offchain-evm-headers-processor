@@ -1,50 +1,32 @@
-import os
 import requests
 import json
 import time
 import math
 import json
+from typing import Union, List
 
-from tools.py.block_header import build_block_header
+from tools.py.block_header import build_block_header, BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai
 
 RPC_BATCH_MAX_SIZE = 50
-
-def bytes_to_little_endian_ints(input_bytes):
-    # Split the input_bytes into 8-byte chunks
-    byte_chunks = [input_bytes[i:i + 8] for i in range(0, len(input_bytes), 8)]
-
-    # Convert each chunk to little-endian integers
-    little_endian_ints = [int.from_bytes(chunk, byteorder='little') for chunk in byte_chunks]
-
-    return little_endian_ints
-
-def bytes_to_8_bytes_chunks(input_bytes):
-    # Split the input_bytes into 8-byte chunks
-    byte_chunks = [input_bytes[i:i + 8] for i in range(0, len(input_bytes), 8)]
-
-    # Convert each chunk to little-endian integers
-    little_endian_ints = [int.from_bytes(chunk, byteorder='big') for chunk in byte_chunks]
-
-    return little_endian_ints
-
-def reverse_endian(input_int, byte_length):
-    # Convert the input integer to bytes with the given byte length
-    byte_representation = input_int.to_bytes(byte_length, byteorder='little')
-    # Convert the bytes back to an integer with reversed endianness
-    reversed_endian_int = int.from_bytes(byte_representation, byteorder='big')
-
-    return reversed_endian_int
-
-def split_128(a):
-    """Takes in value, returns uint256-ish tuple."""
-    return (a & ((1 << 128) - 1), a >> 128)
-
 
 def rpc_request(url, rpc_request):
     response = requests.post(url=url, data=json.dumps(rpc_request))
     return response.json()
 
-def fetch_blocks_from_rpc_no_async(range_from: int, range_till: int, rpc_url: str, delay=0.5): # delay is in seconds
+
+
+def fetch_blocks_from_rpc_no_async(range_from: int, range_till: int, rpc_url: str, delay=0.5) -> List[Union[BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai]]: 
+    """
+    # Fetches blocks from RPC in batches of RPC_BATCH_MAX_SIZE
+    # Returns a list of block headers
+    # Params:
+    #   range_from: int - the block number to start fetching from
+    #   range_till: int - the block number to stop fetching at
+    #   rpc_url: str - the RPC url to fetch from
+    #   delay: float - delay between RPC requests (in seconds)
+    # Returns:
+    #   list - a list of block headers of type BlockHeader, BlockHeaderEIP1559 or BlockHeaderShangai
+    """
     assert range_from > range_till, "Invalid range"
     number_of_blocks = range_from - range_till
     rpc_batches_amount = math.ceil(number_of_blocks / RPC_BATCH_MAX_SIZE)
@@ -65,8 +47,8 @@ def fetch_blocks_from_rpc_no_async(range_from: int, range_till: int, rpc_url: st
         results = rpc_request(rpc_url, requests)
 
         for result in results:
-            raw_rlp = build_block_header(result['result'])
-            all_results.append(raw_rlp)
+            block_header:Union[BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai] = build_block_header(result['result'])
+            all_results.append(block_header)
 
 
         time.sleep(delay)  # Add delay

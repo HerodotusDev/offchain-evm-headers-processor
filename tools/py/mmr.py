@@ -1,11 +1,58 @@
 """
 Merkle Mountain Range
+Adapted from https://github.com/jjyr/mmr.py (MIT License)
+Replicates the MMR behavior of the chunk processor, ie : 
+    - the leafs are directly inserted in the tree without any hashing (they're supposed to be already hashes of block headers)
+    - merging is done by hashing the two hashes together, without prepending any indexes
+    - the root is computed by bagging the peaks without prepending any indexes
 """
 
-from typing import List, Tuple, Optional
-import hashlib
-from tools.py.poseidon.poseidon_hash import poseidon_hash_single, poseidon_hash
-import matplotlib.pyplot as plt
+from typing import List, Tuple, Union
+import sha3
+from tools.py.poseidon.poseidon_hash import poseidon_hash, poseidon_hash_single, poseidon_hash_many
+    
+
+class PoseidonHasher:
+    def __init__(self):
+        self.list = []
+
+    def update(self, item):
+        if type(item) == int:
+            self.list.append(item)
+        elif type(item) == bytes:
+            self.list.append(int.from_bytes(item, 'big'))
+        else:
+            raise Exception("unsupported type")
+    def digest(self) -> int:
+        try:
+            if len(self.list) == 1:
+                res= poseidon_hash_single(self.list[0])
+            elif len(self.list) == 2:
+                
+                res= poseidon_hash(self.list[0], self.list[1])
+            elif len(self.list) > 2:
+                res= poseidon_hash_many(self.list)
+            else:
+                raise Exception("no item to digest")
+        finally:
+            self.list = []
+        return res
+        
+class KeccakHasher:
+    def __init__(self):
+        self.keccak = sha3.keccak_256()
+    def update(self, item):
+        if type(item) == int:
+            self.keccak.update(item.to_bytes(32, 'big'))
+        elif type(item) == bytes:
+            self.keccak.update(item)
+        else:
+            raise Exception("unsupported type")
+    def digest(self) -> int:
+        res = self.keccak.digest()
+        self.keccak = sha3.keccak_256()
+        return int.from_bytes(res, 'big')
+    
 
 
 def tree_pos_height(pos: int) -> int:
@@ -103,18 +150,16 @@ class MMR(object):
     """
     MMR
     """
-    def __init__(self, hasher=hashlib.blake2b):
+    def __init__(self, hasher:Union[PoseidonHasher, KeccakHasher]=PoseidonHasher()):
         self.last_pos = -1
         self.pos_hash = {}
         self._hasher = hasher
 
-    def add(self, elem: bytes) -> int:
+    def add(self, elem: Union[bytes, int]) -> int:
         """
         Insert a new leaf, v is a binary value
         """
         self.last_pos += 1
-        # hasher = self._hasher()
-        # hasher.update(elem)
 
         # store hash
         self.pos_hash[self.last_pos] = elem
@@ -129,60 +174,42 @@ class MMR(object):
             # calculate pos of left child and right child
             left_pos = self.last_pos - (2 << height)
             right_pos = left_pos + sibling_offset(height)
-            # hasher = self._hasher()
-            # # calculate parent hash
-            # hasher.update(self.pos_hash[left_pos])
-            # hasher.update(self.pos_hash[right_pos])
-            hash_val = poseidon_hash(self.pos_hash[left_pos], self.pos_hash[right_pos])
-            self.pos_hash[self.last_pos] = hash_val
+            # calculate parent hash
+            self._hasher.update(self.pos_hash[left_pos])
+            self._hasher.update(self.pos_hash[right_pos])
+            self.pos_hash[self.last_pos] = self._hasher.digest()
             height += 1
         return pos
 
-    # def get_root(self) -> Optional[bytes]:
-    #     """
-    #     MMR root
-    #     """
-    #     peaks = get_peaks(self.last_pos + 1)
-    #     print("peaks pos", peaks)
-    #     # bag all rhs peaks, which is exact root
-    #     return self._bag_rhs_peaks(-1, peaks)
-
-    def get_root(self) -> Optional[bytes]:
+    def get_root(self) -> int:
         """
         MMR root
         """
-        peaks = get_peaks(self.last_pos + 1)
+        peaks = get_peaks(len(self.pos_hash))
         peaks_values = [self.pos_hash[p] for p in peaks]
         bagged = self.bag_peaks(peaks_values)
-        root = poseidon_hash(len(self.pos_hash), bagged)
-        return root
+        
+        return bagged
 
     def bag_peaks(self, peaks: List[int]) -> int:
         bags = peaks[-1]
         for peak in reversed(peaks[:-1]): 
-            bags = poseidon_hash(peak, bags) 
+            self._hasher.update(peak)
+            self._hasher.update(bags)
+
+            bags = self._hasher.digest()
 
         return bags
-    def _bag_rhs_peaks(self, peak_pos: int, peaks: List[int]
-                       ) -> Optional[bytes]:
-        rhs_peak_hashes = [self.pos_hash[p] for p in peaks
-                           if p > peak_pos]
-        print("peaks hashes", rhs_peak_hashes)
-        while len(rhs_peak_hashes) > 1:
-            peak_r = rhs_peak_hashes.pop()
-            peak_l = rhs_peak_hashes.pop()
-            # hasher = self._hasher()
-            # hasher.update(peak_r)
-            # hasher.update(peak_l)
-            hash_val = poseidon_hash(peak_r, peak_l)
-            # rhs_peak_hashes.append(hasher.digest())
-            rhs_peak_hashes.append(hash_val)
-        if len(rhs_peak_hashes) > 0:
-            return rhs_peak_hashes[0]
-        else:
-            return None
 
-    def _lhs_peaks(self, peak_pos: int, peaks: List[int]
-                   ) -> List[bytes]:
-        return [self.pos_hash[p] for p in peaks if p < peak_pos]
 
+if __name__ == '__main__':
+    poseidon_mmr=MMR(PoseidonHasher())
+    for i in range(3):
+        _ = poseidon_mmr.add(i)
+    
+    print(poseidon_mmr.get_root())
+
+    keccak_mmr=MMR(KeccakHasher())
+    for i in range(3):
+        _ = keccak_mmr.add(i)
+    print(keccak_mmr.get_root())

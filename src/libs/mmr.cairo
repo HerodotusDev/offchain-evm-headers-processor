@@ -8,15 +8,21 @@ from starkware.cairo.common.uint256 import Uint256, uint256_reverse_endian
 from starkware.cairo.common.builtin_keccak.keccak import keccak
 from starkware.cairo.common.keccak_utils.keccak_utils import keccak_add_uint256
 
-// Computes MMR tree height given an index.
-// This assumes the first index is 1. See below:
+// Determines the height of the MMR tree based on a given index x.
+// Assumes the starting index is 1 as depicted:
 // H    MMR positions
 // 2        7
 //        /   \
 // 1     3     6
 //      / \   / \
 // 0   1   2 4   5
-// ref : https://github.com/mimblewimble/grin/blob/0ff6763ee64e5a14e70ddd4642b99789a1648a32/core/src/core/pmmr.rs#L606
+// Reference: https://github.com/mimblewimble/grin/blob/0ff6763ee64e5a14e70ddd4642b99789a1648a32/core/src/core/pmmr.rs#L606
+// Implicits arguments:
+// - pow2_array: felt* - Array holding powers of 2 values.
+// Params:
+// - x: felt - Index (or position) in the MMR.
+// Returns:
+// - height: felt - Calculated height for the specified position.
 func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) -> felt {
     alloc_locals;
     local bit_length;
@@ -46,8 +52,14 @@ func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) 
     }
 }
 
-// Computes the position of the leftmost peak of the MMR.
-// Ref: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
+// Computes the leftmost peak's position in the MMR based on its size.
+// Reference: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
+// Implicits arguments:
+// - pow2_array: felt* - Array of powers of 2.
+// Params:
+// - mmr_len: felt - MMR size.
+// Returns:
+// - peak_pos: felt - Position of the leftmost peak.
 func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> felt {
     alloc_locals;
     local bit_length;
@@ -74,8 +86,15 @@ func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -
     }
 }
 
-// Returns peaks position indexes from left to right and the number of peaks given the size of the MMR
-// Ref: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
+// Retrieves positions of MMR peaks from left to right and their count based on the MMR size.
+// Reference: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
+// Implicits arguments:
+// - pow2_array: felt* - Array of powers of 2.
+// Params:
+// - mmr_len: felt - Size of the MMR.
+// Returns:
+// - peaks: felt* - Pointer to the peaks' position array.
+// - peaks_len: felt - Number of peaks.
 func compute_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> (
     peaks: felt*, peaks_len: felt
 ) {
@@ -90,6 +109,16 @@ func compute_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_len: felt) 
     return (peaks, peaks_len);
 }
 
+// Inner function for compute_peaks_positions.
+// Implicits arguments:
+// - pow2_array: felt* - Array of powers of 2.
+// - mmr_len: felt - Size of the MMR.
+// Params:
+// - peaks: felt* - Pointer to array storing peak positions. First peak at index 0 is already set.
+// - peaks_len: felt - Initial number of peaks (set to 1 initially).
+// - mmr_pos: felt - Current MMR position. The function concludes when mmr_pos matches mmr_len.
+// Returns:
+// - peaks_len: felt - Final count of peaks.
 func compute_peaks_inner{range_check_ptr, pow2_array: felt*, mmr_len: felt}(
     peaks: felt*, peaks_len: felt, mmr_pos: felt
 ) -> felt {
@@ -105,8 +134,16 @@ func compute_peaks_inner{range_check_ptr, pow2_array: felt*, mmr_len: felt}(
     }
 }
 
-// Jump to the left children from a position (by subtracting 2^height) until we are inside the MMR.
-// Ref: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
+// Inner function for compute_peaks_inner.
+// Iterates to the left child from a position until reaching within the MMR bounds.
+// Reference: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
+// Implicits arguments:
+// - pow2_array: Array of powers of 2.
+// - mmr_len: Size of the MMR.
+// Params:
+// - left_child: felt - Current left child position.
+// Returns:
+// - left_child: felt - First left child's position within the MMR.
 func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_len}(
     left_child: felt
 ) -> felt {
@@ -132,6 +169,20 @@ func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_le
 
 // Returns the value of peaks for both MMRs at a given position
 // The values are taken either from the MMR array or from the previous peaks dictionary depending on the position
+// Implicits arguments:
+// - mmr_array_poseidon: array of new nodes of the Poseidon MMR
+// - mmr_array_keccak: array of new nodes of the Keccak MMR
+// - mmr_offset: offset of the MMR (previous MMR length)
+// - previous_peaks_dict_poseidon: dictionary of previous peaks for Poseidon
+// - previous_peaks_dict_keccak: dictionary of previous peaks for Keccak
+// Params:
+// - position: felt - position in the MMR
+// Returns:
+// - peak_poseidon: felt - value of the peak for Poseidon
+// - peak_keccak: Uint256 - value of the peak for Keccak
+// This function should only be called when merging left and right chidrens, or when merging peaks.
+// If the asked position is not in the MMR array, it is necessarily a previous peak and therefore present in the previous peaks dictionary
+// Otherwise, if the asked position is <= mmr_offset, and position!=peak position, it will return the default value of the dict which is 0.
 func get_full_mmr_peak_values{
     range_check_ptr,
     mmr_array_poseidon: felt*,
@@ -151,6 +202,10 @@ func get_full_mmr_peak_values{
         tempvar range_check_ptr = range_check_ptr + 1;
         let peak_poseidon = mmr_array_poseidon[position - mmr_offset - 1];
         let peak_keccak = mmr_array_keccak[position - mmr_offset - 1];
+        // %{
+        //     print(f"mmr_array poseidon value at {ids.position - ids.mmr_offset -1} = {ids.peak_poseidon}")
+        //     print(f"mmr_array keccak value at {ids.position - ids.mmr_offset -1 } = {ids.peak_keccak.low} {ids.peak_keccak.high}")
+        // %}
         return (peak_poseidon, peak_keccak);
     } else {
         // %{ print('getting from dict') %}
@@ -174,6 +229,17 @@ func get_full_mmr_peak_values{
 }
 
 // Compute the roots of both MMRs by bagging their peaks (see bag peaks function)
+// Implicits arguments:
+// - mmr_array_poseidon: felt* - array of new nodes of the Poseidon MMR
+// - mmr_array_keccak: Uint256* - array of new nodes of the Keccak MMR
+// - mmr_array_len: felt - length of the MMR array
+// - pow2_array: felt* - array of powers of 2
+// - previous_peaks_dict_poseidon: DictAccess* - dictionary of previous peaks for Poseidon MMR
+// - previous_peaks_dict_keccak: DictAccess* - dictionary of previous peaks for Keccak MMR
+// - mmr_offset: offset of the MMR (size of the previous MMR)
+// Returns:
+// - root_poseidon: felt - root of the Poseidon MMR
+// - root_keccak: Uint256 - root of the Keccak MMR
 func get_roots{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
@@ -202,6 +268,18 @@ func get_roots{
 }
 
 // Returns the peaks values from left to right for both MMRs given the peaks positions
+// Implicits arguments:
+// - mmr_array_poseidon: felt* - array of new nodes of the Poseidon MMR
+// - mmr_array_keccak: Uint256* - array of new nodes of the Keccak MMR
+// - mmr_offset: felt - offset of the MMR (previous MMR length)
+// - previous_peaks_dict_poseidon: DictAccess* - dictionary of previous peaks for Poseidon MMR
+// - previous_peaks_dict_keccak: DictAccess* - dictionary of previous peaks for Keccak MMR
+// - peaks_positions: felt* - array of positions of the peaks
+// Params:
+// - peaks_len: felt - length of the peaks_positions array
+// Returns:
+// - peaks_poseidon: felt* - array of peaks values for Poseidon MMR
+// - peaks_keccak: Uint256* - array of peaks values for Keccak MMR
 func get_peaks_from_positions{
     range_check_ptr,
     mmr_array_poseidon: felt*,
@@ -218,6 +296,18 @@ func get_peaks_from_positions{
     return (peaks_poseidon, peaks_keccak);
 }
 
+// Inner function for get_peaks_from_positions
+// Implicits arguments:
+// - mmr_array_poseidon: felt* - array of new nodes of the Poseidon MMR
+// - mmr_array_keccak: Uint256* - array of new nodes of the Keccak MMR
+// - mmr_offset: felt - offset of the MMR (previous MMR length)
+// - previous_peaks_dict_poseidon: DictAccess* - dictionary of previous peaks for Poseidon MMR
+// - previous_peaks_dict_keccak: DictAccess* - dictionary of previous peaks for Keccak MMR
+// - peaks_positions: felt* - array of positions of the peaks
+// Params:
+// - peaks_poseidon: felt* - array of peaks values for Poseidon MMR (to be filled)
+// - peaks_keccak: Uint256* - array of peaks values for Keccak MMR (to be filled)
+// - index: felt - index of the peak to be retrieved
 func get_peaks_from_positions_inner{
     range_check_ptr,
     mmr_array_poseidon: felt*,
@@ -248,6 +338,13 @@ func get_peaks_from_positions_inner{
 
 // Hashes the peaks of both MMRs together by computing H(peak1, H(peak2, H(peak3, ...))).
 // peak1 is the leftmost peak, peakN is the rightmost peak.
+// Params:
+// - peaks_poseidon: the peaks of the MMR to hash together
+// - peaks_keccak: the peaks of the MMR to hash together
+// - peaks_len: the number of peaks to hash together
+// Returns:
+// - bag_peaks_poseidon: Poseidon(peak1, Poseidon(peak2, Poseidon(peak3, ...)))
+// - bag_peaks_keccak: Keccak(peak1, Keccak(peak2, Keccak(peak3, ...)))
 func bag_peaks{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,

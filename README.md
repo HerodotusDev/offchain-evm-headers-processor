@@ -86,6 +86,8 @@ _Returns the program hash of the main program (chunk_processor.cairo)_
 make get-program-hash
 ```
 
+For more details about the commands, see [tools/make/README.md](tools/make/README.md).
+
 #### One chunk simulated usage :
 
 1. Modify the last line of `tools/make/prepare_inputs_api.py` to choose the start block number and batch size.

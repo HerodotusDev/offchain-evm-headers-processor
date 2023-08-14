@@ -16,6 +16,21 @@ from src.libs.utils import (
     word_reverse_endian_56_RC,
 )
 
+// Loads block headers and their byte lengths from the program input.
+//
+// Return:
+// - rlp_array: felt** - A pointer to an array of arrays of block headers. Each element
+//                       of rlp_array is a pointer to an array of felts, each representing a block header.
+//                       Every felt denotes a 64-bit little endian value.
+//                       For instance, rlp_array[i][j] is the jth 64-bit word of the ith block header.
+//
+// - rlp_array_bytes_len: felt* - A pointer to the array of byte lengths for each block header.
+//                               Each element indicates the byte length of the corresponding block header.
+//                               For example, rlp_array_bytes_len[i] is the byte length of rlp_array[i].
+//
+// The last index pertains to the block "from_block_number_high", while
+// the first index corresponds to the block "to_block_number_low".
+// Refer to chunk_processor.cairo or the Readme for additional details.
 func read_block_headers() -> (rlp_array: felt**, rlp_array_bytes_len: felt*) {
     let (block_headers_array: felt**) = alloc();
     let (block_headers_array_bytes_len: felt*) = alloc();
@@ -28,11 +43,22 @@ func read_block_headers() -> (rlp_array: felt**, rlp_array_bytes_len: felt*) {
     return (block_headers_array, block_headers_array_bytes_len);
 }
 
-// Assumes all words in block header are 8 bytes little endian values.
-// Returns the keccak hash in little endian representation, to be asserted directly
-// against the cairo keccak hash of block header
+// Extracts the parent hash from a block header in little endian format. This can be directly asserted
+// against the Cairo Keccak hash of the preceding block header.
+// Assumes all words in the block header are 8-byte little endian values and it's correctly RLP encoded.
+//
+// Params:
+// - rlp: felt* - A pointer to the array of felts, each segmenting the block header into 8-byte little endian chunks.
+//
+// Returns:
+// - res: Uint256 - The parent hash of the block header in little endian format.
 func extract_parent_hash_little{range_check_ptr}(rlp: felt*) -> (res: Uint256) {
     alloc_locals;
+    // The parent hash is the first item in an Ethereum block header
+    //
+    // -parent hash prefix: \xf9\x02B\xa0 (4 bytes)
+    // -parent hash: 32 bytes
+    // It means we can extract it from the first 5 8-byte chunks of the block header
     let rlp_0 = rlp[0];
     let (rlp_0, thrash) = felt_divmod_2pow32(rlp_0);
     let rlp_1 = rlp[1];
@@ -48,8 +74,16 @@ func extract_parent_hash_little{range_check_ptr}(rlp: felt*) -> (res: Uint256) {
     return (res=Uint256(low=res_low, high=res_high));
 }
 
-// Returns byte size of a Bigint inside a rlp using the first byte to decode
-// Assume 0<= byte <= 183 (single byte or 55 byte long max)
+// Determines the byte size of a Bigint item in RLP encoding using its first byte.
+// Assumes that 0 <= byte <= 183. This means the Bigint item is either one byte or a maximum of 55 bytes.
+//
+// Params:
+// - byte: felt - The initial byte of the RLP Bigint item.
+//
+// Returns:
+// - res: felt - The byte size of the RLP Bigint item.
+//
+// Reference: https://ethereum.org/en/developers/docs/data-structures-and-encoding/rlp/#definition
 func get_bigint_byte_size{range_check_ptr}(byte: felt) -> felt {
     %{ memory[ap]=1 if ids.byte<=127 else 0 %}
     ap += 1;
@@ -66,28 +100,36 @@ func get_bigint_byte_size{range_check_ptr}(byte: felt) -> felt {
     }
 }
 
-// Returns the block number of a block header
-// Assumes the block header is properly RLP encoded, and its words are 64 bit big endian values
-// This is guaranteed if the block header has been previously keccak hashed and compared to a parent hash.
+// Retrieves the block number from a block header.
+// Assumes the block header is correctly RLP encoded with values as 64-bit big endian.
+// This is guaranteed if the block header was previously keccak hashed and matched with a parent hash,
+// then processed through the reverse_block_header function.
+//
+// Params:
+// - rlp: felt* - A pointer to the array of felts, each segmenting the block header into 8-byte chunks.
+//
+// Returns:
+// - res: felt - The block number extracted from the block header.
 func extract_block_number_big{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow2_array: felt*}(
     rlp: felt*
 ) -> felt {
     alloc_locals;
     // Ethereum block header RLP encoding is as follows for the first 7 items:
-    // parent hash prefix: \xf9\x02B\xa0 (4 bytes)
-    // parent hash: 32 bytes
-    // unclesHash prefix: \xa0 (1 byte)
-    // unclesHash: 32 bytes
-    // coinbase prefix: \x94 (1 byte)
-    // coinbase: 20 bytes
-    // stateRoot prefix: \xa0 (1 byte)
-    // stateRoot: 32 bytes
-    // transactionsRoot prefix: \xa0 (1 byte)
-    // transactionsRoot: 32 bytes
-    // receiptsRoot prefix: \xa0 (1 byte)
-    // receiptsRoot: 32 bytes
-    // logsBloom prefix: \xb9\x01\x00 (3 bytes)
-    // logsBloom: 256 bytes
+    //
+    // -parent hash prefix: \xf9\x02B\xa0 (4 bytes)
+    // -parent hash: 32 bytes
+    // -unclesHash prefix: \xa0 (1 byte)
+    // -unclesHash: 32 bytes
+    // -coinbase prefix: \x94 (1 byte)
+    // -coinbase: 20 bytes
+    // -stateRoot prefix: \xa0 (1 byte)
+    // -stateRoot: 32 bytes
+    // -transactionsRoot prefix: \xa0 (1 byte)
+    // -transactionsRoot: 32 bytes
+    // -receiptsRoot prefix: \xa0 (1 byte)
+    // -receiptsRoot: 32 bytes
+    // -logsBloom prefix: \xb9\x01\x00 (3 bytes)
+    // -logsBloom: 256 bytes
 
     // Next items : difficulty (variable length), number (variable length)
     // So we can skip the first 7 items, and start reading the difficulty field, by using the following offset :
@@ -153,9 +195,18 @@ func extract_block_number_big{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow
     }
 }
 
-// This function should only be called after the hash of the block header has been verified against the parent hash.
-// seed is used to divide resource allocation between range check and bitwise.
-// Returns the reversed block header and the number of felts in it.
+// Adjusts the endianness of every 8-byte segment of a block header.
+// Only invoke this after verifying the hash of the block header against its parent hash.
+//
+// Params:
+// - n_bytes: felt - Total byte count of the block header.
+// - block_header: felt* - Pointer to the array of felts, segmenting the block header into 8-byte chunks.
+// - seed: felt - Determines resource allocation between range check and bitwise operations.
+//                If even, range check is used, else bitwise.
+//
+// Returns:
+// - reversed: felt* - Pointer to the array of felts, each representing the block header with reversed bytes in 8-byte chunks.
+// - n_felts: felt - Number of felts in the reversed block header.
 func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
     n_bytes: felt, block_header: felt*, seed: felt
 ) -> (reversed: felt*, n_felts: felt) {
@@ -181,6 +232,8 @@ func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
         tempvar range_check_ptr = range_check_ptr;
         tempvar bitwise_ptr = bitwise_ptr;
     }
+
+    // Handle the last chunk if it is not a full 8 bytes chunk :
 
     if (number_of_bytes_in_last_chunk == 1) {
         assert reversed_block_header[number_of_exact_8bytes_chunks] = block_header[
@@ -237,18 +290,18 @@ func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
         return (reversed_block_header, number_of_exact_8bytes_chunks + 1);
     }
 
+    // If we reach that poiint, it means that 8 divides n_bytes, so the last chunk is a full 8 bytes chunk and we don't need to handle it.
+
     return (reversed_block_header, number_of_exact_8bytes_chunks);
 }
 
-func reverse_block_header_chunks_RC{range_check_ptr}(n_felts: felt, block_header: felt*) -> felt* {
-    alloc_locals;
-    let (reversed_block_header: felt*) = alloc();
-    reverse_block_header_chunks_RC_inner(
-        index=n_felts - 1, block_header=block_header, reversed_block_header=reversed_block_header
-    );
-    return reversed_block_header;
-}
-
+// Inner function for reverse_block_header_chunks.
+// It inverts the 8-byte segments of a block header using range check operations.
+//
+// Params:
+// - index: felt - Index of the segment to invert.
+// - block_header: felt* - Pointer to the array of felts, segmenting the block header into 8-byte chunks.
+// - reversed_block_header: felt* - Pointer to the array that will store the inverted block header.
 func reverse_block_header_chunks_RC_inner{range_check_ptr}(
     index: felt, block_header: felt*, reversed_block_header: felt*
 ) {
@@ -265,17 +318,13 @@ func reverse_block_header_chunks_RC_inner{range_check_ptr}(
     }
 }
 
-func reverse_block_header_chunks_bitwise{bitwise_ptr: BitwiseBuiltin*}(
-    n_felts: felt, block_header: felt*
-) -> felt* {
-    alloc_locals;
-    let (reversed_block_header: felt*) = alloc();
-    reverse_block_header_chunks_bitwise_inner(
-        index=n_felts - 1, block_header=block_header, reversed_block_header=reversed_block_header
-    );
-    return reversed_block_header;
-}
-
+// Inner function for reverse_block_header_chunks.
+// It inverts the 8-byte segments of a block header through bitwise operations.
+//
+// Params:
+// - index: felt - Index of the segment to invert.
+// - block_header: felt* - Pointer to the array representing the block header.
+// - reversed_block_header: felt* - Pointer to the array that will contain the inverted block header.
 func reverse_block_header_chunks_bitwise_inner{bitwise_ptr: BitwiseBuiltin*}(
     index: felt, block_header: felt*, reversed_block_header: felt*
 ) {
