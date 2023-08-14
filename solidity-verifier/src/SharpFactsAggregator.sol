@@ -55,7 +55,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     mapping(uint256 => bytes32) public blockNumberToParentHash;
 
     // Flag to control operator role requirements
-    bool public isOperatorRequired = true;
+    bool public isOperatorRequired;
 
     // Representation of the Cairo program's output (raw unpacked)
     struct JobOutput {
@@ -135,9 +135,12 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         // to be able to define new aggregate ranges
         _grantRole(OPERATOR_ROLE, _msgSender());
         _grantRole(UNLOCKER_ROLE, _msgSender());
+
+        // Set operator role requirement to true by default
+        isOperatorRequired = true;
     }
 
-    /// @notice Reverts if the caller is not an operator
+    /// @notice Reverts if the caller is not an operator and the operator role requirement is enabled
     modifier onlyOperator() {
         if (isOperatorRequired) {
             require(
