@@ -12,8 +12,7 @@ contract AggregatorsFactoryTest is Test {
 
     SharpFactsAggregator public aggregator;
 
-    SharpFactsAggregator private aggregatorTemplate =
-        new SharpFactsAggregator();
+    SharpFactsAggregator private aggregatorTemplate;
 
     uint256 constant PROPOSAL_DELAY = 3 days;
 
@@ -23,6 +22,10 @@ contract AggregatorsFactoryTest is Test {
     event AggregatorCreation(address aggregator, uint256 aggregatorId);
 
     function setUp() public {
+        vm.createSelectFork(vm.rpcUrl("goerli"));
+
+        aggregatorTemplate = new SharpFactsAggregator();
+
         factory = new AggregatorsFactory(address(aggregatorTemplate));
 
         vm.expectEmit(false, true, false, false);
@@ -34,6 +37,8 @@ contract AggregatorsFactoryTest is Test {
             )
         );
         assertEq(factory.aggregatorsById(1), address(aggregator));
+
+        assertTrue(factory.hasRole(keccak256("OPERATOR_ROLE"), address(this)));
     }
 
     function testDeployment() public {
@@ -52,8 +57,20 @@ contract AggregatorsFactoryTest is Test {
             aggregator.hasRole(keccak256("UNLOCKER_ROLE"), address(this))
         );
 
+        aggregator.registerNewRange(42);
+
         aggregator.revokeRole(keccak256("UNLOCKER_ROLE"), address(this));
         aggregator.revokeRole(keccak256("OPERATOR_ROLE"), address(this));
+
+        assertFalse(
+            aggregator.hasRole(keccak256("OPERATOR_ROLE"), address(this))
+        );
+        assertFalse(
+            aggregator.hasRole(keccak256("UNLOCKER_ROLE"), address(this))
+        );
+
+        vm.expectRevert("Caller is not an operator");
+        aggregator.registerNewRange(50);
     }
 
     function testUpgrade() public {
@@ -78,6 +95,11 @@ contract AggregatorsFactoryTest is Test {
         factory.upgrade(1);
 
         vm.warp(block.timestamp + PROPOSAL_DELAY);
+
+        vm.startPrank(address(42));
+        vm.expectRevert("Caller is not an operator");
+        factory.upgrade(1);
+        vm.stopPrank();
 
         vm.expectEmit(true, true, false, true);
         emit Upgrade(address(aggregatorTemplate), address(newAggregator));
