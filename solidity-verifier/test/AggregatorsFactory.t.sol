@@ -12,8 +12,7 @@ contract AggregatorsFactoryTest is Test {
 
     SharpFactsAggregator public aggregator;
 
-    SharpFactsAggregator private aggregatorTemplate =
-        new SharpFactsAggregator();
+    SharpFactsAggregator private aggregatorTemplate;
 
     uint256 constant PROPOSAL_DELAY = 3 days;
 
@@ -23,25 +22,23 @@ contract AggregatorsFactoryTest is Test {
     event AggregatorCreation(address aggregator, uint256 aggregatorId);
 
     function setUp() public {
+        vm.createSelectFork(vm.rpcUrl("goerli"));
+
+        aggregatorTemplate = new SharpFactsAggregator();
+
         factory = new AggregatorsFactory(address(aggregatorTemplate));
 
         vm.expectEmit(false, true, false, false);
         emit AggregatorCreation(address(aggregator), 0);
         aggregator = SharpFactsAggregator(
             factory.createAggregator(
-                // Sharp Facts Registry (Goërli)
-                0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168,
-                // Program hash (prover)
-                bytes32(
-                    uint256(
-                        0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
-                    )
-                ),
                 // Create a new one (past aggregator ID = 0 for non-existing)
                 0
             )
         );
         assertEq(factory.aggregatorsById(1), address(aggregator));
+
+        assertTrue(factory.hasRole(keccak256("OPERATOR_ROLE"), address(this)));
     }
 
     function testDeployment() public {
@@ -52,28 +49,28 @@ contract AggregatorsFactoryTest is Test {
             aggregator.hasRole(keccak256("OPERATOR_ROLE"), address(factory))
         );
 
-        // Aggregator checks
-        vm.startPrank(address(factory));
-        aggregator.grantRole(keccak256("OPERATOR_ROLE"), address(this));
-        aggregator.grantRole(keccak256("UPGRADER_ROLE"), address(this));
-        aggregator.grantRole(keccak256("UNLOCKER_ROLE"), address(this));
-        vm.stopPrank();
-
+        // Aggregator roles checks
         assertTrue(
             aggregator.hasRole(keccak256("OPERATOR_ROLE"), address(this))
         );
         assertTrue(
             aggregator.hasRole(keccak256("UNLOCKER_ROLE"), address(this))
         );
-        assertTrue(
-            aggregator.hasRole(keccak256("UPGRADER_ROLE"), address(this))
+
+        aggregator.registerNewRange(42);
+
+        aggregator.revokeRole(keccak256("UNLOCKER_ROLE"), address(this));
+        aggregator.revokeRole(keccak256("OPERATOR_ROLE"), address(this));
+
+        assertFalse(
+            aggregator.hasRole(keccak256("OPERATOR_ROLE"), address(this))
+        );
+        assertFalse(
+            aggregator.hasRole(keccak256("UNLOCKER_ROLE"), address(this))
         );
 
-        vm.startPrank(address(factory));
-        aggregator.revokeRole(keccak256("OPERATOR_ROLE"), address(this));
-        aggregator.revokeRole(keccak256("UPGRADER_ROLE"), address(this));
-        aggregator.revokeRole(keccak256("UNLOCKER_ROLE"), address(this));
-        vm.stopPrank();
+        vm.expectRevert("Caller is not an operator");
+        aggregator.registerNewRange(50);
     }
 
     function testUpgrade() public {
@@ -81,15 +78,7 @@ contract AggregatorsFactoryTest is Test {
         emit AggregatorCreation(address(aggregator), 1);
         SharpFactsAggregator newAggregator = SharpFactsAggregator(
             factory.createAggregator(
-                // Sharp Facts Registry (Goërli)
-                0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168,
-                // Program hash (prover)
-                bytes32(
-                    uint256(
-                        0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
-                    )
-                ),
-                // Create a new one (past aggregator ID = 0 for non-existing)
+                // Attach to existing aggregator (id = 1)
                 1
             )
         );
@@ -106,6 +95,11 @@ contract AggregatorsFactoryTest is Test {
         factory.upgrade(1);
 
         vm.warp(block.timestamp + PROPOSAL_DELAY);
+
+        vm.startPrank(address(42));
+        vm.expectRevert("Caller is not an operator");
+        factory.upgrade(1);
+        vm.stopPrank();
 
         vm.expectEmit(true, true, false, true);
         emit Upgrade(address(aggregatorTemplate), address(newAggregator));

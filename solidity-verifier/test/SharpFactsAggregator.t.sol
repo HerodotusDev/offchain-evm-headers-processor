@@ -63,22 +63,8 @@ contract SharpFactsAggregatorTest is Test {
                 address(this)
             )
         );
-        assertFalse(
-            sharpFactsAggregator.hasRole(
-                keccak256("UPGRADER_ROLE"),
-                address(this)
-            )
-        );
 
         sharpFactsAggregator.initialize(
-            // Sharp Facts Registry (Goërli)
-            0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168,
-            // Program hash (prover)
-            bytes32(
-                uint(
-                    0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
-                )
-            ),
             // Initial aggregator state (empty trees)
             initialAggregatorState
         );
@@ -93,12 +79,6 @@ contract SharpFactsAggregatorTest is Test {
         assertTrue(
             sharpFactsAggregator.hasRole(
                 keccak256("UNLOCKER_ROLE"),
-                address(this)
-            )
-        );
-        assertTrue(
-            sharpFactsAggregator.hasRole(
-                keccak256("UPGRADER_ROLE"),
                 address(this)
             )
         );
