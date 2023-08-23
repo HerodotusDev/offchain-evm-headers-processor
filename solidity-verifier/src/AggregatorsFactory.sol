@@ -152,7 +152,7 @@ contract AggregatorsFactory is AccessControl {
      * @param updateId The id of the upgrade proposal to execute
      */
     function upgrade(uint256 updateId) external onlyOperator {
-        require(updateId <= upgradesCount, "Invalid updateId");
+        require(updateId == upgradesCount, "Invalid updateId");
 
         uint256 timeLockTimestamp = upgrades[updateId].timestamp;
         require(timeLockTimestamp != 0, "TimeLock not set");
