@@ -6,6 +6,7 @@ import "forge-std/console.sol";
 
 import "../src/SharpFactsAggregator.sol";
 import "../src/lib/Uint256Splitter.sol";
+import {IFactsRegistry} from "../src/interfaces/IFactsRegistry.sol";
 
 contract SharpFactsAggregatorTest is Test {
     using Uint256Splitter for uint256;
@@ -48,7 +49,9 @@ contract SharpFactsAggregatorTest is Test {
                     continuableParentHash: bytes32(0)
                 });
 
-        sharpFactsAggregator = new SharpFactsAggregator();
+        sharpFactsAggregator = new SharpFactsAggregator(
+            IFactsRegistry(0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168) // Goërli
+        );
 
         // Ensure roles were not granted
         assertFalse(

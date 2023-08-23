@@ -6,6 +6,7 @@ import "forge-std/console.sol";
 
 import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
 import {AggregatorsFactory} from "../src/AggregatorsFactory.sol";
+import {IFactsRegistry} from "../src/interfaces/IFactsRegistry.sol";
 
 contract AggregatorsFactoryTest is Test {
     AggregatorsFactory public factory;
@@ -24,7 +25,9 @@ contract AggregatorsFactoryTest is Test {
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("goerli"));
 
-        aggregatorTemplate = new SharpFactsAggregator();
+        aggregatorTemplate = new SharpFactsAggregator(
+            IFactsRegistry(0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168) // Goërli
+        );
 
         factory = new AggregatorsFactory(aggregatorTemplate);
 

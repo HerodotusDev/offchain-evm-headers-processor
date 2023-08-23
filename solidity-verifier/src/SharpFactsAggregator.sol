@@ -32,8 +32,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     uint256 public constant MAXIMUM_BLOCKS_CONFIRMATIONS = 255;
 
     // Sharp Facts Registry
-    IFactsRegistry public constant FACTS_REGISTRY =
-        IFactsRegistry(0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168); // Goërli
+    IFactsRegistry public immutable FACTS_REGISTRY;
 
     // Cairo program hash (i.e., the off-chain block headers accumulator program)
     bytes32 public constant PROGRAM_HASH =
@@ -120,6 +119,10 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     event OperatorRequirementChange(
         bool newRequirement
     );
+
+    constructor(IFactsRegistry factsRegistry) {
+        FACTS_REGISTRY = factsRegistry;
+    }
 
     /**
      * @notice Initializes the contract with given parameters.
