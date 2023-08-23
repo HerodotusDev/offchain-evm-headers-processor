@@ -12,12 +12,12 @@ import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
 ///         and upgrading new one's starter template
 contract AggregatorsFactory is AccessControl {
     // Blank contract template address
-    address public template;
+    SharpFactsAggregator public template;
 
     // Timelock mechanism for upgrades proposals
     struct UpgradeProposalTimelock {
         uint256 timestamp;
-        address newTemplate;
+        SharpFactsAggregator newTemplate;
     }
 
     // Upgrades timelocks
@@ -33,7 +33,7 @@ contract AggregatorsFactory is AccessControl {
     uint256 public aggregatorsCount;
 
     // Aggregators by id
-    mapping(uint256 => address) public aggregatorsById;
+    mapping(uint256 => SharpFactsAggregator) public aggregatorsById;
 
     // Access control
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
@@ -48,13 +48,13 @@ contract AggregatorsFactory is AccessControl {
         0xce92cc894a17c107be8788b58092c22cd0634d1489ca0ce5b4a045a1ce31b168;
 
     // Events
-    event UpgradeProposal(address newTemplate);
-    event Upgrade(address oldTemplate, address newTemplate);
-    event AggregatorCreation(address aggregator, uint256 aggregatorId);
+    event UpgradeProposal(SharpFactsAggregator newTemplate);
+    event Upgrade(SharpFactsAggregator oldTemplate, SharpFactsAggregator newTemplate);
+    event AggregatorCreation(SharpFactsAggregator aggregator, uint256 aggregatorId);
 
     /// Creates a new Factory contract and grants OPERATOR_ROLE to the deployer
     /// @param initialTemplate The address of the template contract to clone
-    constructor(address initialTemplate) {
+    constructor(SharpFactsAggregator initialTemplate) {
         template = initialTemplate;
 
         _setRoleAdmin(OPERATOR_ROLE, OPERATOR_ROLE);
@@ -83,7 +83,7 @@ contract AggregatorsFactory is AccessControl {
             // Attach from existing aggregator
             require(aggregatorId <= aggregatorsCount, "Invalid aggregator ID");
 
-            address existingAggregatorAddr = aggregatorsById[aggregatorId];
+            address existingAggregatorAddr = address(aggregatorsById[aggregatorId]);
             require(
                 existingAggregatorAddr != address(0),
                 "Aggregator not found"
@@ -110,16 +110,16 @@ contract AggregatorsFactory is AccessControl {
         );
 
         // Clone the template contract
-        address clone = Clones.clone(template);
+        address clone = Clones.clone(address(template));
 
         // The data is the encoded initialize function (with initial parameters)
         (bool success, ) = clone.call(data);
 
         require(success, "Aggregator initialization failed");
 
-        aggregatorsById[++aggregatorsCount] = clone;
+        aggregatorsById[++aggregatorsCount] = SharpFactsAggregator(clone);
 
-        emit AggregatorCreation(clone, aggregatorsCount);
+        emit AggregatorCreation(SharpFactsAggregator(clone), aggregatorsCount);
 
         // Grant roles to the caller so that roles are not stuck in the Factory
         SharpFactsAggregator(clone).grantRole(
@@ -138,7 +138,7 @@ contract AggregatorsFactory is AccessControl {
      * Proposes an upgrade to the template (blank aggregator) contract
      * @param newTemplate The address of the new template contract to use for future aggregators
      */
-    function proposeUpgrade(address newTemplate) external onlyOperator {
+    function proposeUpgrade(SharpFactsAggregator newTemplate) external onlyOperator {
         upgrades[++upgradesCount] = UpgradeProposalTimelock(
             block.timestamp + DELAY,
             newTemplate
@@ -158,12 +158,12 @@ contract AggregatorsFactory is AccessControl {
         require(timeLockTimestamp != 0, "TimeLock not set");
         require(block.timestamp >= timeLockTimestamp, "TimeLock not expired");
 
-        address oldTemplate = template;
-        template = upgrades[updateId].newTemplate;
+        address oldTemplate = address(template);
+        template = SharpFactsAggregator(upgrades[updateId].newTemplate);
 
         // Clear timelock
-        upgrades[updateId] = UpgradeProposalTimelock(0, address(0));
+        upgrades[updateId] = UpgradeProposalTimelock(0, SharpFactsAggregator(address(0)));
 
-        emit Upgrade(oldTemplate, template);
+        emit Upgrade(SharpFactsAggregator(oldTemplate), template);
     }
 }

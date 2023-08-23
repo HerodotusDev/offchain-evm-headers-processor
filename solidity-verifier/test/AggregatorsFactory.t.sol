@@ -17,33 +17,33 @@ contract AggregatorsFactoryTest is Test {
     uint256 constant PROPOSAL_DELAY = 3 days;
 
     // Important events
-    event UpgradeProposal(address newTemplate);
-    event Upgrade(address oldTemplate, address newTemplate);
-    event AggregatorCreation(address aggregator, uint256 aggregatorId);
+    event UpgradeProposal(SharpFactsAggregator newTemplate);
+    event Upgrade(SharpFactsAggregator oldTemplate, SharpFactsAggregator newTemplate);
+    event AggregatorCreation(SharpFactsAggregator aggregator, uint256 aggregatorId);
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("goerli"));
 
         aggregatorTemplate = new SharpFactsAggregator();
 
-        factory = new AggregatorsFactory(address(aggregatorTemplate));
+        factory = new AggregatorsFactory(aggregatorTemplate);
 
         vm.expectEmit(false, true, false, false);
-        emit AggregatorCreation(address(aggregator), 0);
+        emit AggregatorCreation(aggregator, 0);
         aggregator = SharpFactsAggregator(
             factory.createAggregator(
                 // Create a new one (past aggregator ID = 0 for non-existing)
                 0
             )
         );
-        assertEq(factory.aggregatorsById(1), address(aggregator));
+        assertEq(address(factory.aggregatorsById(1)), address(aggregator));
 
         assertTrue(factory.hasRole(keccak256("OPERATOR_ROLE"), address(this)));
     }
 
     function testDeployment() public {
         // Factory checks
-        assertTrue(factory.aggregatorsById(1) == address(aggregator));
+        assertTrue(address(factory.aggregatorsById(1)) == address(aggregator));
         assertEq(factory.DELAY(), PROPOSAL_DELAY);
         assertTrue(
             aggregator.hasRole(keccak256("OPERATOR_ROLE"), address(factory))
@@ -75,18 +75,18 @@ contract AggregatorsFactoryTest is Test {
 
     function testUpgrade() public {
         vm.expectEmit(false, true, false, false);
-        emit AggregatorCreation(address(aggregator), 1);
+        emit AggregatorCreation(aggregator, 1);
         SharpFactsAggregator newAggregator = SharpFactsAggregator(
             factory.createAggregator(
                 // Attach to existing aggregator (id = 1)
                 1
             )
         );
-        assertEq(factory.aggregatorsById(2), address(newAggregator));
+        assertEq(address(factory.aggregatorsById(2)), address(newAggregator));
 
         vm.expectEmit(true, false, false, true);
-        emit UpgradeProposal(address(newAggregator));
-        factory.proposeUpgrade(address(newAggregator));
+        emit UpgradeProposal(newAggregator);
+        factory.proposeUpgrade(newAggregator);
 
         vm.expectRevert("Invalid updateId");
         factory.upgrade(42);
@@ -102,7 +102,7 @@ contract AggregatorsFactoryTest is Test {
         vm.stopPrank();
 
         vm.expectEmit(true, true, false, true);
-        emit Upgrade(address(aggregatorTemplate), address(newAggregator));
+        emit Upgrade(aggregatorTemplate, newAggregator);
         factory.upgrade(1);
 
         vm.expectRevert("TimeLock not set");
