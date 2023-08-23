@@ -49,7 +49,7 @@ func felt_divmod_2pow32{range_check_ptr}(value: felt) -> (q: felt, r: felt) {
 }
 
 // A function to reverse the endianness of a 8 bytes (64 bits) integer.
-// The result will not make sense if word > 2^64.
+// The result will not make sense if word >= 2^64.
 // The implementation is directly inspired by the function word_reverse_endian
 // from the common library starkware.cairo.common.uint256 with three steps instead of four.
 // params:
@@ -59,15 +59,15 @@ func felt_divmod_2pow32{range_check_ptr}(value: felt) -> (q: felt, r: felt) {
 func word_reverse_endian_64{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: felt) {
     // Step 1.
     assert bitwise_ptr[0].x = word;
-    assert bitwise_ptr[0].y = 0x00ff00ff00ff00ff00ff00ff00ff00ff;
+    assert bitwise_ptr[0].y = 0x00ff00ff00ff00ff;
     tempvar word = word + (2 ** 16 - 1) * bitwise_ptr[0].x_and_y;
     // Step 2.
     assert bitwise_ptr[1].x = word;
-    assert bitwise_ptr[1].y = 0x00ffff0000ffff0000ffff0000ffff00;
+    assert bitwise_ptr[1].y = 0x0000ffff0000ffff00;
     tempvar word = word + (2 ** 32 - 1) * bitwise_ptr[1].x_and_y;
     // Step 3.
     assert bitwise_ptr[2].x = word;
-    assert bitwise_ptr[2].y = 0x00ffffffff00000000ffffffff000000;
+    assert bitwise_ptr[2].y = 0x00000000ffffffff000000;
     tempvar word = word + (2 ** 64 - 1) * bitwise_ptr[2].x_and_y;
 
     let bitwise_ptr = bitwise_ptr + 3 * BitwiseBuiltin.SIZE;
