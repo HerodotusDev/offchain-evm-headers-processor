@@ -106,11 +106,19 @@ func word_reverse_endian_64_RC{range_check_ptr}(word: felt) -> felt {
     assert [range_check_ptr + 5] = 255 - b5;
     assert [range_check_ptr + 6] = 255 - b6;
     assert [range_check_ptr + 7] = 255 - b7;
+    assert [range_check_ptr + 8] = b0;
+    assert [range_check_ptr + 9] = b1;
+    assert [range_check_ptr + 10] = b2;
+    assert [range_check_ptr + 11] = b3;
+    assert [range_check_ptr + 12] = b4;
+    assert [range_check_ptr + 13] = b5;
+    assert [range_check_ptr + 14] = b6;
+    assert [range_check_ptr + 15] = b7;
 
     assert word = b0 * 256 ** 7 + b1 * 256 ** 6 + b2 * 256 ** 5 + b3 * 256 ** 4 + b4 * 256 ** 3 +
         b5 * 256 ** 2 + b6 * 256 + b7;
 
-    tempvar range_check_ptr = range_check_ptr + 8;
+    tempvar range_check_ptr = range_check_ptr + 16;
     return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4 + b5 * 256 ** 5 + b6 *
         256 ** 6 + b7 * 256 ** 7;
 }
@@ -136,10 +144,12 @@ func word_reverse_endian_16_RC{range_check_ptr}(word: felt) -> felt {
 
     assert [range_check_ptr] = 255 - b0;
     assert [range_check_ptr + 1] = 255 - b1;
+    assert [range_check_ptr + 2] = b0;
+    assert [range_check_ptr + 3] = b1;
 
     assert word = b0 * 256 + b1;
 
-    tempvar range_check_ptr = range_check_ptr + 2;
+    tempvar range_check_ptr = range_check_ptr + 4;
     return b0 + b1 * 256;
 }
 
@@ -166,10 +176,13 @@ func word_reverse_endian_24_RC{range_check_ptr}(word: felt) -> felt {
     assert [range_check_ptr] = 255 - b0;
     assert [range_check_ptr + 1] = 255 - b1;
     assert [range_check_ptr + 2] = 255 - b2;
+    assert [range_check_ptr + 3] = b0;
+    assert [range_check_ptr + 4] = b1;
+    assert [range_check_ptr + 5] = b2;
 
     assert word = b0 * 256 ** 2 + b1 * 256 + b2;
 
-    tempvar range_check_ptr = range_check_ptr + 3;
+    tempvar range_check_ptr = range_check_ptr + 6;
     return b0 + b1 * 256 + b2 * 256 ** 2;
 }
 
@@ -198,10 +211,14 @@ func word_reverse_endian_32_RC{range_check_ptr}(word: felt) -> felt {
     assert [range_check_ptr + 1] = 255 - b1;
     assert [range_check_ptr + 2] = 255 - b2;
     assert [range_check_ptr + 3] = 255 - b3;
+    assert [range_check_ptr + 4] = b0;
+    assert [range_check_ptr + 5] = b1;
+    assert [range_check_ptr + 6] = b2;
+    assert [range_check_ptr + 7] = b3;
 
     assert word = b0 * 256 ** 3 + b1 * 256 ** 2 + b2 * 256 + b3;
 
-    tempvar range_check_ptr = range_check_ptr + 4;
+    tempvar range_check_ptr = range_check_ptr + 8;
     return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3;
 }
 
@@ -232,10 +249,15 @@ func word_reverse_endian_40_RC{range_check_ptr}(word: felt) -> felt {
     assert [range_check_ptr + 2] = 255 - b2;
     assert [range_check_ptr + 3] = 255 - b3;
     assert [range_check_ptr + 4] = 255 - b4;
+    assert [range_check_ptr + 5] = b0;
+    assert [range_check_ptr + 6] = b1;
+    assert [range_check_ptr + 7] = b2;
+    assert [range_check_ptr + 8] = b3;
+    assert [range_check_ptr + 9] = b4;
 
     assert word = b0 * 256 ** 4 + b1 * 256 ** 3 + b2 * 256 ** 2 + b3 * 256 + b4;
 
-    tempvar range_check_ptr = range_check_ptr + 5;
+    tempvar range_check_ptr = range_check_ptr + 10;
     return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4;
 }
 
@@ -268,10 +290,16 @@ func word_reverse_endian_48_RC{range_check_ptr}(word: felt) -> felt {
     assert [range_check_ptr + 3] = 255 - b3;
     assert [range_check_ptr + 4] = 255 - b4;
     assert [range_check_ptr + 5] = 255 - b5;
+    assert [range_check_ptr + 6] = b0;
+    assert [range_check_ptr + 7] = b1;
+    assert [range_check_ptr + 8] = b2;
+    assert [range_check_ptr + 9] = b3;
+    assert [range_check_ptr + 10] = b4;
+    assert [range_check_ptr + 11] = b5;
 
     assert word = b0 * 256 ** 5 + b1 * 256 ** 4 + b2 * 256 ** 3 + b3 * 256 ** 2 + b4 * 256 + b5;
 
-    tempvar range_check_ptr = range_check_ptr + 6;
+    tempvar range_check_ptr = range_check_ptr + 12;
     return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4 + b5 * 256 ** 5;
 }
 
@@ -306,11 +334,18 @@ func word_reverse_endian_56_RC{range_check_ptr}(word: felt) -> felt {
     assert [range_check_ptr + 4] = 255 - b4;
     assert [range_check_ptr + 5] = 255 - b5;
     assert [range_check_ptr + 6] = 255 - b6;
+    assert [range_check_ptr + 7] = b0;
+    assert [range_check_ptr + 8] = b1;
+    assert [range_check_ptr + 9] = b2;
+    assert [range_check_ptr + 10] = b3;
+    assert [range_check_ptr + 11] = b4;
+    assert [range_check_ptr + 12] = b5;
+    assert [range_check_ptr + 13] = b6;
 
     assert word = b0 * 256 ** 6 + b1 * 256 ** 5 + b2 * 256 ** 4 + b3 * 256 ** 3 + b4 * 256 ** 2 +
         b5 * 256 + b6;
 
-    tempvar range_check_ptr = range_check_ptr + 7;
+    tempvar range_check_ptr = range_check_ptr + 14;
     return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4 + b5 * 256 ** 5 + b6 *
         256 ** 6;
 }
