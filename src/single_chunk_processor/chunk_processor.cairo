@@ -185,21 +185,16 @@ func merge_subtrees_if_applicable{
 }(height: felt) {
     alloc_locals;
 
-    local next_pos_is_parent: felt;
     tempvar next_pos: felt = mmr_array_len + mmr_offset + 1;
     let height_next_pos = compute_height{pow2_array=pow2_array}(next_pos);
 
-    %{ ids.next_pos_is_parent = 1 if ids.height_next_pos > ids.height else 0 %}
-    if (next_pos_is_parent != 0) {
-        // This ensures height_next_pos > height.
+    if (height_next_pos == height + 1) {
+        // The height of the next position is one level higher than the current one.
         // It means than the last element in the array is a right children.
-
-        assert [range_check_ptr] = height_next_pos - height - 1;
-        tempvar range_check_ptr = range_check_ptr + 1;
 
         // Compute left and right positions of the subtree to merge
         local left_pos = next_pos - pow2_array[height + 1];
-        local right_pos = left_pos + pow2_array[height + 1] - 1;
+        local right_pos = next_pos - 1;
 
         // %{ print(f"Merging {ids.left_pos} + {ids.right_pos} at index {ids.next_pos} and height {ids.height_next_pos} ") %}
 
@@ -225,9 +220,7 @@ func merge_subtrees_if_applicable{
         // Continue merging if needed:
         return merge_subtrees_if_applicable(height=height + 1);
     } else {
-        // We need to assert heigt_next_pos <= height
-        assert [range_check_ptr] = height - height_next_pos;
-        tempvar range_check_ptr = range_check_ptr + 1;
+        // Next position is not a parent, no need to merge.
         return ();
     }
 }
