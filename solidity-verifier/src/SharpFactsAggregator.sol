@@ -114,6 +114,10 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 continuableParentHash
     );
 
+    event OperatorRequirementChange(
+        bool newRequirement
+    );
+
     /**
      * @notice Initializes the contract with given parameters.
      * @param initialAggregatorState Initial state of the aggregator (i.e., initial trees state).
@@ -162,6 +166,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bool _isOperatorRequired
     ) external onlyUnlocker {
         isOperatorRequired = _isOperatorRequired;
+        emit OperatorRequirementChange(_isOperatorRequired);
     }
 
     /// Registers a new range to aggregate from
