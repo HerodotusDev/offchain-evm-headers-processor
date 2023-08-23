@@ -437,8 +437,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 outputHash = keccak256(abi.encodePacked(outputs));
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
-        bool isValidFact = FACTS_REGISTRY.isValid(fact);
-        return isValidFact;
+        return FACTS_REGISTRY.isValid(fact);
     }
 
     /// @notice Returns the current aggregator state
