@@ -45,7 +45,7 @@ func read_block_headers() -> (rlp_array: felt**, rlp_array_bytes_len: felt*) {
 
 // Extracts the parent hash from a block header in little endian format. This can be directly asserted
 // against the Cairo Keccak hash of the preceding block header.
-// Assumes all words in the block header are 8-byte little endian values and it's correctly RLP encoded.
+// Requires that all words in the block header are 8-byte little endian values and it's correctly RLP encoded.
 //
 // Params:
 // - rlp: felt* - A pointer to the array of felts, each segmenting the block header into 8-byte little endian chunks.
@@ -141,8 +141,9 @@ func extract_block_number_big{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow
 
     let (first_byte, remaining_7) = felt_divmod(rlp_difficulty, 2 ** 56);
     let difficulty_offset = get_bigint_byte_size(first_byte);
-    // MAX Difficulty recorded is 15911382925018176 so max difficulty offset is 7, and will alway fit in the remaining_7.
-
+    // MAX Difficulty recorded before ETH merge is 15911382925018176 so max difficulty offset possible is 7, and will alway fit in the remaining_7.
+    assert [range_check_ptr] = 7 - difficulty_offset;
+    tempvar range_check_ptr = range_check_ptr + 1;
     if (difficulty_offset != 7) {
         // It means 0 <= difficulty_offset < 7 and the first byte of block number is inside remaining_7
         let mask = pow2_array[8 * (7 - difficulty_offset)] - 1;
@@ -162,7 +163,6 @@ func extract_block_number_big{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow
         );
 
         let block_number_offset = get_bigint_byte_size(first_byte);
-
         if (block_number_offset == 0) {
             if (first_byte == 128) {
                 return 0;
@@ -213,9 +213,13 @@ func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
     alloc_locals;
     let (reversed_block_header: felt*) = alloc();
     let (number_of_exact_8bytes_chunks, number_of_bytes_in_last_chunk) = felt_divmod(n_bytes, 8);
-    let (_, rem) = felt_divmod(seed, 2);
+    let (_, rem) = felt_divmod(seed, 10);
+    local is_le_5;
+    %{ ids.is_le_5 = 1 if ids.rem <= 5 else 0 %}
+    if (is_le_5 == 0) {
+        assert [range_check_ptr] = rem - 6;
+        tempvar range_check_ptr = range_check_ptr + 1;
 
-    if (rem == 0) {
         reverse_block_header_chunks_RC_inner(
             index=number_of_exact_8bytes_chunks - 1,
             block_header=block_header,
@@ -224,6 +228,9 @@ func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
         tempvar range_check_ptr = range_check_ptr;
         tempvar bitwise_ptr = bitwise_ptr;
     } else {
+        assert [range_check_ptr] = 5 - rem;
+        tempvar range_check_ptr = range_check_ptr + 1;
+
         reverse_block_header_chunks_bitwise_inner(
             index=number_of_exact_8bytes_chunks - 1,
             block_header=block_header,
