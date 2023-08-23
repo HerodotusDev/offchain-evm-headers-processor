@@ -28,6 +28,9 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant UNLOCKER_ROLE = keccak256("UNLOCKER_ROLE");
 
+    uint256 public constant MINIMUM_BLOCKS_CONFIRMATIONS = 20;
+    uint256 public constant MAXIMUM_BLOCKS_CONFIRMATIONS = 255;
+
     // Sharp Facts Registry
     IFactsRegistry public constant FACTS_REGISTRY =
         IFactsRegistry(0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168); // Goërli
@@ -170,19 +173,19 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     }
 
     /// Registers a new range to aggregate from
-    /// @notice Caches a recent block hash (-20 to -255 from present), relying on the global `blockhash` Solidity function
+    /// @notice Caches a recent block hash (MINIMUM_BLOCKS_CONFIRMATIONS to -MAXIMUM_BLOCKS_CONFIRMATIONS from present), relying on the global `blockhash` Solidity function
     /// @param blocksConfirmations Number of blocks preceding the current block
     function registerNewRange(
         uint256 blocksConfirmations
     ) external onlyOperator {
-        // Minimum 20 blocks confirmations to avoid reorgs
-        if (blocksConfirmations < 20) {
+        // Minimum blocks confirmations to avoid reorgs
+        if (blocksConfirmations < MINIMUM_BLOCKS_CONFIRMATIONS) {
             revert NotEnoughBlockConfirmations();
         }
 
-        // Maximum 255 blocks confirmations to capture
+        // Maximum MAXIMUM_BLOCKS_CONFIRMATIONS blocks confirmations to capture
         // an available block hash with Solidity `blockhash()`
-        if (blocksConfirmations > 255) {
+        if (blocksConfirmations > MAXIMUM_BLOCKS_CONFIRMATIONS) {
             revert TooManyBlocksConfirmations();
         }
 
