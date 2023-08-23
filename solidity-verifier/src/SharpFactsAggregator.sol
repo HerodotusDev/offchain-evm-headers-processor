@@ -440,15 +440,6 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         return FACTS_REGISTRY.isValid(fact);
     }
 
-    /// @notice Returns the current aggregator state
-    function getAggregatorState()
-        external
-        view
-        returns (AggregatorState memory)
-    {
-        return aggregatorState;
-    }
-
     /// @notice Returns the current root hash of the Keccak Merkle Mountain Range (MMR) tree
     function getMMRKeccakRoot() external view returns (bytes32) {
         return aggregatorState.keccakMmrRoot;
