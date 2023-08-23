@@ -92,10 +92,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     error TooManyBlocksConfirmations();
     error NotEnoughJobs();
     error UnknownParentHash();
-    error AggregationPoseidonRootMismatch();
-    error AggregationKeccakRootMismatch();
-    error AggregationSizeMismatch();
-    error AggregationErrorParentHashMismatch();
+    error AggregationError(string message);
     error AggregationBlockMismatch();
     error GenesisBlockReached();
     error InvalidFact();
@@ -357,15 +354,15 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
         // Check that the job's previous Poseidon MMR root is the same as the one stored in the contract state
         if (output.mmrPreviousRootPoseidon != aggregatorState.poseidonMmrRoot)
-            revert AggregationPoseidonRootMismatch();
+            revert AggregationError("Poseidon root mismatch");
 
         // Check that the job's previous Keccak MMR root is the same as the one stored in the contract state
         if (output.mmrPreviousRootKeccak != aggregatorState.keccakMmrRoot)
-            revert AggregationKeccakRootMismatch();
+            revert AggregationError("Keccak root mismatch");
 
         // Check that the job's previous MMR size is the same as the one stored in the contract state
         if (mmrPreviousSize != aggregatorState.mmrSize)
-            revert AggregationSizeMismatch();
+            revert AggregationError("MMR size mismatch");
 
         if (rightBoundStartParentHash == bytes32(0)) {
             // If the right bound start parent hash __is not__ specified,
@@ -374,13 +371,13 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
                 output.blockNPlusOneParentHash !=
                 aggregatorState.continuableParentHash
             ) {
-                revert AggregationErrorParentHashMismatch();
+                revert AggregationError("Global state: Parent hash mismatch");
             }
         } else {
             // If the right bound start parent hash __is__ specified,
             // we check that the job's `blockN + 1 parent hash` is matching with a previously stored parent hash
             if (output.blockNPlusOneParentHash != rightBoundStartParentHash) {
-                revert AggregationErrorParentHashMismatch();
+                revert AggregationError("Parent hash mismatch");
             }
         }
     }
@@ -411,21 +408,21 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
         // We check that the previous job's new Poseidon MMR root matches the next job's previous Poseidon MMR root
         if (output.mmrNewRootPoseidon != nextOutput.mmrPreviousRootPoseidon)
-            revert AggregationPoseidonRootMismatch();
+            revert AggregationError("Poseidon root mismatch");
 
         // We check that the previous job's new Keccak MMR root matches the next job's previous Keccak MMR root
         if (output.mmrNewRootKeccak != nextOutput.mmrPreviousRootKeccak)
-            revert AggregationKeccakRootMismatch();
+            revert AggregationError("Keccak root mismatch");
 
         // We check that the previous job's new MMR size matches the next job's previous MMR size
         if (outputMmrNewSize != nextOutputMmrPreviousSize)
-            revert AggregationSizeMismatch();
+            revert AggregationError("MMR size mismatch");
 
         // We check that the previous job's lowest block hash matches the next job's highest block hash
         if (
             output.blockNMinusRPlusOneParentHash !=
             nextOutput.blockNPlusOneParentHash
-        ) revert AggregationErrorParentHashMismatch();
+        ) revert AggregationError("Parent hash mismatch");
     }
 
     /// @dev Helper function to verify a fact based on a job output
