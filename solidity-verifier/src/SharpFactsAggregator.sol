@@ -92,7 +92,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     error TooManyBlocksConfirmations();
     error NotEnoughJobs();
     error UnknownParentHash();
-    error AggregationError(string message);
+    error AggregationError(string message); // Generic error with a message
     error AggregationBlockMismatch();
     error GenesisBlockReached();
     error InvalidFact();
