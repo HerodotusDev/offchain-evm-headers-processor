@@ -26,6 +26,7 @@ from src.libs.mmr import (
     bag_peaks,
     get_roots,
     get_full_mmr_peak_values,
+    assert_mmr_size_is_valid,
 )
 
 // Recursively verifies that Cairo_Keccak(block_header_i) = parent_hash(block_header_i+1)_little_endian for all from i=index to i=0
@@ -42,7 +43,8 @@ from src.libs.mmr import (
 //
 // Params:
 // - index: felt - index of block header to verify in block_headers_array
-// - parent_hash: Uint256 - parent hash of block header i+1 (little endian)
+//   Should initially be equal to the number of blocks in the batch - 1
+// - expected_block_hash: Uint256 - should be the parent hash of block header i+1 (little endian)
 //
 // Returns:
 // - block_n_minus_r_plus_one_parent_hash: Uint256 - extracted parent hash of block_headers_array[0] (little endian)
@@ -60,15 +62,15 @@ func verify_block_headers_and_hash_them{
     block_n_minus_r_plus_one_parent_hash: Uint256, last_block_header_big: felt*
 ) {
     alloc_locals;
-    let (rlp_keccak_hash: Uint256) = keccak(
+    let (block_header_hash_little: Uint256) = keccak(
         inputs=block_headers_array[index], n_bytes=bytes_len_array[index]
     );
-    assert rlp_keccak_hash.low = parent_hash.low;
-    assert rlp_keccak_hash.high = parent_hash.high;
+    assert block_header_hash_little.low = expected_block_hash.low;
+    assert block_header_hash_little.high = expected_block_hash.high;
 
     %{ print("\n") %}
-    %{ print_u256(ids.rlp_keccak_hash,f"rlp_keccak_hash_{ids.index}") %}
-    %{ print_u256(ids.parent_hash,f"prt_keccak_hash_{ids.index}") %}
+    %{ print_u256(ids.block_header_hash_little,f"block_header_keccak_hash_{ids.index}") %}
+    %{ print_u256(ids.parent_hash,f"expected_keccak_hash_{ids.index}") %}
 
     // Reverse block header chunks back to big endian values and hash it with poseidon
     let (reversed_block_header: felt*, n_felts: felt) = reverse_block_header_chunks(
@@ -77,7 +79,7 @@ func verify_block_headers_and_hash_them{
     let (poseidon_hash) = poseidon_hash_many(n=n_felts, elements=reversed_block_header);
 
     // Reverse keccak hash back to big endian
-    let (block_header_hash_big) = uint256_reverse_endian(rlp_keccak_hash);
+    let (block_header_hash_big) = uint256_reverse_endian(block_header_hash_little);
 
     // Store poseidon hash and keccak hash in their respective arrays
     assert poseidon_hash_array[index] = poseidon_hash;
@@ -114,6 +116,7 @@ func verify_block_headers_and_hash_them{
 //
 // Params:
 // - index: felt - index of block header hash to append to MMR
+//   Should intially correspond to the number of blocks in the batch - 1
 func construct_mmr{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*,
@@ -302,6 +305,8 @@ func main{
         write_uint256_array(ids.previous_peaks_values_keccak, program_input['keccak_mmr_last_peaks'])
     %}
 
+    // Ensure that the previous MMR size is valid.
+    assert_mmr_size_is_valid{pow2_array=pow2_array}(mmr_offset);
     // Compute previous_peaks_positions given the previous MMR size (from left to right), as well:
     let (
         previous_peaks_positions: felt*, previous_peaks_positions_len: felt
@@ -365,7 +370,7 @@ func main{
         let (
             block_n_minus_r_plus_one_parent_hash_little: Uint256, last_block_header: felt*
         ) = verify_block_headers_and_hash_them(
-            index=n, parent_hash=block_n_plus_one_parent_hash_little
+            index=n, expected_block_hash=block_n_plus_one_parent_hash_little
         );
     }
 
@@ -485,6 +490,7 @@ func main{
 //
 // Params:
 // - index: felt - the index of the array to be stored in the dictionary
+//   Should be equal to the computed peaks_len given the validated MMR size, - 1.
 // - peaks_positions: felt* - the array of positions of the peaks
 // - peaks_values_poseidon: felt* - the array of values of the peaks for the Poseidon MMR
 // - peaks_values_keccak: Uint256* - the array of values of the peaks for the Keccak MMR

@@ -53,7 +53,19 @@ class KeccakHasher:
         self.keccak = sha3.keccak_256()
         return int.from_bytes(res, 'big')
     
-
+def is_valid_mmr_size(n):
+    prev_peak = 0
+    while n > 0:
+        i = n.bit_length()
+        peak = 2**i - 1
+        if peak > n:
+            i -= 1
+            peak = 2**i - 1
+        if peak == prev_peak:
+            return False
+        prev_peak = peak
+        n -= peak
+    return n == 0
 
 def tree_pos_height(pos: int) -> int:
     """

@@ -31,17 +31,31 @@ func main{
 
     %{
         import random
+        def is_valid_mmr_size(n):
+            prev_peak = 0
+            while n > 0:
+                i = n.bit_length()
+                peak = 2**i - 1
+                if peak > n:
+                    i -= 1
+                    peak = 2**i - 1
+                if peak == prev_peak:
+                    return False
+                prev_peak = peak
+                n -= peak
+            return n == 0
+
         ids.mmr_size_0=1
-        ids.mmr_size_1=2
+        ids.mmr_size_1=4
         ids.mmr_size_2=3
         ids.mmr_size_3=7
         ids.mmr_size_4=11
-        random_mmr_sizes = [random.randint(0, 20000000) for _ in range(5)]
-        ids.mmr_size_5=random_mmr_sizes[0]
-        ids.mmr_size_6=random_mmr_sizes[1]
-        ids.mmr_size_7=random_mmr_sizes[2]
-        ids.mmr_size_8=random_mmr_sizes[3]
-        ids.mmr_size_9=random_mmr_sizes[4]
+        for i in range(5, 10):
+            while True:
+                random_size = random.randint(0, 20000000)
+                if is_valid_mmr_size(random_size):
+                    setattr(ids, f"mmr_size_{i}", random_size)
+                    break
     %}
     let pow2_array: felt* = pow2alloc127();
 
@@ -79,6 +93,7 @@ func main{
 func test_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_size: felt) -> felt {
     alloc_locals;
     let (true_pos: felt*) = alloc();
+    local true_pos_len: felt;
 
     %{
         import random
@@ -87,9 +102,11 @@ func test_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_size: felt) ->
         mmr_size = ids.mmr_size
         peak_pos = [x+1 for x in get_peaks(mmr_size)] # Convert to 1-based indexing.
         segments.write_arg(ids.true_pos, peak_pos)
+        ids.true_pos_len = len(peak_pos)
     %}
 
     let (peaks: felt*, peaks_len: felt) = compute_peaks_positions(mmr_size);
+    assert 0 = peaks_len - true_pos_len;
     assert_array_rec(true_pos, peaks, peaks_len - 1);
     return peaks_len;
 }
@@ -97,10 +114,10 @@ func test_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_size: felt) ->
 // Recursively asserts that arrays x and y are equal at all indices up to index.
 func assert_array_rec(x: felt*, y: felt*, index: felt) {
     if (index == 0) {
-        assert x[0] = y[0];
+        assert 0 = x[0] - y[0];
         return ();
     } else {
-        assert x[index] = y[index];
+        assert 0 = x[index] - y[index];
         return assert_array_rec(x, y, index - 1);
     }
 }

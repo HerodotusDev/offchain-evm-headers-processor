@@ -6,6 +6,34 @@ from starkware.cairo.common.alloc import alloc
 const DIV_32 = 2 ** 32;
 const DIV_32_MINUS_1 = DIV_32 - 1;
 
+// Returns the number of bits in x.
+// Implicits arguments:
+// - pow2_array: felt* - A pointer such that pow2_array[i] = 2^i for i in [0, 127].
+// Params:
+// - x: felt - Input value.
+// Assumptions for the caller:
+// - 1 <= x < 2^127
+// Returns:
+// - bit_length: felt - Number of bits in x.
+func get_felt_bitlength{range_check_ptr, pow2_array: felt*}(x: felt) -> felt {
+    alloc_locals;
+    local bit_length;
+    %{
+        x = ids.x
+        ids.bit_length = x.bit_length()
+    %}
+    // Computes N=2^bit_length and n=2^(bit_length-1)
+    // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
+    tempvar N = pow2_array[bit_length];
+    tempvar n = pow2_array[bit_length - 1];
+    assert [range_check_ptr] = bit_length;
+    assert [range_check_ptr + 1] = 127 - bit_length;
+    assert [range_check_ptr + 2] = N - x - 1;
+    assert [range_check_ptr + 3] = x - n;
+    tempvar range_check_ptr = range_check_ptr + 4;
+    return bit_length;
+}
+
 // Computes x//y and x%y.
 // Assumption: y must be a power of 2
 // params:
