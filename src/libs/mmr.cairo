@@ -198,10 +198,11 @@ func get_full_mmr_peak_values{
     if (is_position_in_mmr_array != 0) {
         // %{ print(f'getting from mmr_array at index {ids.position-ids.mmr_offset -1}') %}
         // ensure position > mmr_offset
-        assert [range_check_ptr] = position - mmr_offset - 1;
+        let mmr_array_position = position - mmr_offset - 1;
+        assert [range_check_ptr] = mmr_array_position;
         tempvar range_check_ptr = range_check_ptr + 1;
-        let peak_poseidon = mmr_array_poseidon[position - mmr_offset - 1];
-        let peak_keccak = mmr_array_keccak[position - mmr_offset - 1];
+        let peak_poseidon = mmr_array_poseidon[mmr_array_position];
+        let peak_keccak = mmr_array_keccak[mmr_array_position];
         // %{
         //     print(f"mmr_array poseidon value at {ids.position - ids.mmr_offset -1} = {ids.peak_poseidon}")
         //     print(f"mmr_array keccak value at {ids.position - ids.mmr_offset -1 } = {ids.peak_keccak.low} {ids.peak_keccak.high}")
