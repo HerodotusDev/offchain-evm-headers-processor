@@ -29,8 +29,8 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     bytes32 public constant UNLOCKER_ROLE = keccak256("UNLOCKER_ROLE");
 
     // Sharp Facts Registry
-    address public constant FACTS_REGISTRY =
-        0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168; // Goërli
+    IFactsRegistry public constant FACTS_REGISTRY =
+        IFactsRegistry(0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168); // Goërli
 
     // Cairo program hash (i.e., the off-chain block headers accumulator program)
     bytes32 public constant PROGRAM_HASH =
@@ -338,7 +338,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
         // We ensure this fact has been registered on SHARP Facts Registry
-        if (!IFactsRegistry(FACTS_REGISTRY).isValid(fact)) {
+        if (!FACTS_REGISTRY.isValid(fact)) {
             revert InvalidFact();
         }
     }
@@ -430,7 +430,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 outputHash = keccak256(abi.encodePacked(outputs));
         bytes32 fact = keccak256(abi.encode(PROGRAM_HASH, outputHash));
 
-        bool isValidFact = IFactsRegistry(FACTS_REGISTRY).isValid(fact);
+        bool isValidFact = FACTS_REGISTRY.isValid(fact);
         return isValidFact;
     }
 
