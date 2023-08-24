@@ -58,7 +58,7 @@ func verify_block_headers_and_hash_them{
     keccak_hash_array: Uint256*,
     block_headers_array: felt**,
     bytes_len_array: felt*,
-}(index: felt, parent_hash: Uint256) -> (
+}(index: felt, expected_block_hash: Uint256) -> (
     block_n_minus_r_plus_one_parent_hash: Uint256, last_block_header_big: felt*
 ) {
     alloc_locals;
@@ -70,7 +70,7 @@ func verify_block_headers_and_hash_them{
 
     %{ print("\n") %}
     %{ print_u256(ids.block_header_hash_little,f"block_header_keccak_hash_{ids.index}") %}
-    %{ print_u256(ids.parent_hash,f"expected_keccak_hash_{ids.index}") %}
+    %{ print_u256(ids.expected_block_hash,f"expected_keccak_hash_{ids.index}") %}
 
     // Reverse block header chunks back to big endian values and hash it with poseidon
     let (reversed_block_header: felt*, n_felts: felt) = reverse_block_header_chunks(
@@ -97,7 +97,9 @@ func verify_block_headers_and_hash_them{
         );
     } else {
         // Otherwise, verify the (previous) block header at index (index-1)
-        return verify_block_headers_and_hash_them(index=index - 1, parent_hash=block_i_parent_hash);
+        return verify_block_headers_and_hash_them(
+            index=index - 1, expected_block_hash=block_i_parent_hash
+        );
     }
 }
 
