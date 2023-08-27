@@ -319,6 +319,7 @@ func get_full_mmr_peak_values{
 }
 
 // Compute the roots of both MMRs by bagging their peaks (see bag peaks function)
+// Hashes to bagged peaks with the size of the MMR: root=H(index, bagged_peak)
 // Implicits arguments:
 // - mmr_array_poseidon: felt* - array of new nodes of the Poseidon MMR
 // - mmr_array_keccak: Uint256* - array of new nodes of the Keccak MMR
@@ -349,9 +350,8 @@ func get_roots{
     mmr_offset: felt,
 }() -> (root_poseidon: felt, root_keccak: Uint256) {
     alloc_locals;
-    let (peaks_positions: felt*, peaks_len: felt) = compute_peaks_positions(
-        mmr_array_len + mmr_offset
-    );
+    let mmr_size = mmr_offset + mmr_array_len;
+    let (peaks_positions: felt*, peaks_len: felt) = compute_peaks_positions(mmr_size);
     let (peaks_poseidon: felt*, peaks_keccak: Uint256*) = get_peaks_from_positions{
         peaks_positions=peaks_positions
     }(peaks_len);
@@ -359,7 +359,16 @@ func get_roots{
         peaks_poseidon, peaks_keccak, peaks_len
     );
 
-    return (bagged_peaks_poseidon, bagged_peaks_keccak);
+    let (root_poseidon) = poseidon_hash(mmr_size, bagged_peaks_poseidon);
+
+    let (keccak_input: felt*) = alloc();
+    let inputs_start = keccak_input;
+    keccak_add_uint256{inputs=keccak_input}(num=Uint256(mmr_size, 0), bigend=1);
+    keccak_add_uint256{inputs=keccak_input}(num=bagged_peaks_keccak, bigend=1);
+    let (root_keccak: Uint256) = keccak(inputs=inputs_start, n_bytes=2 * 32);
+    let (root_keccak) = uint256_reverse_endian(root_keccak);
+
+    return (root_poseidon, root_keccak);
 }
 
 // Returns the peaks values from left to right for both MMRs given the peaks positions

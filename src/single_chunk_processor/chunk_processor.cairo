@@ -314,14 +314,24 @@ func main{
         previous_peaks_positions: felt*, previous_peaks_positions_len: felt
     ) = compute_peaks_positions{pow2_array=pow2_array}(mmr_offset);
 
-    // Based on the previous peaks positions, compute the previous root:
-    let (expected_previous_root_poseidon, expected_previous_root_keccak) = bag_peaks(
+    // Based on the previous peaks positions, compute the previous roots:
+    let (bagged_peaks_poseidon, bagged_peaks_keccak) = bag_peaks(
         previous_peaks_values_poseidon, previous_peaks_values_keccak, previous_peaks_positions_len
     );
+
+    let (root_poseidon) = poseidon_hash(mmr_offset, bagged_peaks_poseidon);
+
+    let (keccak_input: felt*) = alloc();
+    let inputs_start = keccak_input;
+    keccak_add_uint256{inputs=keccak_input}(num=Uint256(mmr_offset, 0), bigend=1);
+    keccak_add_uint256{inputs=keccak_input}(num=bagged_peaks_keccak, bigend=1);
+    let (root_keccak: Uint256) = keccak(inputs=inputs_start, n_bytes=2 * 32);
+    let (root_keccak) = uint256_reverse_endian(root_keccak);
+
     // Check that the previous roots matche the ones provided in the program's input:
-    assert expected_previous_root_poseidon = mmr_last_root_poseidon;
-    assert expected_previous_root_keccak.low = mmr_last_root_keccak.low;
-    assert expected_previous_root_keccak.high = mmr_last_root_keccak.high;
+    assert root_poseidon = mmr_last_root_poseidon;
+    assert root_keccak.low = mmr_last_root_keccak.low;
+    assert root_keccak.high = mmr_last_root_keccak.high;
 
     // If previous peaks match the previous root, append the peak values to previous_peaks_dict:
     let (local previous_peaks_dict_poseidon) = default_dict_new(default_value=0);
