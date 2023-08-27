@@ -65,8 +65,8 @@ func verify_block_headers_and_hash_them{
     let (block_header_hash_little: Uint256) = keccak(
         inputs=block_headers_array[index], n_bytes=bytes_len_array[index]
     );
-    assert block_header_hash_little.low = expected_block_hash.low;
-    assert block_header_hash_little.high = expected_block_hash.high;
+    assert 0 = block_header_hash_little.low - expected_block_hash.low;
+    assert 0 = block_header_hash_little.high - expected_block_hash.high;
 
     %{ print("\n") %}
     %{ print_u256(ids.block_header_hash_little,f"block_header_keccak_hash_{ids.index}") %}
@@ -329,9 +329,9 @@ func main{
     let (root_keccak) = uint256_reverse_endian(root_keccak);
 
     // Check that the previous roots matche the ones provided in the program's input:
-    assert root_poseidon = mmr_last_root_poseidon;
-    assert root_keccak.low = mmr_last_root_keccak.low;
-    assert root_keccak.high = mmr_last_root_keccak.high;
+    assert 0 = root_poseidon - mmr_last_root_poseidon;
+    assert 0 = root_keccak.low - mmr_last_root_keccak.low;
+    assert 0 = root_keccak.high - mmr_last_root_keccak.high;
 
     // If previous peaks match the previous root, append the peak values to previous_peaks_dict:
     let (local previous_peaks_dict_poseidon) = default_dict_new(default_value=0);
@@ -391,7 +391,7 @@ func main{
     }
 
     // Checks that to_block_number_low from the program's input matches the extracted block number from the last block header:
-    assert to_block_number_low = block_n_minus_r_plus_one_number;
+    assert 0 = to_block_number_low - block_n_minus_r_plus_one_number;
 
     // %{ print(f"RLP successfully validated!") %}
     // (2) Build Poseidon/Keccak MMR by appending all poseidon/keccak hashes of block headers stored in poseidon_hash_array/keccak_hash_array:
