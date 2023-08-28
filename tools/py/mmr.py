@@ -200,8 +200,10 @@ class MMR(object):
         peaks = get_peaks(len(self.pos_hash))
         peaks_values = [self.pos_hash[p] for p in peaks]
         bagged = self.bag_peaks(peaks_values)
-        
-        return bagged
+        self._hasher.update(len(self.pos_hash))
+        self._hasher.update(bagged)
+        root = self._hasher.digest()
+        return root
 
     def bag_peaks(self, peaks: List[int]) -> int:
         bags = peaks[-1]
