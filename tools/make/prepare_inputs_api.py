@@ -3,7 +3,10 @@ import json
 import time
 import os
 from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async
-from tools.py.utils import split_128, bytes_to_8_bytes_chunks_little
+from tools.py.utils import split_128, from_uint256, bytes_to_8_bytes_chunks_little, bytes_to_8_bytes_chunks
+from tools.py.mmr import MMR, get_peaks, PoseidonHasher, KeccakHasher
+from tools.py.poseidon.poseidon_hash import poseidon_hash_many, poseidon_hash
+
 import requests
 from dotenv import load_dotenv
 
@@ -17,8 +20,12 @@ load_dotenv()
 
 GOERLI = 'goerli'
 MAINNET = 'mainnet'
+LOCAL = 'local'
+API = 'api'
 
-NETWORK = GOERLI
+## Set Parameters below : 
+
+NETWORK = MAINNET
 RPC_URL = os.getenv("RPC_URL_GOERLI") if NETWORK == GOERLI else os.getenv("RPC_URL_MAINNET")
 
 if NETWORK == GOERLI:
@@ -26,7 +33,7 @@ if NETWORK == GOERLI:
 else:
     RPC_BACKEND_URL = RPC_URL
 
-
+PROCESS = LOCAL
 
 def rpc_request(url, rpc_request):
     headers = {'Content-Type': 'application/json'}
@@ -40,7 +47,7 @@ def write_to_json(filename, data):
     with open(filename, 'w') as f:
         json.dump(data, f, indent=4)
 
-def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, from_block_number_high:int, to_block_number_low) -> json:
+def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, from_block_number_high:int, to_block_number_low, process=PROCESS) -> json:
     chunk_input={}
     chunk_output={}
     blocks = fetch_blocks_from_rpc_no_async(from_block_number_high+1, to_block_number_low-1, RPC_URL)
@@ -54,7 +61,13 @@ def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, 
 
     blocks = blocks[:-1]
     # print([x.number for x in blocks])
+
+    if process == LOCAL:
+        keccak_hashes = [int.from_bytes(bytes.fromhex(block.hash().hex()[2:]), 'big') for block in blocks]
     blocks = [block.raw_rlp() for block in blocks]
+    if process == LOCAL:
+        poseidon_hashes = [poseidon_hash_many(bytes_to_8_bytes_chunks(block)) for block in blocks] 
+
     blocks_len = [len(block) for block in blocks]
     blocks = [bytes_to_8_bytes_chunks_little(block) for block in blocks]
 
@@ -79,19 +92,32 @@ def prepare_chunk_input(last_peaks:dict, last_mmr_size:int, last_mmr_root:dict, 
     chunk_output['mmr_last_len'] = last_mmr_size
 
 
-                 
-    return chunk_input, chunk_output
+        
+    if process == LOCAL:
+        assert len(poseidon_hashes) == len(keccak_hashes) == len(blocks)
+        return chunk_input, chunk_output, (poseidon_hashes, keccak_hashes)
+    else:
+        return chunk_input, chunk_output, None
 
-def process_chunk(last_peaks:dict, last_mmr_size:int, from_block_number_high:int, to_block_number_low) -> dict:
+
+def process_chunk(chunk_input, local_process:tuple, process=PROCESS) -> dict:
+    if process == API:
+        return process_chunk_api(chunk_input)
+    elif process == LOCAL:
+        return process_chunk_local(chunk_input, *local_process)
+    else:
+        raise ValueError(f"Unknown process: {process}")
+    
+def process_chunk_api(chunk_input) -> dict:
     """Calls the chunk_process_api and processes the returned data."""
     params = {
         "chunk_size":50, 
-        "poseidon_last_elements_count":last_mmr_size,
-        "poseidon_last_peaks":[hex(x) for x in last_peaks['poseidon']], 
-        "keccak_last_elements_count":last_mmr_size,
-        "keccak_last_peaks":[hex(x) for x in last_peaks['keccak']],
-        "start_block": to_block_number_low, 
-        "end_block": from_block_number_high, 
+        "poseidon_last_elements_count":chunk_input['mmr_last_len'],
+        "poseidon_last_peaks":[hex(x) for x in chunk_input['poseidon_mmr_last_peaks']], 
+        "keccak_last_elements_count":chunk_input['mmr_last_len'],
+        "keccak_last_peaks":[hex(from_uint256(x)) for x in chunk_input['keccak_mmr_last_peaks']],
+        "start_block": chunk_input['to_block_number_low'], 
+        "end_block": chunk_input['from_block_number_high'], 
         'rpc_url':RPC_BACKEND_URL, 
         "max_retries_per_request":3, 
         "append_in_reverse":True
@@ -111,6 +137,40 @@ def process_chunk(last_peaks:dict, last_mmr_size:int, from_block_number_high:int
         }
     }
 
+def process_chunk_local(chunk_input, poseidon_block_hashes:list, keccak_block_hashes:list) -> dict:
+    mmr_poseidon = MMR(PoseidonHasher())
+    mmr_keccak=MMR(KeccakHasher())
+    peaks_positions = get_peaks(chunk_input['mmr_last_len'])
+    assert len(poseidon_block_hashes) == len(keccak_block_hashes)
+    assert len(peaks_positions) == len(chunk_input['poseidon_mmr_last_peaks']) == len(chunk_input['keccak_mmr_last_peaks'])
+    
+    for i, pos in enumerate(peaks_positions):
+        print(f"i: {i}, pos: {pos}")
+        print(f"Adding peak at position {pos} with hash {chunk_input['poseidon_mmr_last_peaks'][i]} and {from_uint256(chunk_input['keccak_mmr_last_peaks'][i])}")
+        mmr_poseidon.pos_hash[pos] = chunk_input['poseidon_mmr_last_peaks'][i]
+        mmr_keccak.pos_hash[pos] = from_uint256(chunk_input['keccak_mmr_last_peaks'][i])
+
+    mmr_poseidon.last_pos = chunk_input['mmr_last_len'] - 1
+    mmr_keccak.last_pos = chunk_input['mmr_last_len'] - 1
+
+    print(f"last pos: {mmr_poseidon.last_pos}, last len: {mmr_poseidon.last_pos + 1}")
+    for hash_pos, hash_keccak in zip(reversed(poseidon_block_hashes), reversed(keccak_block_hashes)):
+        mmr_poseidon.add(hash_pos)
+        mmr_keccak.add(hash_keccak)
+
+    return {
+        'last_peaks': {
+            'poseidon': mmr_poseidon.get_peaks(),
+            'keccak': mmr_keccak.get_peaks()
+        },
+        'last_mmr_size': mmr_poseidon.last_pos + 1,
+        'last_mmr_root': {
+            'poseidon': mmr_poseidon.get_root(),
+            'keccak': mmr_keccak.get_root()
+        }
+    }
+
+
 
 
 def prepare_full_chain_inputs(from_block_number_high, to_block_number_low=0, batch_size=50, 
@@ -128,7 +188,10 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low=0, bat
         initial_peaks = {'poseidon': [968420142673072399148736368629862114747721166432438466378474074601992041181], 
                          'keccak': [93435818137180840214006077901347441834554899062844693462640230920378475721064]}
         initial_mmr_size = 1
-        initial_mmr_root = {'poseidon': initial_peaks['poseidon'][0], 'keccak': initial_peaks['keccak'][0]}
+        k=KeccakHasher()
+        k.update(initial_mmr_size)
+        k.update(initial_peaks['keccak'][0])
+        initial_mmr_root = {'poseidon': poseidon_hash(initial_mmr_size,initial_peaks['poseidon'][0]), 'keccak': k.digest()}
 
     assert set(initial_peaks.keys()) == {'poseidon', 'keccak'}, f"Initial peaks should be a dict with keys 'poseidon' and 'keccak', got {initial_peaks.keys()}"
     assert set(initial_mmr_root.keys()) == {'poseidon', 'keccak'}, f"Initial mmr root should be a dict with keys 'poseidon' and 'keccak', got {initial_mmr_root.keys()}"
@@ -149,7 +212,7 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low=0, bat
     while from_block_number_high >= to_block_number_low:
         print(f"\tPreparing input and pre-computing output for blocks from {from_block_number_high} to {to_block_number_batch_low}")
 
-        chunk_input, chunk_output  = prepare_chunk_input(last_peaks, last_mmr_size, last_mmr_root, from_block_number_high, to_block_number_batch_low)
+        chunk_input, chunk_output, local_process  = prepare_chunk_input(last_peaks, last_mmr_size, last_mmr_root, from_block_number_high, to_block_number_batch_low)
 
         # Save the chunk input data
         write_to_json(f"{PATH}blocks_{from_block_number_high}_{to_block_number_batch_low}_input.json", chunk_input)
@@ -183,7 +246,7 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low=0, bat
 
 if __name__ == "__main__":
     # Prepare _inputs.json and pre-compute _outputs.json for blocks 20 to 0:
-    peaks, size, roots = prepare_full_chain_inputs(from_block_number_high=20, to_block_number_low=0, batch_size=5)
+    peaks, size, roots = prepare_full_chain_inputs(from_block_number_high=8160000, to_block_number_low=8000001, batch_size=1250)
     # Prepare _inputs.json and pre-compute _outputs.json for blocks 30 to 21, using the last peaks, size and roots from the previous run:
-    prepare_full_chain_inputs(from_block_number_high=30, to_block_number_low=21, batch_size=5, initial_peaks=peaks, initial_mmr_size=size, initial_mmr_root=roots)
+    # prepare_full_chain_inputs(from_block_number_high=30, to_block_number_low=21, batch_size=5, initial_peaks=peaks, initial_mmr_size=size, initial_mmr_root=roots)
 

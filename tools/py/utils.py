@@ -4,6 +4,10 @@ def split_128(a):
     """Takes in value, returns uint256-ish tuple."""
     return (a & ((1 << 128) - 1), a >> 128)
 
+def from_uint256(a):
+    """Takes in uint256-ish tuple, returns value."""
+    return a[0] + (a[1] << 128)
+
 
 def bytes_to_8_bytes_chunks_little(input_bytes):
     # Split the input_bytes into 8-byte chunks
