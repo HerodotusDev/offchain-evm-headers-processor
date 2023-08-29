@@ -12,7 +12,7 @@ library Uint256Splitter {
         return (a & _MASK, a >> 128);
     }
 
-    /// @notice Splits two uint128s (low, high) into one uint256.
+    /// @notice Merges two uint128s (low, high) into one uint256.
     /// @param lower The lower uint256. The caller is required to pass a value that is less than 2^128 - 1.
     /// @param upper The upper uint256.
     function merge128(
