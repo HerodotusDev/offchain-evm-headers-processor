@@ -50,7 +50,7 @@ contract AggregatorsFactory is AccessControl {
     // Events
     event UpgradeProposal(SharpFactsAggregator newTemplate);
     event Upgrade(SharpFactsAggregator oldTemplate, SharpFactsAggregator newTemplate);
-    event AggregatorCreation(SharpFactsAggregator aggregator, uint256 aggregatorId);
+    event AggregatorCreation(SharpFactsAggregator aggregator, uint256 newAggregatorId, uint256 detachedFromAggregatorId);
 
     /// Creates a new Factory contract and grants OPERATOR_ROLE to the deployer
     /// @param initialTemplate The address of the template contract to clone
@@ -129,7 +129,7 @@ contract AggregatorsFactory is AccessControl {
 
         aggregatorsById[++aggregatorsCount] = SharpFactsAggregator(clone);
 
-        emit AggregatorCreation(SharpFactsAggregator(clone), aggregatorsCount);
+        emit AggregatorCreation(SharpFactsAggregator(clone), aggregatorsCount, aggregatorId);
 
         // Grant roles to the caller so that roles are not stuck in the Factory
         SharpFactsAggregator(clone).grantRole(

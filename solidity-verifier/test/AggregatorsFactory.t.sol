@@ -20,7 +20,7 @@ contract AggregatorsFactoryTest is Test {
     // Important events
     event UpgradeProposal(SharpFactsAggregator newTemplate);
     event Upgrade(SharpFactsAggregator oldTemplate, SharpFactsAggregator newTemplate);
-    event AggregatorCreation(SharpFactsAggregator aggregator, uint256 aggregatorId);
+    event AggregatorCreation(SharpFactsAggregator aggregator, uint256 newAggregatorId, uint256 detachedFromAggregatorId);
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("goerli"));
@@ -31,8 +31,8 @@ contract AggregatorsFactoryTest is Test {
 
         factory = new AggregatorsFactory(aggregatorTemplate);
 
-        vm.expectEmit(false, true, false, false);
-        emit AggregatorCreation(aggregator, 0);
+        vm.expectEmit(true, true, true, false);
+        emit AggregatorCreation(aggregator, 0, 0);
         aggregator = SharpFactsAggregator(
             factory.createAggregator(
                 // Create a new one (past aggregator ID = 0 for non-existing)
@@ -77,8 +77,8 @@ contract AggregatorsFactoryTest is Test {
     }
 
     function testUpgrade() public {
-        vm.expectEmit(false, true, false, false);
-        emit AggregatorCreation(aggregator, 1);
+        vm.expectEmit(true, true, true, false);
+        emit AggregatorCreation(aggregator, 1, 0);
         SharpFactsAggregator newAggregator = SharpFactsAggregator(
             factory.createAggregator(
                 // Attach to existing aggregator (id = 1)
