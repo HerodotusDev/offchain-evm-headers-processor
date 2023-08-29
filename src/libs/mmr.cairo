@@ -319,7 +319,7 @@ func get_full_mmr_peak_values{
 }
 
 // Compute the roots of both MMRs by bagging their peaks (see bag peaks function)
-// Hashes to bagged peaks with the size of the MMR: root=H(index, bagged_peak)
+// Hashes to bagged peaks with the size of the MMR: root=H(mmr_size, bagged_peak)
 // Implicits arguments:
 // - mmr_array_poseidon: felt* - array of new nodes of the Poseidon MMR
 // - mmr_array_keccak: Uint256* - array of new nodes of the Keccak MMR
