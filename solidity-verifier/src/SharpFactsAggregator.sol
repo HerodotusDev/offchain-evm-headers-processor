@@ -261,7 +261,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
         uint256 limit = outputs.length - 1;
         
-        // Iterate over the jobs outputs (aside from the first and the last one)
+        // Iterate over the jobs outputs (aside from the last one)
         // and ensure jobs are correctly linked and valid
         for (uint256 i = 0; i < limit; ++i) {
             JobOutputPacked calldata curOutput = outputs[i];
