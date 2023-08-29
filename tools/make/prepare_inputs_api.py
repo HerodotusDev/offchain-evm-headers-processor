@@ -218,7 +218,7 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low=0, bat
         write_to_json(f"{PATH}blocks_{from_block_number_high}_{to_block_number_batch_low}_input.json", chunk_input)
 
         try:
-            data = process_chunk(last_peaks, last_mmr_size, from_block_number_high, to_block_number_batch_low)
+            data = process_chunk(chunk_input, local_process)
         except Exception as e:
             print(f"Failed to process chunk: {e}")
             break
@@ -246,7 +246,7 @@ def prepare_full_chain_inputs(from_block_number_high, to_block_number_low=0, bat
 
 if __name__ == "__main__":
     # Prepare _inputs.json and pre-compute _outputs.json for blocks 20 to 0:
-    peaks, size, roots = prepare_full_chain_inputs(from_block_number_high=8160000, to_block_number_low=8000001, batch_size=1250)
+    peaks, size, roots = prepare_full_chain_inputs(from_block_number_high=8088750, to_block_number_low=8000001, batch_size=1250)
     # Prepare _inputs.json and pre-compute _outputs.json for blocks 30 to 21, using the last peaks, size and roots from the previous run:
     # prepare_full_chain_inputs(from_block_number_high=30, to_block_number_low=21, batch_size=5, initial_peaks=peaks, initial_mmr_size=size, initial_mmr_root=roots)
 
