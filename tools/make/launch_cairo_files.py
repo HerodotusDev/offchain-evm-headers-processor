@@ -21,6 +21,10 @@ if args.profile:
 else:
     print("Profiling is disabled")
 
+if args.pie:
+    print("PIE is enabled")
+else:
+    print("PIE is disabled")
 
 
 CAIRO_PROGRAMS_FOLDERS = ["tests/cairo_programs/","src/single_chunk_processor"]
