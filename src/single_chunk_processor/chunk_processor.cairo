@@ -11,6 +11,7 @@ from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash, pose
 from starkware.cairo.common.default_dict import default_dict_new, default_dict_finalize
 from starkware.cairo.common.dict_access import DictAccess
 from starkware.cairo.common.dict import dict_write
+from starkware.cairo.common.math import unsigned_div_rem as felt_divmod
 
 from src.libs.block_header import (
     extract_parent_hash_little,
@@ -72,11 +73,17 @@ func verify_block_headers_and_hash_them{
     %{ print_u256(ids.block_header_hash_little,f"block_header_keccak_hash_{ids.index}") %}
     %{ print_u256(ids.expected_block_hash,f"expected_keccak_hash_{ids.index}") %}
 
-    // Reverse block header chunks back to big endian values and hash it with poseidon
-    let (reversed_block_header: felt*, n_felts: felt) = reverse_block_header_chunks(
-        n_bytes=bytes_len_array[index], block_header=block_headers_array[index], seed=index
+    let (number_of_exact_8bytes_chunks, number_of_bytes_in_last_chunk) = felt_divmod(
+        bytes_len_array[index], 8
     );
-    let (poseidon_hash) = poseidon_hash_many(n=n_felts, elements=reversed_block_header);
+    local n_felts;
+    if (number_of_bytes_in_last_chunk == 0) {
+        assert n_felts = number_of_exact_8bytes_chunks;
+    } else {
+        assert n_felts = number_of_exact_8bytes_chunks + 1;
+    }
+
+    let (poseidon_hash) = poseidon_hash_many(n=n_felts, elements=block_headers_array[index]);
 
     // Reverse keccak hash back to big endian
     let (block_header_hash_big) = uint256_reverse_endian(block_header_hash_little);
@@ -90,7 +97,10 @@ func verify_block_headers_and_hash_them{
     let (block_i_parent_hash: Uint256) = extract_parent_hash_little(block_headers_array[index]);
 
     if (index == 0) {
-        // If we are at the last block header in the batch, return the parent hash of block 0 and the reversed block header
+        // If we are at the last block header in the batch, return the parent hash of block 0 and the reversed block header.
+        let (reversed_block_header: felt*, _: felt) = reverse_block_header_chunks(
+            n_bytes=bytes_len_array[index], block_header=block_headers_array[index]
+        );
         return (
             block_n_minus_r_plus_one_parent_hash=block_i_parent_hash,
             last_block_header_big=reversed_block_header,

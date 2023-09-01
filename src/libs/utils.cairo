@@ -102,57 +102,6 @@ func word_reverse_endian_64{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: f
     return (res=word / 2 ** (8 + 16 + 32));
 }
 
-// A function to reverse the endianness of a 8 bytes (64 bits) integer using range checks operations.
-// Asuumes 0 <= word < 2^64.
-// This is guaranteed if word comes from a validated block header that has been keccak-hashed and verified against a parent hash.
-// params:
-//   word: the 64 bits integer to reverse.
-// returns:
-//   res: the reversed integer.
-func word_reverse_endian_64_RC{range_check_ptr}(word: felt) -> felt {
-    %{
-        word = ids.word
-        assert word < 2**64
-        word_bytes=word.to_bytes(8, byteorder='big')
-        for i in range(8):
-            memory[ap+i] = word_bytes[i]
-    %}
-    ap += 8;
-
-    let b0 = [ap - 8];
-    let b1 = [ap - 7];
-    let b2 = [ap - 6];
-    let b3 = [ap - 5];
-    let b4 = [ap - 4];
-    let b5 = [ap - 3];
-    let b6 = [ap - 2];
-    let b7 = [ap - 1];
-
-    assert [range_check_ptr] = 255 - b0;
-    assert [range_check_ptr + 1] = 255 - b1;
-    assert [range_check_ptr + 2] = 255 - b2;
-    assert [range_check_ptr + 3] = 255 - b3;
-    assert [range_check_ptr + 4] = 255 - b4;
-    assert [range_check_ptr + 5] = 255 - b5;
-    assert [range_check_ptr + 6] = 255 - b6;
-    assert [range_check_ptr + 7] = 255 - b7;
-    assert [range_check_ptr + 8] = b0;
-    assert [range_check_ptr + 9] = b1;
-    assert [range_check_ptr + 10] = b2;
-    assert [range_check_ptr + 11] = b3;
-    assert [range_check_ptr + 12] = b4;
-    assert [range_check_ptr + 13] = b5;
-    assert [range_check_ptr + 14] = b6;
-    assert [range_check_ptr + 15] = b7;
-
-    assert word = b0 * 256 ** 7 + b1 * 256 ** 6 + b2 * 256 ** 5 + b3 * 256 ** 4 + b4 * 256 ** 3 +
-        b5 * 256 ** 2 + b6 * 256 + b7;
-
-    tempvar range_check_ptr = range_check_ptr + 16;
-    return b0 + b1 * 256 + b2 * 256 ** 2 + b3 * 256 ** 3 + b4 * 256 ** 4 + b5 * 256 ** 5 + b6 *
-        256 ** 6 + b7 * 256 ** 7;
-}
-
 // A function to reverse the endianness of a 2 bytes (16 bits) integer using range checks operations.
 // Asuumes 0 <= word < 2^16.
 // params:

@@ -7,7 +7,6 @@ from src.libs.utils import (
     bitwise_divmod,
     felt_divmod_2pow32,
     word_reverse_endian_64,
-    word_reverse_endian_64_RC,
     word_reverse_endian_16_RC,
     word_reverse_endian_24_RC,
     word_reverse_endian_32_RC,
@@ -201,44 +200,21 @@ func extract_block_number_big{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, pow
 // Params:
 // - n_bytes: felt - Total byte count of the block header.
 // - block_header: felt* - Pointer to the array of felts, segmenting the block header into 8-byte chunks.
-// - seed: felt - Determines resource allocation between range check and bitwise operations.
-//                If even, range check is used, else bitwise.
-//
 // Returns:
 // - reversed: felt* - Pointer to the array of felts, each representing the block header with reversed bytes in 8-byte chunks.
 // - n_felts: felt - Number of felts in the reversed block header.
 func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
-    n_bytes: felt, block_header: felt*, seed: felt
+    n_bytes: felt, block_header: felt*
 ) -> (reversed: felt*, n_felts: felt) {
     alloc_locals;
     let (reversed_block_header: felt*) = alloc();
     let (number_of_exact_8bytes_chunks, number_of_bytes_in_last_chunk) = felt_divmod(n_bytes, 8);
-    let (_, rem) = felt_divmod(seed, 10);
-    local is_le_5;
-    %{ ids.is_le_5 = 1 if ids.rem <= 5 else 0 %}
-    if (is_le_5 == 0) {
-        assert [range_check_ptr] = rem - 6;
-        tempvar range_check_ptr = range_check_ptr + 1;
 
-        reverse_block_header_chunks_RC_inner(
-            index=number_of_exact_8bytes_chunks - 1,
-            block_header=block_header,
-            reversed_block_header=reversed_block_header,
-        );
-        tempvar range_check_ptr = range_check_ptr;
-        tempvar bitwise_ptr = bitwise_ptr;
-    } else {
-        assert [range_check_ptr] = 5 - rem;
-        tempvar range_check_ptr = range_check_ptr + 1;
-
-        reverse_block_header_chunks_bitwise_inner(
-            index=number_of_exact_8bytes_chunks - 1,
-            block_header=block_header,
-            reversed_block_header=reversed_block_header,
-        );
-        tempvar range_check_ptr = range_check_ptr;
-        tempvar bitwise_ptr = bitwise_ptr;
-    }
+    reverse_block_header_chunks_bitwise_inner(
+        index=number_of_exact_8bytes_chunks - 1,
+        block_header=block_header,
+        reversed_block_header=reversed_block_header,
+    );
 
     // Handle the last chunk if it is not a full 8 bytes chunk :
 
@@ -300,29 +276,6 @@ func reverse_block_header_chunks{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
     // If we reach that poiint, it means that 8 divides n_bytes, so the last chunk is a full 8 bytes chunk and we don't need to handle it.
 
     return (reversed_block_header, number_of_exact_8bytes_chunks);
-}
-
-// Inner function for reverse_block_header_chunks.
-// It inverts the 8-byte segments of a block header using range check operations.
-//
-// Params:
-// - index: felt - Index of the segment to invert.
-// - block_header: felt* - Pointer to the array of felts, segmenting the block header into 8-byte chunks.
-// - reversed_block_header: felt* - Pointer to the array that will store the inverted block header.
-func reverse_block_header_chunks_RC_inner{range_check_ptr}(
-    index: felt, block_header: felt*, reversed_block_header: felt*
-) {
-    if (index == 0) {
-        let reversed_chunk_i: felt = word_reverse_endian_64_RC(block_header[index]);
-        assert reversed_block_header[index] = reversed_chunk_i;
-        return ();
-    } else {
-        let reversed_chunk_i: felt = word_reverse_endian_64_RC(block_header[index]);
-        assert reversed_block_header[index] = reversed_chunk_i;
-        return reverse_block_header_chunks_RC_inner(
-            index=index - 1, block_header=block_header, reversed_block_header=reversed_block_header
-        );
-    }
 }
 
 // Inner function for reverse_block_header_chunks.
