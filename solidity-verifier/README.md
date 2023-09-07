@@ -50,6 +50,14 @@ Pre-requisites:
 
 Note: the aggregation state is stored in the `SharpFactsAggregator` contract and can be retrieved by calling `getAggregatorState()`.
 
+## Deployment
+
+Make sure to have a `.env` file configured with the variables defined in `.env.example`, then run:
+
+```sh
+source .env; forge script script/AggregatorsFactory.s.sol:AggregatorsFactoryDeployer --rpc-url $DEPLOY_RPC_URL --broadcast --verify -vvvv
+```
+
 ## Quick Start
 
 ```sh
