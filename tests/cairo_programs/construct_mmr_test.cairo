@@ -2,9 +2,11 @@
 // Builtins are commented because of redefinition when importing functions from src.single_chunk_processor.chunk_processor
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, PoseidonBuiltin, KeccakBuiltin
-from starkware.cairo.common.uint256 import Uint256
+from starkware.cairo.common.uint256 import Uint256, uint256_reverse_endian
 
 from starkware.cairo.common.builtin_keccak.keccak import keccak
+from starkware.cairo.common.keccak_utils.keccak_utils import keccak_add_uint256
+
 from src.libs.mmr import (
     compute_height_pre_alloc_pow2,
     compute_first_peak_pos,
@@ -16,6 +18,7 @@ from src.libs.utils import pow2alloc127
 from starkware.cairo.common.default_dict import default_dict_new, default_dict_finalize
 from starkware.cairo.common.dict_access import DictAccess
 from starkware.cairo.common.dict import dict_write
+from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash
 
 from src.single_chunk_processor.chunk_processor import construct_mmr, initialize_peaks_dicts
 
@@ -130,13 +133,23 @@ func main{
         previous_peaks_positions: felt*, previous_peaks_positions_len: felt
     ) = compute_peaks_positions{pow2_array=pow2_array}(mmr_offset);
 
-    let (expected_previous_root_poseidon, expected_previous_root_keccak) = bag_peaks(
+    let (bagged_peaks_poseidon, bagged_peaks_keccak) = bag_peaks(
         previous_peaks_values_poseidon, previous_peaks_values_keccak, previous_peaks_positions_len
     );
 
-    assert expected_previous_root_poseidon = mmr_last_root_poseidon;
-    assert expected_previous_root_keccak.low = mmr_last_root_keccak.low;
-    assert expected_previous_root_keccak.high = mmr_last_root_keccak.high;
+    let (root_poseidon) = poseidon_hash(mmr_offset, bagged_peaks_poseidon);
+
+    let (keccak_input: felt*) = alloc();
+    let inputs_start = keccak_input;
+    keccak_add_uint256{inputs=keccak_input}(num=Uint256(mmr_offset, 0), bigend=1);
+    keccak_add_uint256{inputs=keccak_input}(num=bagged_peaks_keccak, bigend=1);
+    let (root_keccak: Uint256) = keccak(inputs=inputs_start, n_bytes=2 * 32);
+    let (root_keccak) = uint256_reverse_endian(root_keccak);
+
+    // Check that the previous roots matche the ones provided in the program's input:
+    assert 0 = root_poseidon - mmr_last_root_poseidon;
+    assert 0 = root_keccak.low - mmr_last_root_keccak.low;
+    assert 0 = root_keccak.high - mmr_last_root_keccak.high;
 
     //
     let (local previous_peaks_dict_poseidon) = default_dict_new(default_value=0);

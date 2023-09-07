@@ -115,6 +115,6 @@ See [solidity-verifier/README.md](solidity-verifier/README.md) for more details.
 
 #### Current processor program hash :
 
-`0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784`
+`0x1eca36d586f5356fba096edbf7414017d51cd0ed24b8fde80f78b61a9216ed2`
 
 Herodotus Dev - 2023.

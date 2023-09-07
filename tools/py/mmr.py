@@ -22,7 +22,7 @@ class PoseidonHasher:
         elif type(item) == bytes:
             self.list.append(int.from_bytes(item, 'big'))
         else:
-            raise Exception("unsupported type")
+            raise Exception(f"unsupported type: {type(item)}, {item}")
     def digest(self) -> int:
         try:
             if len(self.list) == 1:
@@ -47,13 +47,25 @@ class KeccakHasher:
         elif type(item) == bytes:
             self.keccak.update(item)
         else:
-            raise Exception("unsupported type")
+            raise Exception(f"unsupported type, {type(item)}, {item}")
     def digest(self) -> int:
         res = self.keccak.digest()
         self.keccak = sha3.keccak_256()
         return int.from_bytes(res, 'big')
     
-
+def is_valid_mmr_size(n):
+    prev_peak = 0
+    while n > 0:
+        i = n.bit_length()
+        peak = 2**i - 1
+        if peak > n:
+            i -= 1
+            peak = 2**i - 1
+        if peak == prev_peak:
+            return False
+        prev_peak = peak
+        n -= peak
+    return n == 0
 
 def tree_pos_height(pos: int) -> int:
     """
@@ -185,12 +197,20 @@ class MMR(object):
         """
         MMR root
         """
-        peaks = get_peaks(len(self.pos_hash))
+        peaks = get_peaks(self.last_pos + 1)
         peaks_values = [self.pos_hash[p] for p in peaks]
         bagged = self.bag_peaks(peaks_values)
-        
-        return bagged
+        self._hasher.update(self.last_pos+1)
+        self._hasher.update(bagged)
+        root = self._hasher.digest()
+        return root
+    def get_peaks(self) -> list:
+        peaks=get_peaks(self.last_pos+1)
+        # print(peaks)
+        # print(self.pos_hash)
+        peaks_values = [self.pos_hash[p] for p in peaks]
 
+        return peaks_values
     def bag_peaks(self, peaks: List[int]) -> int:
         bags = peaks[-1]
         for peak in reversed(peaks[:-1]): 

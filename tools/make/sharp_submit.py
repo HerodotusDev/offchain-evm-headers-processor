@@ -127,10 +127,13 @@ if __name__ == "__main__":
 
         if args.pie:
             print(f'Running chunk processor for {input_filename} ...') 
+            t0=time.time()
             output = run_cairo_program(input_filepath)
+            t1=time.time()
+            print(f"\t ==> Run successful. Time taken: {t1-t0} seconds.")
             expected_output = json.load(open(input_filepath.replace('_input', '_output')))
             assert output == expected_output, f"Output mismatch for {input_filename}.Expected: \n {expected_output}\n got: \n{output}"
-            print(f"\t ==> Run successful. Output matches precomputed output.")
+            print(f"\t ==> Run is correct. Output matches precomputed output.")
             print(f"\t ==> PIE Object written to {INPUT_PATH}{input_filename.removesuffix('_input.json')}_pie.zip \n")
 
 

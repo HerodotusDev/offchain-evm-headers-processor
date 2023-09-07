@@ -1,5 +1,6 @@
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, PoseidonBuiltin, KeccakBuiltin
-from starkware.cairo.common.math import assert_le, assert_nn
+from starkware.cairo.common.math import assert_le
+from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash
 from starkware.cairo.common.dict_access import DictAccess
@@ -7,6 +8,76 @@ from starkware.cairo.common.dict import dict_write, dict_read
 from starkware.cairo.common.uint256 import Uint256, uint256_reverse_endian
 from starkware.cairo.common.builtin_keccak.keccak import keccak
 from starkware.cairo.common.keccak_utils.keccak_utils import keccak_add_uint256
+from src.libs.utils import get_felt_bitlength
+
+// Asserts that the MMR size is valid given:
+// - our condition on size (1 <= x <= 2^126)
+// - the specific way the MMR is constructed, ie : a list of balanced merkle trees.
+// For example,
+// 0 is not a valid MMR size.
+// 1 is a valid MMR size.
+// 2 is not a valid MMR size.
+// 3 is a valid MMR size.
+// 4 is a valid MMR size.
+// 5 is not a valid MMR size.
+// 6 is not a valid MMR size.
+// 7 is a valid MMR size.
+// 8 is a valid MMR size.
+// 9 is not a valid MMR size.
+// 10 is a valid MMR size.
+// etc.
+// Params:
+// - x: felt - MMR size.
+// Fails if the MMR size is not valid given the above conditions.
+func assert_mmr_size_is_valid{range_check_ptr, pow2_array: felt*}(x: felt) {
+    assert [range_check_ptr] = x;
+    assert [range_check_ptr + 1] = 2 ** 126 - x;
+    tempvar range_check_ptr = range_check_ptr + 2;
+    if (x == 0) {
+        assert 1 = 0;  // Add an unsatisfiable assertion to make sure the program fails.
+        return ();
+    } else {
+        let is_valid = is_valid_mmr_size_inner(x, 0);
+        assert is_valid - 1 = 0;
+        return ();
+    }
+}
+// Inner function for assert_mmr_size_is_valid.
+// Contains the core logic for MMR size validation.
+// Parameters:
+// Should not be called directly.
+// Implicits arguments:
+// - pow2_array: felt* - Array of powers of 2.
+// Params:
+// - n: felt - remaining size that hasn't been associated with a peak.
+// - prev_peak: felt - size of the last identified peak
+func is_valid_mmr_size_inner{range_check_ptr, pow2_array: felt*}(n: felt, prev_peak: felt) -> felt {
+    alloc_locals;
+    let is_n_sup_equal_1 = is_le(1, n);
+    if (is_n_sup_equal_1 == 0) {
+        if (n == 0) {
+            return 1;
+        } else {
+            return 0;
+        }
+    } else {
+        let i = get_felt_bitlength(n);
+        let peak_tmp = pow2_array[i] - 1;
+        let is_peak_sup_n = is_le(n + 1, peak_tmp);
+
+        local peak;  // Max (2^k - 1) value such that 2^(k-1) <= n
+        if (is_peak_sup_n != 0) {
+            assert peak = pow2_array[i - 1] - 1;
+        } else {
+            assert peak = peak_tmp;
+        }
+        if (peak == prev_peak) {
+            return 0;
+        } else {
+            return is_valid_mmr_size_inner(n=n - peak, prev_peak=peak);
+        }
+    }
+}
 
 // Determines the height of the MMR tree based on a given index x.
 // Assumes the starting index is 1 as depicted:
@@ -21,6 +92,8 @@ from starkware.cairo.common.keccak_utils.keccak_utils import keccak_add_uint256
 // - pow2_array: felt* - Array holding powers of 2 values.
 // Params:
 // - x: felt - Index (or position) in the MMR.
+// Assumptions for the caller:
+// 1 <= x < 2^127
 // Returns:
 // - height: felt - Calculated height for the specified position.
 func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) -> felt {
@@ -40,12 +113,17 @@ func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) 
         // x has bit_length bits and they are all ones.
         // We return the height which is bit_length - 1.
         // %{ print(f" compute_height : {ids.bit_length - 1} ") %}
+        assert [range_check_ptr] = bit_length;
+        assert [range_check_ptr + 1] = 127 - bit_length;
+        tempvar range_check_ptr = range_check_ptr + 2;
         return bit_length - 1;
     } else {
         // Ensure 2^(bit_length-1) <= x < 2^bit_length so that x has indeed bit_length bits.
-        assert [range_check_ptr] = N - x - 1;
-        assert [range_check_ptr + 1] = x - n;
-        tempvar range_check_ptr = range_check_ptr + 2;
+        assert [range_check_ptr] = bit_length;
+        assert [range_check_ptr + 1] = 127 - bit_length;
+        assert [range_check_ptr + 2] = N - x - 1;
+        assert [range_check_ptr + 3] = x - n;
+        tempvar range_check_ptr = range_check_ptr + 4;
         // Jump left on the MMR and continue until it's all ones.
         // This is done by substracting (2^(bit_length-1) - 1) from x.
         return compute_height_pre_alloc_pow2(x - n + 1);
@@ -58,6 +136,8 @@ func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) 
 // - pow2_array: felt* - Array of powers of 2.
 // Params:
 // - mmr_len: felt - MMR size.
+// Assumptions:
+// - 1 <= mmr_len < 2^127
 // Returns:
 // - peak_pos: felt - Position of the leftmost peak.
 func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> felt {
@@ -73,9 +153,12 @@ func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -
     let N = pow2_array[bit_length];
     let n = pow2_array[bit_length - 1];
 
-    assert [range_check_ptr] = N - mmr_len - 1;
-    assert [range_check_ptr + 1] = mmr_len - n;
-    tempvar range_check_ptr = range_check_ptr + 2;
+    assert [range_check_ptr] = bit_length;
+    assert [range_check_ptr + 1] = 127 - bit_length;
+    assert [range_check_ptr + 2] = N - mmr_len - 1;
+    assert [range_check_ptr + 3] = mmr_len - n;
+
+    tempvar range_check_ptr = range_check_ptr + 4;
 
     let all_ones = pow2_array[bit_length] - 1;
     if (mmr_len == all_ones) {
@@ -91,7 +174,10 @@ func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -
 // Implicits arguments:
 // - pow2_array: felt* - Array of powers of 2.
 // Params:
-// - mmr_len: felt - Size of the MMR.
+// - mmr_len: felt - Size of the MMR. Must be a validated MMR size. (see assert_mmr_size_is_valid function)
+// Assumptions:
+// - 1 <= mmr_len < 2^127
+// - mmr_len is a valid MMR size. See validate_mmr_size function.
 // Returns:
 // - peaks: felt* - Pointer to the peaks' position array.
 // - peaks_len: felt - Number of peaks.
@@ -110,6 +196,7 @@ func compute_peaks_positions{range_check_ptr, pow2_array: felt*}(mmr_len: felt) 
 }
 
 // Inner function for compute_peaks_positions.
+// Should not be called directly, but only within compute_peaks_positions with its requirements satisfied. with its assumptions satisfied.
 // Implicits arguments:
 // - pow2_array: felt* - Array of powers of 2.
 // - mmr_len: felt - Size of the MMR.
@@ -127,25 +214,27 @@ func compute_peaks_inner{range_check_ptr, pow2_array: felt*, mmr_len: felt}(
         return peaks_len;
     } else {
         let height = compute_height_pre_alloc_pow2(mmr_pos);
-        let right_sibling = mmr_pos + pow2_array[height + 1] - 1;
-        let left_child = left_child_jump_until_inside_mmr(right_sibling);
+        let right_sibling = mmr_pos + pow2_array[height + 1] - 1;  // Same height as mmr_pos
+        let left_child = left_child_jump_until_inside_mmr(right_sibling, height);
         assert peaks[peaks_len] = left_child;
         return compute_peaks_inner(peaks, peaks_len + 1, left_child);
     }
 }
 
 // Inner function for compute_peaks_inner.
+// Should not be called directly, but only within compute_peaks_inner with its requirements satisfied.
 // Iterates to the left child from a position until reaching within the MMR bounds.
 // Reference: https://docs.grin.mw/wiki/chain-state/merkle-mountain-range/#hashing-and-bagging
 // Implicits arguments:
 // - pow2_array: Array of powers of 2.
-// - mmr_len: Size of the MMR.
+// - mmr_len: Size of the MMR. Must be a validated MMR size. (see assert_mmr_size_is_valid function)
 // Params:
 // - left_child: felt - Current left child position.
+// - height: felt - height of the current left child.
 // Returns:
 // - left_child: felt - First left child's position within the MMR.
-func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_len}(
-    left_child: felt
+func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_len: felt}(
+    left_child: felt, height: felt
 ) -> felt {
     alloc_locals;
     local in_mmr;
@@ -161,9 +250,8 @@ func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_le
         assert [range_check_ptr] = left_child - mmr_len - 1;
         tempvar range_check_ptr = range_check_ptr + 1;
 
-        let height = compute_height_pre_alloc_pow2(left_child);
         let left_child = left_child - pow2_array[height];
-        return left_child_jump_until_inside_mmr(left_child);
+        return left_child_jump_until_inside_mmr(left_child, height - 1);
     }
 }
 
@@ -172,15 +260,16 @@ func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_le
 // Implicits arguments:
 // - mmr_array_poseidon: array of new nodes of the Poseidon MMR
 // - mmr_array_keccak: array of new nodes of the Keccak MMR
-// - mmr_offset: offset of the MMR (previous MMR length)
+// - mmr_offset: offset of the MMR (previous MMR length). Must be a validated MMR size. (see assert_mmr_size_is_valid function)
 // - previous_peaks_dict_poseidon: dictionary of previous peaks for Poseidon
 // - previous_peaks_dict_keccak: dictionary of previous peaks for Keccak
 // Params:
-// - position: felt - position in the MMR
+// - position: felt - position in the MMR. Must be a correct left or right child position to be merged in the current MMR state.
 // Returns:
 // - peak_poseidon: felt - value of the peak for Poseidon
 // - peak_keccak: Uint256 - value of the peak for Keccak
 // This function should only be called when merging left and right chidrens, or when merging peaks.
+// This is ensured in the main program's logic inside the merge_subtrees_if_applicable function.
 // If the asked position is not in the MMR array, it is necessarily a previous peak and therefore present in the previous peaks dictionary
 // Otherwise, if the asked position is <= mmr_offset, and position!=peak position, it will return the default value of the dict which is 0.
 func get_full_mmr_peak_values{
@@ -198,10 +287,11 @@ func get_full_mmr_peak_values{
     if (is_position_in_mmr_array != 0) {
         // %{ print(f'getting from mmr_array at index {ids.position-ids.mmr_offset -1}') %}
         // ensure position > mmr_offset
-        assert [range_check_ptr] = position - mmr_offset - 1;
+        let mmr_array_position = position - mmr_offset - 1;
+        assert [range_check_ptr] = mmr_array_position;
         tempvar range_check_ptr = range_check_ptr + 1;
-        let peak_poseidon = mmr_array_poseidon[position - mmr_offset - 1];
-        let peak_keccak = mmr_array_keccak[position - mmr_offset - 1];
+        let peak_poseidon = mmr_array_poseidon[mmr_array_position];
+        let peak_keccak = mmr_array_keccak[mmr_array_position];
         // %{
         //     print(f"mmr_array poseidon value at {ids.position - ids.mmr_offset -1} = {ids.peak_poseidon}")
         //     print(f"mmr_array keccak value at {ids.position - ids.mmr_offset -1 } = {ids.peak_keccak.low} {ids.peak_keccak.high}")
@@ -229,14 +319,20 @@ func get_full_mmr_peak_values{
 }
 
 // Compute the roots of both MMRs by bagging their peaks (see bag peaks function)
+// Hashes to bagged peaks with the size of the MMR: root=H(mmr_size, bagged_peak)
 // Implicits arguments:
 // - mmr_array_poseidon: felt* - array of new nodes of the Poseidon MMR
 // - mmr_array_keccak: Uint256* - array of new nodes of the Keccak MMR
-// - mmr_array_len: felt - length of the MMR array
+// - mmr_array_len: felt - length of the MMR array.
 // - pow2_array: felt* - array of powers of 2
-// - previous_peaks_dict_poseidon: DictAccess* - dictionary of previous peaks for Poseidon MMR
+// - previous_peaks_dict_poseidon: DictAccess* - dictionary of previous peaks for Poseidon MMR.
+// - mmr_offset: offset of the MMR (size of the previous MMR).
+// Requirements for the caller:
+// Both dicts must be initialized with previous peaks at the correct positions.
+// mmr_array_len must be positive >= 1
+// mmr_offset must be a validated MMR size. (see assert_mmr_size_is_valid function)
+// mmr_array+mmr_offset must be a validated MMR size. (see assert_mmr_size_is_valid function)
 // - previous_peaks_dict_keccak: DictAccess* - dictionary of previous peaks for Keccak MMR
-// - mmr_offset: offset of the MMR (size of the previous MMR)
 // Returns:
 // - root_poseidon: felt - root of the Poseidon MMR
 // - root_keccak: Uint256 - root of the Keccak MMR
@@ -254,9 +350,8 @@ func get_roots{
     mmr_offset: felt,
 }() -> (root_poseidon: felt, root_keccak: Uint256) {
     alloc_locals;
-    let (peaks_positions: felt*, peaks_len: felt) = compute_peaks_positions(
-        mmr_array_len + mmr_offset
-    );
+    let mmr_size = mmr_offset + mmr_array_len;
+    let (peaks_positions: felt*, peaks_len: felt) = compute_peaks_positions(mmr_size);
     let (peaks_poseidon: felt*, peaks_keccak: Uint256*) = get_peaks_from_positions{
         peaks_positions=peaks_positions
     }(peaks_len);
@@ -264,10 +359,20 @@ func get_roots{
         peaks_poseidon, peaks_keccak, peaks_len
     );
 
-    return (bagged_peaks_poseidon, bagged_peaks_keccak);
+    let (root_poseidon) = poseidon_hash(mmr_size, bagged_peaks_poseidon);
+
+    let (keccak_input: felt*) = alloc();
+    let inputs_start = keccak_input;
+    keccak_add_uint256{inputs=keccak_input}(num=Uint256(mmr_size, 0), bigend=1);
+    keccak_add_uint256{inputs=keccak_input}(num=bagged_peaks_keccak, bigend=1);
+    let (root_keccak: Uint256) = keccak(inputs=inputs_start, n_bytes=2 * 32);
+    let (root_keccak) = uint256_reverse_endian(root_keccak);
+
+    return (root_poseidon, root_keccak);
 }
 
 // Returns the peaks values from left to right for both MMRs given the peaks positions
+// Should only be called within the get_roots function with its requirements satisfied.
 // Implicits arguments:
 // - mmr_array_poseidon: felt* - array of new nodes of the Poseidon MMR
 // - mmr_array_keccak: Uint256* - array of new nodes of the Keccak MMR
@@ -276,7 +381,7 @@ func get_roots{
 // - previous_peaks_dict_keccak: DictAccess* - dictionary of previous peaks for Keccak MMR
 // - peaks_positions: felt* - array of positions of the peaks
 // Params:
-// - peaks_len: felt - length of the peaks_positions array
+// - peaks_len: felt - length of the peaks_positions array.
 // Returns:
 // - peaks_poseidon: felt* - array of peaks values for Poseidon MMR
 // - peaks_keccak: Uint256* - array of peaks values for Keccak MMR
@@ -296,7 +401,7 @@ func get_peaks_from_positions{
     return (peaks_poseidon, peaks_keccak);
 }
 
-// Inner function for get_peaks_from_positions
+// Inner function for get_peaks_from_positions. Should only be called within get_peaks_from_positions with its requirements satisfied.
 // Implicits arguments:
 // - mmr_array_poseidon: felt* - array of new nodes of the Poseidon MMR
 // - mmr_array_keccak: Uint256* - array of new nodes of the Keccak MMR
