@@ -7,13 +7,17 @@ import "forge-std/console.sol";
 import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
 import {AggregatorsFactory} from "../src/AggregatorsFactory.sol";
 
+import {IFactsRegistry} from "../src/interfaces/IFactsRegistry.sol";
+
 contract AggregatorsFactoryDeployer is Script {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY"); 
         vm.startBroadcast(deployerPrivateKey);
 
+        IFactsRegistry factsRegistry = IFactsRegistry(vm.envAddress("FACTS_REGISTRY_ADDRESS")); 
+
         // Deploy the template
-        SharpFactsAggregator aggregatorTemplate = new SharpFactsAggregator();
+        SharpFactsAggregator aggregatorTemplate = new SharpFactsAggregator(factsRegistry);
 
         console.log(
             "Aggregator TEMPLATE deployed at: ",
@@ -22,7 +26,7 @@ contract AggregatorsFactoryDeployer is Script {
 
         // Deploy the factory
         AggregatorsFactory factory = new AggregatorsFactory(
-            address(aggregatorTemplate)
+            aggregatorTemplate
         );
 
         console.log("AggregatorsFactory deployed at: ", address(factory));
