@@ -107,45 +107,6 @@ class CairoRunner:
             ".cairo", "_input.json"
         )
 
-    # def find_and_select_cairo_file(self):
-    #     self.readline_autocomplete_setup()
-
-    #     while True:
-    #         self.filename_dot_cairo = input(
-    #             "\n>>> Enter .cairo file name to run or double press <TAB> for suggestions:\n\n"
-    #         )
-    #         for cairo_path in self.cairo_programs:
-    #             if cairo_path.endswith(self.filename_dot_cairo):
-    #                 self.filename_dot_cairo_path = cairo_path
-    #                 self.handle_special_files()
-    #                 self.filename = self.filename_dot_cairo.removesuffix(".cairo")
-    #                 return
-    #         print(
-    #             f"### File '{self.filename_dot_cairo}' not found in the Cairo programs folders."
-    #         )
-
-    def handle_special_files(self):
-        if self.filename_dot_cairo == "chunk_processor.cairo":
-            json_files_dir = "src/single_chunk_processor/data"
-            json_files = [
-                f for f in os.listdir(json_files_dir) if f.endswith("_input.json")
-            ]
-
-            if not json_files:
-                print("### No JSON files found.")
-                return
-
-            questions = [
-                inquirer.List("file", message="Choose a file", choices=json_files)
-            ]
-            selected_file = inquirer.prompt(questions)["file"]
-            self.json_input_path = os.path.join(json_files_dir, selected_file)
-        else:
-            self.json_input_path = self.filename_dot_cairo_path.replace(
-                ".cairo", "_input.json"
-            )
-        print(f"Selected JSON file: {self.json_input_path}")
-
     def compile_cairo_file(self):
         while True:
             print(f"Compiling {self.filename_dot_cairo} ... ")
@@ -157,7 +118,7 @@ class CairoRunner:
             if return_code == 0:
                 return compiled_path
             print(f"### Compilation failed. Please fix the errors and try again.")
-            self.find_and_select_cairo_file()
+            self.prompt_for_cairo_file()
 
     def construct_run_command(self, compiled_path):
         cmd_base = f"cairo-run --program={compiled_path} --layout=starknet_with_keccak"
