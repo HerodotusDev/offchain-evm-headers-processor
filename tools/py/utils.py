@@ -1,5 +1,6 @@
 """Utility functions."""
 import json
+import os
 
 
 def split_128(a):
@@ -34,3 +35,18 @@ def write_to_json(filename, data):
     """Helper function to write data to a json file"""
     with open(filename, "w") as f:
         json.dump(data, f, indent=4)
+
+
+def create_directory(path: str):
+    if not os.path.exists(path):
+        os.makedirs(path)
+        print(f"Directory created: {path}")
+
+
+def get_files_from_folders(folders, ext=".cairo"):
+    return [
+        os.path.join(folder, f)
+        for folder in folders
+        for f in os.listdir(folder)
+        if os.path.isfile(os.path.join(folder, f)) and f.endswith(ext)
+    ]
