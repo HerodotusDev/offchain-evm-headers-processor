@@ -5,9 +5,13 @@ __pycache__
 /build/compiled_cairo_files/*.json
 *.pickle
 /src/single_chunk_processor/data/*.json
+
 /src/single_chunk_processor/data/*.zip
 *.env
 
+*.zip
+*.json
+*.db
 cache/
 out/
 .gas-snapshot

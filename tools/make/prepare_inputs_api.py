@@ -3,6 +3,8 @@ import json
 import time
 import os
 import requests
+import sha3
+
 from dotenv import load_dotenv
 from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async
 from tools.py.utils import (
@@ -13,6 +15,7 @@ from tools.py.utils import (
 )
 from tools.py.mmr import MMR, get_peaks, PoseidonHasher, KeccakHasher
 from tools.py.poseidon.poseidon_hash import poseidon_hash_many, poseidon_hash
+from tools.make.db import fetch_block_range_from_db, create_connection
 
 
 def mkdir_if_not_exists(path: str):
@@ -29,11 +32,11 @@ MAINNET = "mainnet"
 LOCAL = "local"
 API = "api"
 
-## Set the two parameters below :
+## Set the 3 parameters below :
 
 NETWORK = MAINNET  # MAINNET or GOERLI
 PROCESS = API  # API or LOCAL
-
+USE_DB = True  # True or False
 ## Get the RPC and backend service URLs from the .env file
 RPC_URL = (
     os.getenv("RPC_URL_GOERLI") if NETWORK == GOERLI else os.getenv("RPC_URL_MAINNET")
@@ -64,101 +67,137 @@ def prepare_chunk_input(
     from_block_number_high: int,
     to_block_number_low,
     process=PROCESS,
+    use_db=USE_DB,
+    conn=None,
 ) -> json:
     chunk_input = {}
     chunk_output = {}
-    t0 = time.time()
-    blocks = fetch_blocks_from_rpc_no_async(
-        from_block_number_high + 1, to_block_number_low - 1, RPC_URL
-    )
-    t1 = time.time()
-    print(
-        f"\tFetched {from_block_number_high+1 - to_block_number_low} blocs in {t1-t0}s"
-    )
-    t0 = time.time()
-    blocks.reverse()
-    block_n_plus_one = blocks[-1]
-    block_n_minus_r_plus_one = blocks[0]
+    t0_db = time.time()
+    if use_db:
+        assert conn is not None, "Database connection must be provided for DB mode."
+        blocks_data = fetch_block_range_from_db(
+            end=from_block_number_high + 1, start=to_block_number_low, conn=conn
+        )
+        assert (
+            len(blocks_data) == from_block_number_high - to_block_number_low + 2
+        ), f"Db request for blocks {from_block_number_high + 1} to {to_block_number_low} returned {len(blocks_data)} blocks instead of {from_block_number_high + 1 - to_block_number_low + 1}"
+
+        assert type(blocks_data[0][1]) == bytes
+        assert blocks_data[0][0] == to_block_number_low
+        assert blocks_data[-1][0] == from_block_number_high + 1
+        blocks = [block[1] for block in blocks_data]
+        t1_db = time.time()
+        print(f"\t\tFetched {len(blocks)} blocks from DB in {t1_db-t0_db}s")
+
+    else:
+        blocks = fetch_blocks_from_rpc_no_async(
+            from_block_number_high + 1, to_block_number_low - 1, RPC_URL
+        )
+
+        blocks.reverse()
+
+        block_n_plus_one = blocks[-1]
+        assert block_n_plus_one.number == from_block_number_high + 1
+        block_n_minus_r_plus_one = blocks[0]
+        assert block_n_minus_r_plus_one.number == to_block_number_low
+
+        blocks = [block.raw_rlp() for block in blocks]
+        t1_db = time.time()
+        print(f"\t\tFetched {len(blocks)} blocks from RPC in {t1_db-t0_db}s")
+
     block_n_plus_one_parent_hash_little = split_128(
-        int.from_bytes(bytes.fromhex(block_n_plus_one.parentHash.hex()[2:]), "little")
+        int.from_bytes(blocks[-1][4:36], "little")
     )
     block_n_plus_one_parent_hash_big = split_128(
-        int.from_bytes(bytes.fromhex(block_n_plus_one.parentHash.hex()[2:]), "big")
+        int.from_bytes(blocks[-1][4:36], "big")
     )
     block_n_minus_r_plus_one_parent_hash_big = split_128(
-        int.from_bytes(
-            bytes.fromhex(block_n_minus_r_plus_one.parentHash.hex()[2:]), "big"
-        )
+        int.from_bytes(blocks[0][4:36], "big")
     )
-
     blocks = blocks[:-1]
-    # print([x.number for x in blocks])
+    assert len(blocks) == from_block_number_high - to_block_number_low + 1
 
     if process == LOCAL:
-        keccak_hashes = [
-            int.from_bytes(bytes.fromhex(block.hash().hex()[2:]), "big")
-            for block in blocks
-        ]
-    blocks = [block.raw_rlp() for block in blocks]
-    if process == LOCAL:
-        poseidon_hashes = [
-            poseidon_hash_many(bytes_to_8_bytes_chunks_little(block))
-            for block in blocks
-        ]
+        k = sha3.keccak_256()
+        keccak_hashes = []
+        poseidon_hashes = []
+        for block in blocks:
+            # Compute Keccak hash for the block
+            k.update(block)
+            digest = k.digest()
+            keccak_hashes.append(int.from_bytes(digest, "big"))
+            # Compute Poseidon hash for the block
+            poseidon_hashes.append(
+                poseidon_hash_many(bytes_to_8_bytes_chunks_little(block))
+            )
 
     blocks_len = [len(block) for block in blocks]
     blocks = [bytes_to_8_bytes_chunks_little(block) for block in blocks]
 
-    chunk_input["mmr_last_root_poseidon"] = last_mmr_root["poseidon"]
-    (
-        chunk_input["mmr_last_root_keccak_low"],
-        chunk_input["mmr_last_root_keccak_high"],
-    ) = split_128(last_mmr_root["keccak"])
-    chunk_input["mmr_last_len"] = last_mmr_size
-    chunk_input["poseidon_mmr_last_peaks"] = last_peaks["poseidon"]
-    chunk_input["keccak_mmr_last_peaks"] = [split_128(x) for x in last_peaks["keccak"]]
-    chunk_input["from_block_number_high"] = from_block_number_high
-    chunk_input["to_block_number_low"] = to_block_number_low
-    chunk_input[
-        "block_n_plus_one_parent_hash_little_low"
-    ] = block_n_plus_one_parent_hash_little[0]
-    chunk_input[
-        "block_n_plus_one_parent_hash_little_high"
-    ] = block_n_plus_one_parent_hash_little[1]
-    chunk_input["block_headers_array"] = blocks
-    chunk_input["bytes_len_array"] = blocks_len
+    chunk_input = {
+        "mmr_last_root_poseidon": last_mmr_root["poseidon"],
+        "mmr_last_root_keccak_low": split_128(last_mmr_root["keccak"])[0],
+        "mmr_last_root_keccak_high": split_128(last_mmr_root["keccak"])[1],
+        "mmr_last_len": last_mmr_size,
+        "poseidon_mmr_last_peaks": last_peaks["poseidon"],
+        "keccak_mmr_last_peaks": [split_128(x) for x in last_peaks["keccak"]],
+        "from_block_number_high": from_block_number_high,
+        "to_block_number_low": to_block_number_low,
+        "block_n_plus_one_parent_hash_little_low": block_n_plus_one_parent_hash_little[
+            0
+        ],
+        "block_n_plus_one_parent_hash_little_high": block_n_plus_one_parent_hash_little[
+            1
+        ],
+        "block_headers_array": blocks,
+        "bytes_len_array": blocks_len,
+    }
 
-    chunk_output["from_block_number_high"] = from_block_number_high
-    chunk_output["to_block_number_low"] = to_block_number_low
-    (
-        chunk_output["block_n_plus_one_parent_hash_low"],
-        chunk_output["block_n_plus_one_parent_hash_high"],
-    ) = block_n_plus_one_parent_hash_big
-    (
-        chunk_output["block_n_minus_r_plus_one_parent_hash_low"],
-        chunk_output["block_n_minus_r_plus_one_parent_hash_high"],
-    ) = block_n_minus_r_plus_one_parent_hash_big
-    chunk_output["mmr_last_root_poseidon"] = last_mmr_root["poseidon"]
-    (
-        chunk_output["mmr_last_root_keccak_low"],
-        chunk_output["mmr_last_root_keccak_high"],
-    ) = split_128(last_mmr_root["keccak"])
-    chunk_output["mmr_last_len"] = last_mmr_size
+    chunk_output = {
+        "from_block_number_high": from_block_number_high,
+        "to_block_number_low": to_block_number_low,
+        "block_n_plus_one_parent_hash_low": block_n_plus_one_parent_hash_big[0],
+        "block_n_plus_one_parent_hash_high": block_n_plus_one_parent_hash_big[1],
+        "block_n_minus_r_plus_one_parent_hash_low": block_n_minus_r_plus_one_parent_hash_big[
+            0
+        ],
+        "block_n_minus_r_plus_one_parent_hash_high": block_n_minus_r_plus_one_parent_hash_big[
+            1
+        ],
+        "mmr_last_root_poseidon": last_mmr_root["poseidon"],
+        "mmr_last_root_keccak_low": split_128(last_mmr_root["keccak"])[0],
+        "mmr_last_root_keccak_high": split_128(last_mmr_root["keccak"])[1],
+        "mmr_last_len": last_mmr_size,
+    }
 
     t1 = time.time()
-    print(f"\tPrepared chunk input with {PROCESS} process in {t1-t0}s")
+    print(
+        f"\t\tPrepared chunk input with {PROCESS} process and {'Local Db' if use_db else 'RPC'} fetching in {t1-t0_db}s"
+    )
     if process == LOCAL:
-        assert len(poseidon_hashes) == len(keccak_hashes) == len(blocks)
+        assert (
+            len(poseidon_hashes)
+            == len(keccak_hashes)
+            == len(blocks)
+            == from_block_number_high - to_block_number_low + 1
+        )
         return chunk_input, chunk_output, (poseidon_hashes, keccak_hashes)
     else:
         return chunk_input, chunk_output, None
 
 
 def process_chunk(chunk_input, local_process: tuple, process=PROCESS) -> dict:
+    t0 = time.time()
     if process == API:
-        return process_chunk_api(chunk_input)
+        res = process_chunk_api(chunk_input)
+        t1 = time.time()
+        print(f"\t\tProcessed chunk with API process in {t1-t0}s")
+        return res
     elif process == LOCAL:
-        return process_chunk_local(chunk_input, *local_process)
+        res = process_chunk_local(chunk_input, *local_process)
+        t1 = time.time()
+        print(f"\t\tProcessed chunk with Local process in {t1-t0}s")
+        return res
     else:
         raise ValueError(f"Unknown process: {process}")
 
@@ -298,6 +337,7 @@ def prepare_full_chain_inputs(
     print(
         f"Preparing inputs and precomputing outputs for blocks from {from_block_number_high} to {to_block_number_low} with batch size {batch_size}"
     )
+    connexion = create_connection() if USE_DB else None
 
     while from_block_number_high >= to_block_number_low:
         print(
@@ -310,6 +350,9 @@ def prepare_full_chain_inputs(
             last_mmr_root,
             from_block_number_high,
             to_block_number_batch_low,
+            process=PROCESS,
+            use_db=USE_DB,
+            conn=connexion,
         )
 
         # Save the chunk input data
@@ -357,7 +400,7 @@ def prepare_full_chain_inputs(
 if __name__ == "__main__":
     # Prepare _inputs.json and pre-compute _outputs.json for blocks 20 to 0:
     peaks, size, roots = prepare_full_chain_inputs(
-        from_block_number_high=17800000, to_block_number_low=17000000 - 3, batch_size=4
+        from_block_number_high=1000, to_block_number_low=0, batch_size=100
     )
     # Prepare _inputs.json and pre-compute _outputs.json for blocks 30 to 21, using the last peaks, size and roots from the previous run:
     # prepare_full_chain_inputs(

@@ -22,7 +22,9 @@ run-pie:
 	@echo "Outputs a cairo PIE object"
 	@echo "Total number of steps will be shown at the end of the run." 
 	./tools/make/launch_cairo_files.py -pie
-
+db-update:
+	@echo "Update/create the block headers database"
+	./tools/make/db.py
 batch-cairo-pie:
 	@echo "Run processor with all inputs in src/single_chunk_processor/data/ and write pie objects"
 	./tools/make/sharp_submit.py -pie
