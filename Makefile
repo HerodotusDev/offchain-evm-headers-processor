@@ -27,6 +27,10 @@ batch-cairo-pie:
 	@echo "Run processor with all inputs in src/single_chunk_processor/data/ and write pie objects"
 	./tools/make/sharp_submit.py -pie
 
+batch-pie-multicore:
+	@echo "Run processor with all inputs in src/single_chunk_processor/data/ and write pie objects"
+	./tools/make/sharp_submit.py -pie-multicore
+	
 batch-sharp-submit:
 	@echo "Submits all pie objects in src/single_chunk_processor/data/ to SHARP"
 	./tools/make/sharp_submit.py -sharp
