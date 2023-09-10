@@ -4,7 +4,7 @@ import time
 import os
 import requests
 import sha3
-
+import concurrent.futures
 from dotenv import load_dotenv
 from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async
 from tools.py.utils import (
@@ -35,7 +35,7 @@ API = "api"
 ## Set the 3 parameters below :
 
 NETWORK = MAINNET  # MAINNET or GOERLI
-PROCESS = API  # API or LOCAL
+PROCESS = LOCAL  # API or LOCAL
 USE_DB = True  # True or False
 ## Get the RPC and backend service URLs from the .env file
 RPC_URL = (
@@ -58,6 +58,18 @@ def rpc_request(url, rpc_request):
     # print(f"Status code: {response.status_code}")
     # print(f"Response content: {response.content}")
     return response.json()
+
+
+def compute_hashes(block):
+    # Compute Keccak hash
+    k = sha3.keccak_256()
+    k.update(block)
+    digest = k.digest()
+    keccak_hash = int.from_bytes(digest, "big")
+
+    # Compute Poseidon hash
+    poseidon_hash = poseidon_hash_many(bytes_to_8_bytes_chunks_little(block))
+    return keccak_hash, poseidon_hash
 
 
 def prepare_chunk_input(
@@ -118,18 +130,13 @@ def prepare_chunk_input(
     assert len(blocks) == from_block_number_high - to_block_number_low + 1
 
     if process == LOCAL:
-        k = sha3.keccak_256()
         keccak_hashes = []
         poseidon_hashes = []
-        for block in blocks:
-            # Compute Keccak hash for the block
-            k.update(block)
-            digest = k.digest()
-            keccak_hashes.append(int.from_bytes(digest, "big"))
-            # Compute Poseidon hash for the block
-            poseidon_hashes.append(
-                poseidon_hash_many(bytes_to_8_bytes_chunks_little(block))
-            )
+
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            for keccak_result, poseidon_result in executor.map(compute_hashes, blocks):
+                keccak_hashes.append(keccak_result)
+                poseidon_hashes.append(poseidon_result)
 
     blocks_len = [len(block) for block in blocks]
     blocks = [bytes_to_8_bytes_chunks_little(block) for block in blocks]
@@ -400,7 +407,7 @@ def prepare_full_chain_inputs(
 if __name__ == "__main__":
     # Prepare _inputs.json and pre-compute _outputs.json for blocks 20 to 0:
     peaks, size, roots = prepare_full_chain_inputs(
-        from_block_number_high=1000, to_block_number_low=0, batch_size=100
+        from_block_number_high=15000, to_block_number_low=0, batch_size=1420
     )
     # Prepare _inputs.json and pre-compute _outputs.json for blocks 30 to 21, using the last peaks, size and roots from the previous run:
     # prepare_full_chain_inputs(
