@@ -5,6 +5,7 @@ import os
 import requests
 import sha3
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 from tools.py.fetch_block_headers import fetch_blocks_from_rpc_no_async
 from tools.py.utils import (
@@ -241,6 +242,20 @@ def process_chunk_api(chunk_input) -> dict:
     }
 
 
+def extend_mmr(
+    mmr: MMR, hashes: list, peaks_positions: list, peaks: list, last_pos: int
+):
+    for i, pos in enumerate(peaks_positions):
+        mmr.pos_hash[pos] = peaks[i]
+
+    mmr.last_pos = last_pos
+
+    for hash_val in reversed(hashes):
+        mmr.add(hash_val)
+
+    return mmr
+
+
 def process_chunk_local(
     chunk_input, poseidon_block_hashes: list, keccak_block_hashes: list
 ) -> dict:
@@ -254,21 +269,28 @@ def process_chunk_local(
         == len(chunk_input["keccak_mmr_last_peaks"])
     )
 
-    for i, pos in enumerate(peaks_positions):
-        # print(f"i: {i}, pos: {pos}")
-        # print(f"Adding peak at position {pos} with hash {chunk_input['poseidon_mmr_last_peaks'][i]} and {from_uint256(chunk_input['keccak_mmr_last_peaks'][i])}")
-        mmr_poseidon.pos_hash[pos] = chunk_input["poseidon_mmr_last_peaks"][i]
-        mmr_keccak.pos_hash[pos] = from_uint256(chunk_input["keccak_mmr_last_peaks"][i])
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_poseidon = executor.submit(
+            extend_mmr,
+            mmr_poseidon,
+            poseidon_block_hashes,
+            peaks_positions,
+            chunk_input["poseidon_mmr_last_peaks"],
+            chunk_input["mmr_last_len"] - 1,
+        )
 
-    mmr_poseidon.last_pos = chunk_input["mmr_last_len"] - 1
-    mmr_keccak.last_pos = chunk_input["mmr_last_len"] - 1
+        future_keccak = executor.submit(
+            extend_mmr,
+            mmr_keccak,
+            keccak_block_hashes,
+            peaks_positions,
+            [from_uint256(val) for val in chunk_input["keccak_mmr_last_peaks"]],
+            chunk_input["mmr_last_len"] - 1,
+        )
 
-    print(f"last pos: {mmr_poseidon.last_pos}, last len: {mmr_poseidon.last_pos + 1}")
-    for hash_pos, hash_keccak in zip(
-        reversed(poseidon_block_hashes), reversed(keccak_block_hashes)
-    ):
-        mmr_poseidon.add(hash_pos)
-        mmr_keccak.add(hash_keccak)
+        # Wait for both futures to complete
+        future_poseidon.result()
+        future_keccak.result()
 
     return {
         "last_peaks": {
@@ -372,7 +394,7 @@ def prepare_full_chain_inputs(
             data = process_chunk(chunk_input, local_process)
         except Exception as e:
             print(f"Failed to process chunk: {e}")
-            break
+            raise
 
         last_peaks = data["last_peaks"]
         last_mmr_size = data["last_mmr_size"]
