@@ -15,7 +15,7 @@ from tools.py.utils import (
     bytes_to_8_bytes_chunks_little,
     write_to_json,
 )
-from tools.py.mmr import MMR, get_peaks, PoseidonHasher, KeccakHasher
+from tools.py.mmr import MMR, get_peaks, PoseidonHasher, KeccakHasher, MockedHasher
 from tools.py.poseidon.poseidon_hash import poseidon_hash_many, poseidon_hash
 from tools.make.db import fetch_block_range_from_db, create_connection
 from tools.make.sharp_submit_params import MAX_RESOURCES_PER_JOB
@@ -55,8 +55,7 @@ print(RPC_URL)
 print(BACKEND_SERVICE_URL)
 
 MAX_KECCAK_ROUNDS = MAX_RESOURCES_PER_JOB["builtin_instance_counter"]["keccak_builtin"]
-SAFETY_KECCAK_ROUND_MARGIN = 128
-DYNAMIC_BATCH_SIZE_START = 1800
+DYNAMIC_BATCH_SIZE_START = 1700
 KECCAK_FULL_RATE_IN_BYTES = 136
 
 
@@ -312,7 +311,9 @@ def process_chunk_local(
     }
 
 
-def estimate_batch_size(from_block_number_high, conn) -> int:
+def compute_dynamic_batch_size(
+    from_block_number_high, initial_mmr_size: int, conn
+) -> int:
     keccak_rounds = MAX_KECCAK_ROUNDS + 1
     batch_size = DYNAMIC_BATCH_SIZE_START
     blocks = fetch_block_range_from_db(
@@ -325,17 +326,24 @@ def estimate_batch_size(from_block_number_high, conn) -> int:
         keccaks_per_block = [
             math.ceil(bytes_len / KECCAK_FULL_RATE_IN_BYTES) for bytes_len in bytes_lens
         ]
-        # print(f"Keccak per block: {keccaks_per_block}")
-        keccak_rounds = (
-            sum(keccaks_per_block) + SAFETY_KECCAK_ROUND_MARGIN + batch_size // 2
-        )
-        # print(f"Keccak rounds: {keccak_rounds}")
+
+        mocked_mmr = MMR(MockedHasher())
+        peaks_positions = get_peaks(initial_mmr_size)
+        mocked_mmr.last_pos = initial_mmr_size - 1
+        for pos in peaks_positions:
+            mocked_mmr.pos_hash[pos] = pos
+        mocked_mmr.get_root()  # Initial root verification
+        for _ in range(batch_size):
+            mocked_mmr.add(0)
+        mocked_mmr.get_root()  # New root computation
+
+        keccak_rounds = sum(keccaks_per_block) + mocked_mmr._hasher.hash_count
         if keccak_rounds > MAX_KECCAK_ROUNDS:
             batch_size = batch_size - 1
             bytes_lens = bytes_lens[1:]
 
-    print(f"Estimated batch size: {batch_size}")
-    print(f"Estimated keccak rounds: {keccak_rounds}")
+    print(f"Computed batch size: {batch_size}")
+    print(f"Predicted # keccak rounds: {keccak_rounds}")
     return batch_size
 
 
@@ -401,7 +409,9 @@ def prepare_full_chain_inputs(
     connexion = create_connection() if USE_DB else None
 
     if dynamic and USE_DB:
-        batch_size = estimate_batch_size(from_block_number_high, connexion)
+        batch_size = compute_dynamic_batch_size(
+            from_block_number_high, initial_mmr_size, connexion
+        )
 
     to_block_number_batch_low = max(
         from_block_number_high - batch_size + 1, to_block_number_low
@@ -457,11 +467,14 @@ def prepare_full_chain_inputs(
         from_block_number_high = from_block_number_high - batch_size
 
         if dynamic and USE_DB:
-            batch_size = estimate_batch_size(from_block_number_high, connexion)
+            batch_size = compute_dynamic_batch_size(
+                from_block_number_high, last_mmr_size, connexion
+            )
 
         to_block_number_batch_low = max(
             from_block_number_high - batch_size + 1, to_block_number_low
         )
+        print(to_block_number_batch_low)
 
     print(f"Inputs and outputs for requested blocks are ready and saved to {PATH}\n")
     print(f"Time taken : {time.time() - t0}s")
