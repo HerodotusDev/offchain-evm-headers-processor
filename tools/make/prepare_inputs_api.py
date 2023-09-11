@@ -4,6 +4,7 @@ import time
 import os
 import requests
 import sha3
+import math
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
@@ -17,6 +18,7 @@ from tools.py.utils import (
 from tools.py.mmr import MMR, get_peaks, PoseidonHasher, KeccakHasher
 from tools.py.poseidon.poseidon_hash import poseidon_hash_many, poseidon_hash
 from tools.make.db import fetch_block_range_from_db, create_connection
+from tools.make.sharp_submit_params import MAX_RESOURCES_PER_JOB
 
 
 def mkdir_if_not_exists(path: str):
@@ -51,6 +53,11 @@ RPC_BACKEND_URL = "http://localhost:8545"
 
 print(RPC_URL)
 print(BACKEND_SERVICE_URL)
+
+MAX_KECCAK_ROUNDS = MAX_RESOURCES_PER_JOB["builtin_instance_counter"]["keccak_builtin"]
+SAFETY_KECCAK_ROUND_MARGIN = 128
+DYNAMIC_BATCH_SIZE_START = 1800
+KECCAK_FULL_RATE_IN_BYTES = 136
 
 
 def rpc_request(url, rpc_request):
@@ -305,10 +312,38 @@ def process_chunk_local(
     }
 
 
+def estimate_batch_size(from_block_number_high, conn) -> int:
+    keccak_rounds = MAX_KECCAK_ROUNDS + 1
+    batch_size = DYNAMIC_BATCH_SIZE_START
+    blocks = fetch_block_range_from_db(
+        end=from_block_number_high,
+        start=from_block_number_high - batch_size + 1,
+        conn=conn,
+    )
+    bytes_lens = [len(block[1]) for block in blocks]
+    while keccak_rounds > MAX_KECCAK_ROUNDS:
+        keccaks_per_block = [
+            math.ceil(bytes_len / KECCAK_FULL_RATE_IN_BYTES) for bytes_len in bytes_lens
+        ]
+        # print(f"Keccak per block: {keccaks_per_block}")
+        keccak_rounds = (
+            sum(keccaks_per_block) + SAFETY_KECCAK_ROUND_MARGIN + batch_size // 2
+        )
+        # print(f"Keccak rounds: {keccak_rounds}")
+        if keccak_rounds > MAX_KECCAK_ROUNDS:
+            batch_size = batch_size - 1
+            bytes_lens = bytes_lens[1:]
+
+    print(f"Estimated batch size: {batch_size}")
+    print(f"Estimated keccak rounds: {keccak_rounds}")
+    return batch_size
+
+
 def prepare_full_chain_inputs(
     from_block_number_high,
     to_block_number_low=0,
     batch_size=50,
+    dynamic=False,
     initial_peaks=None,
     initial_mmr_size=None,
     initial_mmr_root=None,
@@ -359,14 +394,18 @@ def prepare_full_chain_inputs(
     PATH = "src/single_chunk_processor/data/"
     mkdir_if_not_exists(PATH)
 
-    to_block_number_batch_low = max(
-        from_block_number_high - batch_size + 1, to_block_number_low
-    )
-
     print(
         f"Preparing inputs and precomputing outputs for blocks from {from_block_number_high} to {to_block_number_low} with batch size {batch_size}"
     )
+
     connexion = create_connection() if USE_DB else None
+
+    if dynamic and USE_DB:
+        batch_size = estimate_batch_size(from_block_number_high, connexion)
+
+    to_block_number_batch_low = max(
+        from_block_number_high - batch_size + 1, to_block_number_low
+    )
 
     while from_block_number_high >= to_block_number_low:
         print(
@@ -416,6 +455,10 @@ def prepare_full_chain_inputs(
         time.sleep(0.5)
 
         from_block_number_high = from_block_number_high - batch_size
+
+        if dynamic and USE_DB:
+            batch_size = estimate_batch_size(from_block_number_high, connexion)
+
         to_block_number_batch_low = max(
             from_block_number_high - batch_size + 1, to_block_number_low
         )
@@ -427,10 +470,13 @@ def prepare_full_chain_inputs(
 
 
 if __name__ == "__main__":
-    # Prepare _inputs.json and pre-compute _outputs.json for blocks 20 to 0:
     peaks, size, roots = prepare_full_chain_inputs(
-        from_block_number_high=15000, to_block_number_low=0, batch_size=1420
+        from_block_number_high=15000,
+        to_block_number_low=0,
+        batch_size=1420,
+        dynamic=True,
     )
+
     # Prepare _inputs.json and pre-compute _outputs.json for blocks 30 to 21, using the last peaks, size and roots from the previous run:
     # prepare_full_chain_inputs(
     #     from_block_number_high=30,
