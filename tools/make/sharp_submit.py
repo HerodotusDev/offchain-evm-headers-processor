@@ -252,13 +252,14 @@ if __name__ == "__main__":
                     open(input_filepath.replace("_input", "_output"))
                 )
                 pie_path = input_filepath.replace("_input.json", "_pie.zip")
-                assert_execution_resources_under_limits(pie_path)
                 assert (
                     output == expected_output
                 ), f"[Core {core_num}] Output mismatch for {input_filename}.Expected: \n {expected_output}\n got: \n{output}"
                 print(
                     f"[Core {core_num}] ==> Run is correct. Output matches precomputed output."
                 )
+                assert_execution_resources_under_limits(pie_path)
+
                 shutil.copy2(f"{pie_path}", pie_objects_path)
                 results[input_filename] = output
             return results
