@@ -9,8 +9,12 @@ Replicates the MMR behavior of the chunk processor, ie :
 
 from typing import List, Tuple, Union
 import sha3
-from tools.py.poseidon.poseidon_hash import poseidon_hash, poseidon_hash_single, poseidon_hash_many
-    
+from tools.py.poseidon.poseidon_hash import (
+    poseidon_hash,
+    poseidon_hash_single,
+    poseidon_hash_many,
+)
+
 
 class PoseidonHasher:
     def __init__(self):
@@ -20,39 +24,55 @@ class PoseidonHasher:
         if type(item) == int:
             self.list.append(item)
         elif type(item) == bytes:
-            self.list.append(int.from_bytes(item, 'big'))
+            self.list.append(int.from_bytes(item, "big"))
         else:
             raise Exception(f"unsupported type: {type(item)}, {item}")
+
     def digest(self) -> int:
         try:
             if len(self.list) == 1:
-                res= poseidon_hash_single(self.list[0])
+                res = poseidon_hash_single(self.list[0])
             elif len(self.list) == 2:
-                
-                res= poseidon_hash(self.list[0], self.list[1])
+                res = poseidon_hash(self.list[0], self.list[1])
             elif len(self.list) > 2:
-                res= poseidon_hash_many(self.list)
+                res = poseidon_hash_many(self.list)
             else:
                 raise Exception("no item to digest")
         finally:
             self.list = []
         return res
-        
+
+
 class KeccakHasher:
     def __init__(self):
         self.keccak = sha3.keccak_256()
+
     def update(self, item):
         if type(item) == int:
-            self.keccak.update(item.to_bytes(32, 'big'))
+            self.keccak.update(item.to_bytes(32, "big"))
         elif type(item) == bytes:
             self.keccak.update(item)
         else:
             raise Exception(f"unsupported type, {type(item)}, {item}")
+
     def digest(self) -> int:
         res = self.keccak.digest()
         self.keccak = sha3.keccak_256()
-        return int.from_bytes(res, 'big')
-    
+        return int.from_bytes(res, "big")
+
+
+class MockedHasher:
+    def __init__(self):
+        self.hash_count = 0
+
+    def update(self, item):
+        pass
+
+    def digest(self) -> int:
+        self.hash_count += 1
+        return 0
+
+
 def is_valid_mmr_size(n):
     prev_peak = 0
     while n > 0:
@@ -66,6 +86,7 @@ def is_valid_mmr_size(n):
         prev_peak = peak
         n -= peak
     return n == 0
+
 
 def tree_pos_height(pos: int) -> int:
     """
@@ -99,8 +120,9 @@ def sibling_offset(height) -> int:
 
 def get_peaks(mmr_size) -> List[int]:
     """
-    return peaks positions from left to right, 0-index based. 
+    return peaks positions from left to right, 0-index based.
     """
+
     def get_right_peak(height, pos, mmr_size):
         """
         find next right peak
@@ -132,6 +154,7 @@ def left_peak_height_pos(mmr_size: int) -> Tuple[int, int]:
     find left peak
     return (left peak height, pos)
     """
+
     def get_left_pos(height):
         """
         convert height to binary express, then minus 1 to get 0 based pos
@@ -146,6 +169,7 @@ def left_peak_height_pos(mmr_size: int) -> Tuple[int, int]:
         pos = 0b111 - 1 = 6
         """
         return (1 << height + 1) - 2
+
     height = 0
     prev_pos = 0
     pos = get_left_pos(height)
@@ -162,7 +186,8 @@ class MMR(object):
     """
     MMR
     """
-    def __init__(self, hasher:Union[PoseidonHasher, KeccakHasher]=PoseidonHasher()):
+
+    def __init__(self, hasher: Union[PoseidonHasher, KeccakHasher] = PoseidonHasher()):
         self.last_pos = -1
         self.pos_hash = {}
         self._hasher = hasher
@@ -200,20 +225,22 @@ class MMR(object):
         peaks = get_peaks(self.last_pos + 1)
         peaks_values = [self.pos_hash[p] for p in peaks]
         bagged = self.bag_peaks(peaks_values)
-        self._hasher.update(self.last_pos+1)
+        self._hasher.update(self.last_pos + 1)
         self._hasher.update(bagged)
         root = self._hasher.digest()
         return root
+
     def get_peaks(self) -> list:
-        peaks=get_peaks(self.last_pos+1)
+        peaks = get_peaks(self.last_pos + 1)
         # print(peaks)
         # print(self.pos_hash)
         peaks_values = [self.pos_hash[p] for p in peaks]
 
         return peaks_values
+
     def bag_peaks(self, peaks: List[int]) -> int:
         bags = peaks[-1]
-        for peak in reversed(peaks[:-1]): 
+        for peak in reversed(peaks[:-1]):
             self._hasher.update(peak)
             self._hasher.update(bags)
 
@@ -222,14 +249,14 @@ class MMR(object):
         return bags
 
 
-if __name__ == '__main__':
-    poseidon_mmr=MMR(PoseidonHasher())
+if __name__ == "__main__":
+    poseidon_mmr = MMR(PoseidonHasher())
     for i in range(3):
         _ = poseidon_mmr.add(i)
-    
+
     print(poseidon_mmr.get_root())
 
-    keccak_mmr=MMR(KeccakHasher())
+    keccak_mmr = MMR(KeccakHasher())
     for i in range(3):
         _ = keccak_mmr.add(i)
     print(keccak_mmr.get_root())
