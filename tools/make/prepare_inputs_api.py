@@ -4,7 +4,7 @@ import sha3
 import math
 import sqlite3
 from typing import Tuple, List
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from tools.py.utils import (
     split_128,
     from_uint256,
@@ -141,9 +141,10 @@ def prepare_chunk_input(
     return chunk_input, chunk_output, (poseidon_hashes, keccak_hashes)
 
 
-def extend_mmr(
-    mmr: MMR, hashes: list, peaks_positions: list, peaks: list, last_pos: int
+def extend_mmr_poseidon(
+    hashes: list, peaks_positions: list, peaks: list, last_pos: int
 ):
+    mmr = MMR(PoseidonHasher())
     for i, pos in enumerate(peaks_positions):
         mmr.pos_hash[pos] = peaks[i]
 
@@ -152,14 +153,25 @@ def extend_mmr(
     for hash_val in reversed(hashes):
         mmr.add(hash_val)
 
-    return mmr
+    return (mmr.get_peaks(), mmr.get_root(), mmr.last_pos + 1)
+
+
+def extend_mmr_keccak(hashes: list, peaks_positions: list, peaks: list, last_pos: int):
+    mmr = MMR(KeccakHasher())
+    for i, pos in enumerate(peaks_positions):
+        mmr.pos_hash[pos] = peaks[i]
+
+    mmr.last_pos = last_pos
+
+    for hash_val in reversed(hashes):
+        mmr.add(hash_val)
+
+    return (mmr.get_peaks(), mmr.get_root(), mmr.last_pos + 1)
 
 
 def process_chunk(
     chunk_input, poseidon_block_hashes: list, keccak_block_hashes: list
 ) -> dict:
-    mmr_poseidon = MMR(PoseidonHasher())
-    mmr_keccak = MMR(KeccakHasher())
     peaks_positions = get_peaks(chunk_input["mmr_last_len"])
     assert len(poseidon_block_hashes) == len(keccak_block_hashes)
     assert (
@@ -168,10 +180,9 @@ def process_chunk(
         == len(chunk_input["keccak_mmr_last_peaks"])
     )
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ProcessPoolExecutor(max_workers=2) as executor:
         future_poseidon = executor.submit(
-            extend_mmr,
-            mmr_poseidon,
+            extend_mmr_poseidon,
             poseidon_block_hashes,
             peaks_positions,
             chunk_input["poseidon_mmr_last_peaks"],
@@ -179,27 +190,25 @@ def process_chunk(
         )
 
         future_keccak = executor.submit(
-            extend_mmr,
-            mmr_keccak,
+            extend_mmr_keccak,
             keccak_block_hashes,
             peaks_positions,
             [from_uint256(val) for val in chunk_input["keccak_mmr_last_peaks"]],
             chunk_input["mmr_last_len"] - 1,
         )
 
-        # Wait for both futures to complete
-        future_poseidon.result()
-        future_keccak.result()
+        poseidon_result = future_poseidon.result()
+        keccak_result = future_keccak.result()
 
     return {
         "last_peaks": {
-            "poseidon": mmr_poseidon.get_peaks(),
-            "keccak": mmr_keccak.get_peaks(),
+            "poseidon": poseidon_result[0],
+            "keccak": keccak_result[0],
         },
-        "last_mmr_size": mmr_poseidon.last_pos + 1,
+        "last_mmr_size": poseidon_result[2],
         "last_mmr_root": {
-            "poseidon": mmr_poseidon.get_root(),
-            "keccak": mmr_keccak.get_root(),
+            "poseidon": poseidon_result[1],
+            "keccak": keccak_result[1],
         },
     }
 
