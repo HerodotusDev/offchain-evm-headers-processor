@@ -24,13 +24,13 @@ contract SharpFactsAggregatorTest is Test {
         bytes32 continuableParentHash
     );
 
-    // poseidon_hash("brave new world")
+    // poseidon_hash(1, "brave new world")
     bytes32 public constant POSEIDON_MMR_INITIAL_ROOT =
-        0x02241b3b7f1c4b9cf63e670785891de91f7237b1388f6635c1898ae397ad32dd;
+        0x06759138078831011e3bc0b4a135af21c008dda64586363531697207fb5a2bae;
 
-    // keccak_hash("brave new world")
+    // keccak_hash(1, "brave new world")
     bytes32 public constant KECCAK_MMR_INITIAL_ROOT =
-        0xce92cc894a17c107be8788b58092c22cd0634d1489ca0ce5b4a045a1ce31b168;
+        0x5d8d23518dd388daa16925ff9475c5d1c06430d21e0422520d6a56402f42937b;
 
     function setUp() public {
         // The config hereunder must be specified in `foundry.toml`:
