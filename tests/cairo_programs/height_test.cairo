@@ -67,7 +67,7 @@ func assert_height_recursive{range_check_ptr, pow2_array: felt*}(
 
     let h = compute_height_pre_alloc_pow2{pow2_array=pow2_array}(positions[index]);
 
-    assert h = expected_heights[index];
+    assert 0 = h - expected_heights[index];
 
     assert_height_recursive(index - 1, expected_heights, positions);
     return ();

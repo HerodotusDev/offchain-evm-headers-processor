@@ -179,11 +179,11 @@ func main{
     }
 
     // Assert the new MMR root and length are as expected.
-    assert mmr_array_len + mmr_offset = expected_new_len;
+    assert mmr_array_len + mmr_offset - expected_new_len = 0;
 
-    assert new_mmr_root_poseidon = expected_new_root_poseidon;
-    assert new_mmr_root_keccak.low = expected_new_root_keccak.low;
-    assert new_mmr_root_keccak.high = expected_new_root_keccak.high;
+    assert new_mmr_root_poseidon - expected_new_root_poseidon = 0;
+    assert new_mmr_root_keccak.low - expected_new_root_keccak.low = 0;
+    assert new_mmr_root_keccak.high - expected_new_root_keccak.high = 0;
 
     // Finalize dicts for soundness.
     default_dict_finalize(dict_start_poseidon, previous_peaks_dict_poseidon, 0);
