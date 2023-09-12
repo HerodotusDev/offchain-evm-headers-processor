@@ -99,19 +99,13 @@ def tree_pos_height(pos: int) -> int:
     """
     # convert from 0-based to 1-based position, see document
     pos += 1
+    bit_length = pos.bit_length()
+    while not (1 << bit_length) - 1 == pos:
+        most_significant_bits = 1 << bit_length - 1
+        pos -= most_significant_bits - 1
+        bit_length = pos.bit_length()
 
-    def all_ones(num: int) -> bool:
-        return (1 << num.bit_length()) - 1 == num
-
-    def jump_left(pos: int) -> int:
-        most_significant_bits = 1 << pos.bit_length() - 1
-        return pos - (most_significant_bits - 1)
-
-    # loop until we jump to all ones position, which is tree height
-    while not all_ones(pos):
-        pos = jump_left(pos)
-    # count all 1 bits
-    return pos.bit_length() - 1
+    return bit_length - 1
 
 
 # get left or right sibling offset by height

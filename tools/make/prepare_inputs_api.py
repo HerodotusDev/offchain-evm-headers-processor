@@ -207,6 +207,7 @@ def process_chunk(
 def compute_dynamic_batch_size(
     from_block_number_high, initial_mmr_size: int, conn: sqlite3.Connection
 ) -> int:
+    t0 = time.time()
     keccak_rounds = MAX_KECCAK_ROUNDS + 1
     batch_size = DYNAMIC_BATCH_SIZE_START
     blocks = fetch_block_range_from_db(
@@ -215,16 +216,19 @@ def compute_dynamic_batch_size(
         conn=conn,
     )
     bytes_lens = [len(block[1]) for block in blocks]
-    while keccak_rounds > MAX_KECCAK_ROUNDS:
-        keccaks_per_block = [
-            math.ceil(bytes_len / KECCAK_FULL_RATE_IN_BYTES) for bytes_len in bytes_lens
-        ]
+    bytes_lens.reverse()
+    keccaks_per_block = [
+        math.ceil(bytes_len / KECCAK_FULL_RATE_IN_BYTES) for bytes_len in bytes_lens
+    ]
+    peaks_positions = get_peaks(initial_mmr_size)
+    initial_pos = {}
+    for pos in peaks_positions:
+        initial_pos[pos] = pos
 
+    while keccak_rounds > MAX_KECCAK_ROUNDS:
         mocked_mmr = MMR(MockedHasher())
-        peaks_positions = get_peaks(initial_mmr_size)
         mocked_mmr.last_pos = initial_mmr_size - 1
-        for pos in peaks_positions:
-            mocked_mmr.pos_hash[pos] = pos
+        mocked_mmr.pos_hash = initial_pos
         mocked_mmr.get_root()  # Initial root verification
         for _ in range(batch_size):
             mocked_mmr.add(0)
@@ -232,10 +236,11 @@ def compute_dynamic_batch_size(
 
         keccak_rounds = sum(keccaks_per_block) + mocked_mmr._hasher.hash_count
         if keccak_rounds > MAX_KECCAK_ROUNDS:
+            keccaks_per_block.pop()
             batch_size = batch_size - 1
-            bytes_lens = bytes_lens[1:]
+            bytes_lens.pop()
 
-    print(f"Computed batch size: {batch_size}")
+    print(f"Computed batch size: {batch_size} in {time.time()-t0}s")
     print(f"Predicted # keccak rounds: {keccak_rounds}")
     return batch_size
 
