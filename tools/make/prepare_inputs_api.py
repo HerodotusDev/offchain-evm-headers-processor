@@ -1,7 +1,6 @@
 #!venv/bin/python3
 import time
 import sha3
-import math
 import sqlite3
 from typing import Tuple, List
 from concurrent.futures import ProcessPoolExecutor
@@ -227,7 +226,7 @@ def compute_dynamic_batch_size(
     bytes_lens = [len(block[1]) for block in blocks]
     bytes_lens.reverse()
     keccaks_per_block = [
-        math.ceil(bytes_len / KECCAK_FULL_RATE_IN_BYTES) for bytes_len in bytes_lens
+        ((bytes_len // KECCAK_FULL_RATE_IN_BYTES) + 1) for bytes_len in bytes_lens
     ]
     peaks_positions = get_peaks(initial_mmr_size)
     initial_pos = {}
