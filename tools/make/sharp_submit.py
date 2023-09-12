@@ -15,9 +15,9 @@ from tools.make.sharp_submit_params import (
     FILENAME_DOT_CAIRO_PATH,
     COMPILED_CAIRO_FILE_PATH,
 )
-from tools.py.utils import write_to_json
+from tools.py.utils import write_to_json, clear_directory
 
-N_CORES = 2  # os.cpu_count()
+N_CORES = os.cpu_count()
 
 
 # Create an ArgumentParser object
@@ -65,15 +65,16 @@ input_files = [f for f in os.listdir(INPUT_PATH) if f.endswith("_input.json")]
 input_files_paths = [INPUT_PATH + f for f in input_files]
 
 
+# Extract the main number from the filename to use for sorting
+def get_sort_key(filename):
+    match = re.search(r"blocks_(\d+)_", filename)
+    if match:
+        return int(match.group(1))
+    return 0
+
+
 def split_inputs_evenly():
     """Distribute the input files evenly among the available cores."""
-
-    # Extract the main number from the filename to use for sorting
-    def get_sort_key(filename):
-        match = re.search(r"blocks_(\d+)_", filename)
-        if match:
-            return int(match.group(1))
-        return 0
 
     # List all _input.json files and sort them based on the main number
     all_input_files = sorted(
@@ -91,7 +92,9 @@ def split_inputs_evenly():
         # If fewer or equal input files than cores, distribute one file per core
         for core_num, input_file in enumerate(all_input_files):
             core_input_path = f"{INPUT_PATH}{core_num}/"
-            if not os.path.exists(core_input_path):
+            if os.path.exists(core_input_path):
+                clear_directory(core_input_path)
+            else:
                 os.makedirs(core_input_path)
             shutil.copy2(f"{INPUT_PATH}{input_file}", f"{core_input_path}{input_file}")
             output_file = input_file.replace("_input.json", "_output.json")
@@ -105,7 +108,9 @@ def split_inputs_evenly():
         # Distribute chunks to cores
         for core_num in range(N_CORES):
             core_input_path = f"{INPUT_PATH}{core_num}/"
-            if not os.path.exists(core_input_path):
+            if os.path.exists(core_input_path):
+                clear_directory(core_input_path)
+            else:
                 os.makedirs(core_input_path)
 
             # Get files for this core from the chunks
@@ -228,11 +233,16 @@ if __name__ == "__main__":
 
         def run_for_core(core_num):
             core_input_path = f"{INPUT_PATH}{core_num}/"
-            core_input_files = [
-                f for f in os.listdir(core_input_path) if f.endswith("_input.json")
-            ]
-            core_input_files_paths = [core_input_path + f for f in core_input_files]
-
+            core_input_files = sorted(
+                [f for f in os.listdir(core_input_path) if f.endswith("_input.json")],
+                key=get_sort_key,
+                reverse=True,
+            )
+            core_input_files_paths = sorted(
+                [core_input_path + f for f in core_input_files],
+                key=get_sort_key,
+                reverse=True,
+            )
             results = {}
             for input_filename, input_filepath in zip(
                 core_input_files, core_input_files_paths

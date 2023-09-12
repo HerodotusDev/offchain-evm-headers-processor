@@ -1,6 +1,7 @@
 """Utility functions."""
 import json
 import os
+import shutil
 import requests
 from tools.py.mmr import is_valid_mmr_size
 
@@ -51,6 +52,19 @@ def create_directory(path: str):
     if not os.path.exists(path):
         os.makedirs(path)
         print(f"Directory created: {path}")
+
+
+def clear_directory(path):
+    """Delete all files and sub-directories in a directory without deleting the directory itself."""
+    for filename in os.listdir(path):
+        file_path = os.path.join(path, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print(f"Failed to delete {file_path}. Reason: {e}")
 
 
 def get_files_from_folders(folders, ext=".cairo"):
