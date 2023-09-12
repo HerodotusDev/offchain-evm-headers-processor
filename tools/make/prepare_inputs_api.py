@@ -20,7 +20,9 @@ from tools.py.mmr import (
     KeccakHasher,
     MockedHasher,
 )
-from tools.py.poseidon.poseidon_hash import poseidon_hash_many, poseidon_hash
+from starkware.cairo.common.poseidon_hash import poseidon_hash_many, poseidon_hash
+from starkware.cairo.common.poseidon_utils import PoseidonParams
+
 from tools.make.db import (
     fetch_block_range_from_db,
     create_connection,
@@ -33,6 +35,8 @@ MAX_KECCAK_ROUNDS = MAX_RESOURCES_PER_JOB["builtin_instance_counter"]["keccak_bu
 DYNAMIC_BATCH_SIZE_START = 1700
 KECCAK_FULL_RATE_IN_BYTES = 136
 
+POSEIDON_PARAMS = PoseidonParams.get_default_poseidon_params()
+
 
 def compute_hashes(block: bytes) -> Tuple[int, int]:
     # Compute Keccak hash
@@ -42,7 +46,9 @@ def compute_hashes(block: bytes) -> Tuple[int, int]:
     keccak_hash = int.from_bytes(digest, "big")
 
     # Compute Poseidon hash
-    poseidon_hash = poseidon_hash_many(bytes_to_8_bytes_chunks_little(block))
+    poseidon_hash = poseidon_hash_many(
+        bytes_to_8_bytes_chunks_little(block), POSEIDON_PARAMS
+    )
     return keccak_hash, poseidon_hash
 
 
@@ -283,10 +289,10 @@ def prepare_full_chain_inputs(
     create_directory(PATH)
 
     with create_connection() as conn:
-        (_, max) = get_min_max_block_numbers(conn)
-        if from_block_number_high > max - 1:
+        (_, max_block) = get_min_max_block_numbers(conn)
+        if from_block_number_high > max_block - 1:
             raise ValueError(
-                f"Start block {from_block_number_high} is not in the database. Max block number supported is {max-1}\n"
+                f"Start block {from_block_number_high} is not in the database. Max block number supported is {max_block-1}\n"
                 f"Consider updating the database with 'make db-update'",
             )
         if dynamic:
@@ -369,7 +375,7 @@ def prepare_full_chain_inputs(
 
 if __name__ == "__main__":
     output = prepare_full_chain_inputs(
-        from_block_number_high=18000000,
+        from_block_number_high=15000,
         to_block_number_low=0,
         batch_size=1420,
         dynamic=True,

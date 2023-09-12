@@ -9,7 +9,7 @@ Replicates the MMR behavior of the chunk processor, ie :
 
 from typing import List, Tuple, Union
 import sha3
-from tools.py.poseidon.poseidon_hash import (
+from starkware.cairo.common.poseidon_hash import (
     poseidon_hash,
     poseidon_hash_single,
     poseidon_hash_many,
