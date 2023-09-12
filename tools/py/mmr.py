@@ -4,7 +4,7 @@ Adapted from https://github.com/jjyr/mmr.py (MIT License)
 Replicates the MMR behavior of the chunk processor, ie : 
     - the leafs are directly inserted in the tree without any hashing (they're supposed to be already hashes of block headers)
     - merging is done by hashing the two hashes together, without prepending any indexes
-    - the root is computed by bagging the peaks without prepending any indexes
+    - the root is computed by bagging the peaks and hashing the result with the size of the MMR
 """
 
 from typing import List, Tuple, Union
@@ -18,54 +18,55 @@ from tools.py.poseidon.poseidon_hash import (
 
 class PoseidonHasher:
     def __init__(self):
-        self.list = []
+        self.items = []
 
-    def update(self, item):
-        if type(item) == int:
-            self.list.append(item)
-        elif type(item) == bytes:
-            self.list.append(int.from_bytes(item, "big"))
+    def update(self, item: Union[int, bytes]):
+        if isinstance(item, int):
+            self.items.append(item)
+        elif isinstance(item, bytes):
+            self.items.append(int.from_bytes(item, "big"))
         else:
-            raise Exception(f"unsupported type: {type(item)}, {item}")
+            raise TypeError(f"Unsupported type: {type(item)}, {item}")
 
     def digest(self) -> int:
-        try:
-            if len(self.list) == 1:
-                res = poseidon_hash_single(self.list[0])
-            elif len(self.list) == 2:
-                res = poseidon_hash(self.list[0], self.list[1])
-            elif len(self.list) > 2:
-                res = poseidon_hash_many(self.list)
-            else:
-                raise Exception("no item to digest")
-        finally:
-            self.list = []
-        return res
+        num_items = len(self.items)
+
+        if num_items == 1:
+            result = poseidon_hash_single(self.items[0])
+        elif num_items == 2:
+            result = poseidon_hash(self.items[0], self.items[1])
+        elif num_items > 2:
+            result = poseidon_hash_many(self.items)
+        else:
+            raise ValueError("No item to digest")
+
+        self.items.clear()
+        return result
 
 
 class KeccakHasher:
     def __init__(self):
         self.keccak = sha3.keccak_256()
 
-    def update(self, item):
-        if type(item) == int:
+    def update(self, item: Union[int, bytes]):
+        if isinstance(item, int):
             self.keccak.update(item.to_bytes(32, "big"))
-        elif type(item) == bytes:
+        elif isinstance(item, bytes):
             self.keccak.update(item)
         else:
-            raise Exception(f"unsupported type, {type(item)}, {item}")
+            raise TypeError(f"Unsupported type: {type(item)}, {item}")
 
     def digest(self) -> int:
-        res = self.keccak.digest()
+        result = int.from_bytes(self.keccak.digest(), "big")
         self.keccak = sha3.keccak_256()
-        return int.from_bytes(res, "big")
+        return result
 
 
 class MockedHasher:
     def __init__(self):
         self.hash_count = 0
 
-    def update(self, item):
+    def update(self, _):
         pass
 
     def digest(self) -> int:
@@ -187,7 +188,10 @@ class MMR(object):
     MMR
     """
 
-    def __init__(self, hasher: Union[PoseidonHasher, KeccakHasher] = PoseidonHasher()):
+    def __init__(
+        self,
+        hasher: Union[PoseidonHasher, KeccakHasher, MockedHasher] = PoseidonHasher(),
+    ):
         self.last_pos = -1
         self.pos_hash = {}
         self._hasher = hasher
@@ -232,8 +236,6 @@ class MMR(object):
 
     def get_peaks(self) -> list:
         peaks = get_peaks(self.last_pos + 1)
-        # print(peaks)
-        # print(self.pos_hash)
         peaks_values = [self.pos_hash[p] for p in peaks]
 
         return peaks_values
