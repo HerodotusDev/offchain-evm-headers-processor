@@ -16,6 +16,9 @@ run:
 	@echo "A script to select, compile & run one Cairo file"
 	@echo "Total number of steps will be shown at the end of the run." 
 	./tools/make/launch_cairo_files.py
+test:
+	@echo "Run all tests in tests/cairo_programs" 
+	./tools/make/launch_cairo_files.py -test
 
 run-pie:
 	@echo "A script to select, compile & run one Cairo file"

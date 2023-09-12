@@ -33,6 +33,7 @@ class CairoRunner:
             "-profile", action="store_true", help="Enable pprof profile"
         )
         parser.add_argument("-pie", action="store_true", help="Create PIE object")
+        parser.add_argument("-test", action="store_true", help="Run all tests")
         return parser.parse_args()
 
     def setup_autocomplete(self):
@@ -151,6 +152,26 @@ class CairoRunner:
         if self.args.profile:
             self.run_profiling_tool()
 
+    def test(self):
+        """Run all tests."""
+        tests_files = get_files_from_folders(["tests/cairo_programs"], ".cairo")
+        for test_file in tests_files:
+            self.filename_dot_cairo_path = test_file
+            self.filename_dot_cairo = os.path.basename(test_file)
+            self.filename = self.filename_dot_cairo.removesuffix(".cairo")
+            self.compile_cairo_file()
+            run_command = self.construct_run_command(
+                os.path.join(COMPILED_FILES_DIR, f"{self.filename}.json")
+            )
+            return_code = os.system(run_command)
+            if return_code != 0:
+                print(f"### Test {self.filename_dot_cairo} failed.")
+                print(f"### Aborting tests.")
+                return
+            else:
+                print(f"Test {self.filename_dot_cairo} passed.")
+        print(f"All tests passed.")
+
     def run_profiling_tool(self):
         """Run the profiling tool for the selected Cairo file."""
         print(f"Running profiling tool for {self.filename_dot_cairo} ... ")
@@ -160,4 +181,8 @@ class CairoRunner:
 
 
 if __name__ == "__main__":
-    CairoRunner().run()
+    x = CairoRunner()
+    if x.args.test:
+        x.test()
+    else:
+        x.run()

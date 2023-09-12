@@ -9,7 +9,7 @@ func main{range_check_ptr}() {
 
     let pow2_array: felt* = pow2alloc127();
 
-    compute_height_pre_alloc_pow2_hack0{pow2_array=pow2_array}(17);  // Wrong value access
+    // compute_height_pre_alloc_pow2_hack0{pow2_array=pow2_array}(17);  // Wrong value access
     // compute_height_pre_alloc_pow2_hack1{pow2_array=pow2_array}(17);  // Inifinte loop when running
     // compute_height_pre_alloc_pow2_hack2{pow2_array=pow2_array}(17);  // Out of memory access
 
