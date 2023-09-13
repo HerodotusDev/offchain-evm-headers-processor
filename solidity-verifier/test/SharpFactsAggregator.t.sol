@@ -116,6 +116,8 @@ contract SharpFactsAggregatorTest is Test {
     function testRealAggregateJobsFFI() public {
         vm.makePersistent(address(sharpFactsAggregator));
 
+        vm.createSelectFork(vm.rpcUrl("mainnet"));
+
         uint256 firstRangeStartChildBlock = 20;
         uint256 secondRangeStartChildBlock = 30;
 
@@ -141,7 +143,7 @@ contract SharpFactsAggregatorTest is Test {
         string[] memory inputs = new string[](3);
         inputs[0] = "node";
         inputs[1] = "./helpers/compute-outputs.js";
-        inputs[2] = "helpers/outputs_batch_alpha.json";
+        inputs[2] = "helpers/outputs_batch_mainnet.json";
         bytes memory output = vm.ffi(inputs);
 
         SharpFactsAggregator.JobOutputPacked[] memory outputs = abi.decode(
@@ -151,9 +153,12 @@ contract SharpFactsAggregatorTest is Test {
 
         SharpFactsAggregator.JobOutputPacked memory firstOutput = outputs[0];
         assert(mmrSize == 1); // New tree, with genesis element "brave new world" only
+        console.logBytes32(continuableParentHash);
         assert(continuableParentHash == firstOutput.blockNPlusOneParentHash);
         assert(poseidonMmrRoot == firstOutput.mmrPreviousRootPoseidon);
         assert(keccakMmrRoot == firstOutput.mmrPreviousRootKeccak);
+
+        vm.createSelectFork(vm.rpcUrl("goerli"));
 
         vm.rollFork(latestBlockNumber);
 
@@ -163,7 +168,7 @@ contract SharpFactsAggregatorTest is Test {
         string[] memory inputsExtended = new string[](3);
         inputsExtended[0] = "node";
         inputsExtended[1] = "./helpers/compute-outputs.js";
-        inputsExtended[2] = "helpers/outputs_batch_alpha_extended.json";
+        inputsExtended[2] = "helpers/outputs_batch_mainnet_extended.json";
         bytes memory outputExtended = vm.ffi(inputsExtended);
 
         SharpFactsAggregator.JobOutputPacked[] memory outputsExtended = abi
