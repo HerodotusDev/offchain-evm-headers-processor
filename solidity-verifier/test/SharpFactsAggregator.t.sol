@@ -24,13 +24,13 @@ contract SharpFactsAggregatorTest is Test {
         bytes32 continuableParentHash
     );
 
-    // poseidon_hash("brave new world")
+    // poseidon_hash(1, "brave new world")
     bytes32 public constant POSEIDON_MMR_INITIAL_ROOT =
-        0x02241b3b7f1c4b9cf63e670785891de91f7237b1388f6635c1898ae397ad32dd;
+        0x06759138078831011e3bc0b4a135af21c008dda64586363531697207fb5a2bae;
 
-    // keccak_hash("brave new world")
+    // keccak_hash(1, "brave new world")
     bytes32 public constant KECCAK_MMR_INITIAL_ROOT =
-        0xce92cc894a17c107be8788b58092c22cd0634d1489ca0ce5b4a045a1ce31b168;
+        0x5d8d23518dd388daa16925ff9475c5d1c06430d21e0422520d6a56402f42937b;
 
     function setUp() public {
         // The config hereunder must be specified in `foundry.toml`:
@@ -116,6 +116,8 @@ contract SharpFactsAggregatorTest is Test {
     function testRealAggregateJobsFFI() public {
         vm.makePersistent(address(sharpFactsAggregator));
 
+        vm.createSelectFork(vm.rpcUrl("mainnet"));
+
         uint256 firstRangeStartChildBlock = 20;
         uint256 secondRangeStartChildBlock = 30;
 
@@ -141,7 +143,7 @@ contract SharpFactsAggregatorTest is Test {
         string[] memory inputs = new string[](3);
         inputs[0] = "node";
         inputs[1] = "./helpers/compute-outputs.js";
-        inputs[2] = "helpers/outputs_batch_alpha.json";
+        inputs[2] = "helpers/outputs_batch_mainnet.json";
         bytes memory output = vm.ffi(inputs);
 
         SharpFactsAggregator.JobOutputPacked[] memory outputs = abi.decode(
@@ -151,9 +153,12 @@ contract SharpFactsAggregatorTest is Test {
 
         SharpFactsAggregator.JobOutputPacked memory firstOutput = outputs[0];
         assert(mmrSize == 1); // New tree, with genesis element "brave new world" only
+        console.logBytes32(continuableParentHash);
         assert(continuableParentHash == firstOutput.blockNPlusOneParentHash);
         assert(poseidonMmrRoot == firstOutput.mmrPreviousRootPoseidon);
         assert(keccakMmrRoot == firstOutput.mmrPreviousRootKeccak);
+
+        vm.createSelectFork(vm.rpcUrl("goerli"));
 
         vm.rollFork(latestBlockNumber);
 
@@ -163,7 +168,7 @@ contract SharpFactsAggregatorTest is Test {
         string[] memory inputsExtended = new string[](3);
         inputsExtended[0] = "node";
         inputsExtended[1] = "./helpers/compute-outputs.js";
-        inputsExtended[2] = "helpers/outputs_batch_alpha_extended.json";
+        inputsExtended[2] = "helpers/outputs_batch_mainnet_extended.json";
         bytes memory outputExtended = vm.ffi(inputsExtended);
 
         SharpFactsAggregator.JobOutputPacked[] memory outputsExtended = abi

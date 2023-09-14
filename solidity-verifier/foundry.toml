@@ -9,6 +9,7 @@ ffi = true
 
 [rpc_endpoints]
 goerli = "${GOERLI_RPC_URL}"
+mainnet = "${MAINNET_RPC_URL}"
 
 [etherscan]
 goerli = { key = "${ETHERSCAN_API_KEY}" }

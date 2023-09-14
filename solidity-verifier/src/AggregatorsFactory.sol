@@ -39,18 +39,25 @@ contract AggregatorsFactory is AccessControl {
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     // Default roots for new aggregators:
-    // poseidon_hash("brave new world")
+    // poseidon_hash(1, "brave new world")
     bytes32 public constant POSEIDON_MMR_INITIAL_ROOT =
-        0x02241b3b7f1c4b9cf63e670785891de91f7237b1388f6635c1898ae397ad32dd;
+        0x06759138078831011e3bc0b4a135af21c008dda64586363531697207fb5a2bae;
 
-    // keccak_hash("brave new world")
+    // keccak_hash(1, "brave new world")
     bytes32 public constant KECCAK_MMR_INITIAL_ROOT =
-        0xce92cc894a17c107be8788b58092c22cd0634d1489ca0ce5b4a045a1ce31b168;
+        0x5d8d23518dd388daa16925ff9475c5d1c06430d21e0422520d6a56402f42937b;
 
     // Events
     event UpgradeProposal(SharpFactsAggregator newTemplate);
-    event Upgrade(SharpFactsAggregator oldTemplate, SharpFactsAggregator newTemplate);
-    event AggregatorCreation(SharpFactsAggregator aggregator, uint256 newAggregatorId, uint256 detachedFromAggregatorId);
+    event Upgrade(
+        SharpFactsAggregator oldTemplate,
+        SharpFactsAggregator newTemplate
+    );
+    event AggregatorCreation(
+        SharpFactsAggregator aggregator,
+        uint256 newAggregatorId,
+        uint256 detachedFromAggregatorId
+    );
 
     /// Creates a new Factory contract and grants OPERATOR_ROLE to the deployer
     /// @param initialTemplate The address of the template contract to clone
@@ -83,7 +90,9 @@ contract AggregatorsFactory is AccessControl {
             // Attach from existing aggregator
             require(aggregatorId <= aggregatorsCount, "Invalid aggregator ID");
 
-            address existingAggregatorAddr = address(aggregatorsById[aggregatorId]);
+            address existingAggregatorAddr = address(
+                aggregatorsById[aggregatorId]
+            );
             require(
                 existingAggregatorAddr != address(0),
                 "Aggregator not found"
@@ -102,7 +111,8 @@ contract AggregatorsFactory is AccessControl {
             initialAggregatorState.poseidonMmrRoot = poseidonMmrRoot;
             initialAggregatorState.keccakMmrRoot = keccakMmrRoot;
             initialAggregatorState.mmrSize = mmrSize;
-            initialAggregatorState.continuableParentHash = continuableParentHash;
+            initialAggregatorState
+                .continuableParentHash = continuableParentHash;
         } else {
             // Create a new aggregator (detach from existing ones)
             initialAggregatorState = SharpFactsAggregator.AggregatorState({
@@ -129,7 +139,11 @@ contract AggregatorsFactory is AccessControl {
 
         aggregatorsById[++aggregatorsCount] = SharpFactsAggregator(clone);
 
-        emit AggregatorCreation(SharpFactsAggregator(clone), aggregatorsCount, aggregatorId);
+        emit AggregatorCreation(
+            SharpFactsAggregator(clone),
+            aggregatorsCount,
+            aggregatorId
+        );
 
         // Grant roles to the caller so that roles are not stuck in the Factory
         SharpFactsAggregator(clone).grantRole(
@@ -148,7 +162,9 @@ contract AggregatorsFactory is AccessControl {
      * Proposes an upgrade to the template (blank aggregator) contract
      * @param newTemplate The address of the new template contract to use for future aggregators
      */
-    function proposeUpgrade(SharpFactsAggregator newTemplate) external onlyOperator {
+    function proposeUpgrade(
+        SharpFactsAggregator newTemplate
+    ) external onlyOperator {
         upgrades[++upgradesCount] = UpgradeProposalTimelock(
             block.timestamp + DELAY,
             newTemplate
@@ -172,7 +188,10 @@ contract AggregatorsFactory is AccessControl {
         template = SharpFactsAggregator(upgrades[updateId].newTemplate);
 
         // Clear timelock
-        upgrades[updateId] = UpgradeProposalTimelock(0, SharpFactsAggregator(address(0)));
+        upgrades[updateId] = UpgradeProposalTimelock(
+            0,
+            SharpFactsAggregator(address(0))
+        );
 
         emit Upgrade(SharpFactsAggregator(oldTemplate), template);
     }

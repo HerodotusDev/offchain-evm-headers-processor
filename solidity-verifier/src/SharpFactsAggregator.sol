@@ -38,7 +38,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     bytes32 public constant PROGRAM_HASH =
         bytes32(
             uint256(
-                0x21876b34efae7a9a59580c4fb0bfc7971aecebce6669a475171fe0423c0a784
+                0x01eca36d586f5356fba096edbf7414017d51cd0ed24b8fde80f78b61a9216ed2
             )
         );
 
@@ -116,9 +116,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 continuableParentHash
     );
 
-    event OperatorRequirementChange(
-        bool newRequirement
-    );
+    event OperatorRequirementChange(bool newRequirement);
 
     constructor(IFactsRegistry factsRegistry) {
         FACTS_REGISTRY = factsRegistry;
@@ -260,7 +258,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         }
 
         uint256 limit = outputs.length - 1;
-        
+
         // Iterate over the jobs outputs (aside from the last one)
         // and ensure jobs are correctly linked and valid
         for (uint256 i = 0; i < limit; ++i) {
