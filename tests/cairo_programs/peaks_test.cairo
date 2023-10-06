@@ -143,7 +143,7 @@ func test_bag_peaks{
     %{
         import sha3
         import random
-        from tools.py.poseidon.poseidon_hash import poseidon_hash
+        from starkware.cairo.common.poseidon_hash import poseidon_hash
         p = 3618502788666131213697322783095070105623107215331596699973092056135872020481 # STARK PRIME
         n_peaks = ids.peaks_len
         def split_128(a):
@@ -184,9 +184,9 @@ func test_bag_peaks{
 
     let (bag_peaks_poseidon, bag_peaks_keccak) = bag_peaks(peaks_poseidon, peaks_keccak, peaks_len);
 
-    assert bag_peaks_poseidon = expected_bagged_poseidon;
-    assert bag_peaks_keccak.low = expected_bagged_keccak.low;
-    assert bag_peaks_keccak.high = expected_bagged_keccak.high;
+    assert 0 = bag_peaks_poseidon - expected_bagged_poseidon;
+    assert 0 = bag_peaks_keccak.low - expected_bagged_keccak.low;
+    assert 0 = bag_peaks_keccak.high - expected_bagged_keccak.high;
 
     return ();
 }

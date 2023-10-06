@@ -8,6 +8,8 @@ Visualization of an MMR
 Building the MMRs happens off-chain and is proven using a Cairo program in the `src` directory.
 The CAIRO program takes as an input a blockhash passed by the verifier to then provide preimages to the given blockhash or a decoded parent hash that must be valid block headers.
 
+Please read [src/single_chunk_processor/README.md](src/single_chunk_processor/README.md) for more details about the chunk processor.
+
 Visualization of the linkage between blocks.
 ![linked blocks](.github/blocks-linkage.png?raw=true)
 
@@ -19,7 +21,7 @@ The 2 MMRs store the same data and have the same size however are built with two
 
 The Starkware SHARP generates the proofs, and the proof verification happens on-chain. The resulting facts are then aggregated by the contracts implemented in the directory `solidity-verifier`.
 
-## Make commands
+## Offchain processing
 
 ### Create a virtual environment and install the dependencies (one-time setup)
 
@@ -32,78 +34,40 @@ After that and every time you get back to the repo, you will need to activate th
 source venv/bin/activate
 ```
 
-The repository uses RPC providers to fetch block data.  
-You will need to store the RPC urls for Mainnet and Goerli by creating a `.env` file in the root directory of the repository and adding the following lines to it:
-
-```plaintext
-RPC_URL_MAINNET=<RPC_URL_MAINNET>
-RPC_URL_GOERLI=<RPC_URL_GOERLI>
-```
-
-### Compile all Cairo programs
+### Run Cairo unit tests
 
 ```bash
-make build
+make test
 ```
 
-### Run and profile cairo programs of interest (interactive script)
+### Get the chunk processor program's hash
 
-_Profiling graphs will be stored under `build/profiling/`_
-
-```bash
-make run-profile
-```
-
-### Run cairo programs of interest (interactive script)
-
-```bash
-make run
-```
-
-### Prepare inputs / Precompute outputs for SHARP
-
-_Data will be stored under `src/single_chunk_processor/data`_
-
-```bash
-make prepare-processor-input
-```
-
-### SHARP preparation/submission
-
-_Reads/Writes the data from `src/single_chunk_processor/data`_
-
-```bash
-make batch-cairo-pie # Run all chunks and create PIE objects for SHARP
-make batch-sharp-submit # Send PIE objects to SHARP
-make batch-run-and-submit # Both
-```
-
-### Get the main program hash
-
-_Returns the program hash of the main program (chunk_processor.cairo)_
 
 ```bash
 make get-program-hash
 ```
+This command computes the hash of the main chunk processor program and outputs it to stdout. It is used to make sure that STARK proofs of this program are indeed relative to the chunk processor. The hash is hardcoded in the [solidity contract](../../solidity-verifier/src/SharpFactsAggregator.sol)  that verifies SHARP facts.  
 
-For more details about the commands, see [tools/make/README.md](tools/make/README.md).
+### Prepare inputs for the chunk processor, SHARP submitting & more
 
-#### One chunk simulated usage :
+The general workflow is as follows: 
+1) Update the database of block headers
+2) Prepare the inputs and expected outputs for the chunk processor
+3) Run the chunk processor to create PIE objects
+4) Submit those PIE objects to SHARP to prove the execution. 
 
-1. Modify the last line of `tools/make/prepare_inputs_api.py` to choose the start block number and batch size.
-2. Run `make prepare-processor-input` to generate all the cairo .json inputs under `src/single_chunk_processor/data`.
-3. Run `make run` and choose `chunk_processor.cairo`.
-4. Select which input to run.
 
-See [src/single_chunk_processor/README.md](src/single_chunk_processor/README.md) for more details about the single-chunk processor.
+For more details about the other `make` commands and test the repository, see [tools/make/README.md](tools/make/README.md).
 
-## Solidity verifier (SHARP verifier)
+
+
+## Onchain Solidity verifier (SHARP verifier)
 
 See [solidity-verifier/README.md](solidity-verifier/README.md) for more details.
 
 ### Additional data
 
-#### Max Resources Per SHARP Job:
+#### Max Resources per mainnet SHARP Job:
 
 | Resource | Value      |
 | -------- | ---------- |
@@ -113,7 +77,7 @@ See [solidity-verifier/README.md](solidity-verifier/README.md) for more details.
 | Keccaks  | 8,192      |
 | Poseidon | 524,288    |
 
-#### Current processor program hash :
+#### Chunk processor program hash :
 
 `0x1eca36d586f5356fba096edbf7414017d51cd0ed24b8fde80f78b61a9216ed2`
 

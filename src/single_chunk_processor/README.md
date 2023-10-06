@@ -14,7 +14,7 @@ The chunk procesor is used to process block headers from EVM in a continuous way
 
 
 This means one run of chunk processor will process block headers from block number `n` to block number `n-r+1` (both bound included), for a total of `r` block headers.  
-We will note `[n-r+1, n]`` the range of block headers being processed.
+We will note `[n-r+1, n]` the range of block headers being processed.
 
 
 The processor is essentially doing two things:  
@@ -47,20 +47,20 @@ Sample Output :
 
 ```json
 {
-    "from_block_number_high": 10,
-    "to_block_number_low": 6,
-    "block_n_plus_one_parent_hash_low": 340103683093979563137554779304198032351,
-    "block_n_plus_one_parent_hash_high": 43101652814983461597608113204526399126,
-    "block_n_minus_r_plus_one_parent_hash_low": 99343779079568045420366697205756819173,
-    "block_n_minus_r_plus_one_parent_hash_high": 115961467505446651924004661907543813844,
-    "mmr_last_root_poseidon": 252551093926361284205375255497947755050313027176556264268816177711092997281,
-    "mmr_last_root_keccak_low": 1282909371342134768584297556671282863,
-    "mmr_last_root_keccak_high": 320481516134505083105287001274104545683,
-    "mmr_last_len": 19,
-    "new_mmr_root_poseidon": 2361779925055192446597462667205225461533037929828830339107413819739660388696,
-    "new_mmr_root_keccak_low": 77628293913960784949452276508275038051,
-    "new_mmr_root_keccak_high": 29122698726169076856729623180742302198,
-    "new_mmr_len": 31
+    "from_block_number_high": 15000,
+    "to_block_number_low": 13363,
+    "block_n_plus_one_parent_hash_low": 154290822937787733774056680842541373608,
+    "block_n_plus_one_parent_hash_high": 156853552136708155686345135791644162539,
+    "block_n_minus_r_plus_one_parent_hash_low": 281371821923349311514485903736664824394,
+    "block_n_minus_r_plus_one_parent_hash_high": 23750595297014185889703423987183304060,
+    "mmr_last_root_poseidon": 2921600461849179232597610084551483949436449163481908169507355734771418934190,
+    "mmr_last_root_keccak_low": 255731995079421981708054171413297402747,
+    "mmr_last_root_keccak_high": 124351033810760994347164128898134164945,
+    "mmr_last_len": 1,
+    "new_mmr_root_poseidon": 366537929573550773164043174537178174908470791275974636779493804144457621821,
+    "new_mmr_root_keccak_low": 155207974490154382400874803233698222316,
+    "new_mmr_root_keccak_high": 18856215989401494535507531263318176723,
+    "new_mmr_len": 3271
 }
 ```
 
@@ -90,3 +90,6 @@ If that's the case, one can only use the previous MMR peaks to append values to 
 
 The MMR is not using indexes when appending values or when merging childrens, as we do not care about duplicates nor the order of insertion. 
 
+
+The reference implementation of the MMR construction can be found in [mmr.py](../../tools/py/mmr.py).
+The implementation of the processor lies in [chunk_processor.cairo](chunk_processor.cairo).

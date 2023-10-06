@@ -97,8 +97,8 @@ func test_keccak{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, keccak_ptr: Kecc
         let (res_keccak: Uint256) = keccak(inputs=inputs_start, n_bytes=2 * 32);
         let (res_keccak) = uint256_reverse_endian(res_keccak);
 
-        assert res_keccak.low = keccak_result_array[index].low;
-        assert res_keccak.high = keccak_result_array[index].high;
+        assert 0 = res_keccak.low - keccak_result_array[index].low;
+        assert 0 = res_keccak.high - keccak_result_array[index].high;
         return ();
     } else {
         let (keccak_input: felt*) = alloc();
@@ -109,8 +109,8 @@ func test_keccak{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, keccak_ptr: Kecc
         let (res_keccak: Uint256) = keccak(inputs=inputs_start, n_bytes=2 * 32);
         let (res_keccak) = uint256_reverse_endian(res_keccak);
 
-        assert res_keccak.low = keccak_result_array[index].low;
-        assert res_keccak.high = keccak_result_array[index].high;
+        assert 0 = res_keccak.low - keccak_result_array[index].low;
+        assert 0 = res_keccak.high - keccak_result_array[index].high;
         return test_keccak(x_array, y_array, keccak_result_array, index - 1);
     }
 }

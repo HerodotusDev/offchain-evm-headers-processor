@@ -16,17 +16,26 @@ run:
 	@echo "A script to select, compile & run one Cairo file"
 	@echo "Total number of steps will be shown at the end of the run." 
 	./tools/make/launch_cairo_files.py
+test:
+	@echo "Run all tests in tests/cairo_programs" 
+	./tools/make/launch_cairo_files.py -test
 
 run-pie:
 	@echo "A script to select, compile & run one Cairo file"
 	@echo "Outputs a cairo PIE object"
 	@echo "Total number of steps will be shown at the end of the run." 
 	./tools/make/launch_cairo_files.py -pie
-
+db-update:
+	@echo "Update/create the block headers database"
+	./tools/make/db.py
 batch-cairo-pie:
 	@echo "Run processor with all inputs in src/single_chunk_processor/data/ and write pie objects"
 	./tools/make/sharp_submit.py -pie
 
+batch-pie-multicore:
+	@echo "Run processor with all inputs in src/single_chunk_processor/data/ and write pie objects"
+	./tools/make/sharp_submit.py -pie-multicore
+	
 batch-sharp-submit:
 	@echo "Submits all pie objects in src/single_chunk_processor/data/ to SHARP"
 	./tools/make/sharp_submit.py -sharp

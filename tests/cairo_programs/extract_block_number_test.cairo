@@ -73,11 +73,11 @@ func test_batch_block_numbers_inner{
     alloc_locals;
     if (index == 0) {
         let bn = extract_block_number_big(rlp_arrays[index]);
-        assert bn = block_numbers[index];
+        assert 0 = bn - block_numbers[index];
         return ();
     } else {
         let bn = extract_block_number_big(rlp_arrays[index]);
-        assert bn = block_numbers[index];
+        assert 0 = bn - block_numbers[index];
         return test_batch_block_numbers_inner(
             index=index - 1, rlp_arrays=rlp_arrays, block_numbers=block_numbers
         );

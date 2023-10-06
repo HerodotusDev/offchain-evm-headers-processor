@@ -1,22 +1,22 @@
-import requests
-import json
 import time
 import math
 import json
 from typing import Union, List
+from tools.py.utils import rpc_request
 
-from tools.py.block_header import build_block_header, BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai
+from tools.py.block_header import (
+    build_block_header,
+    BlockHeader,
+    BlockHeaderEIP1559,
+    BlockHeaderShangai,
+)
 
 RPC_BATCH_MAX_SIZE = 1450
 
 
-def rpc_request(url, rpc_request):
-    headers = {'Content-Type': 'application/json'}
-    response = requests.post(url=url, headers=headers, data=json.dumps(rpc_request))
-    # print(f"Status code: {response.status_code}")
-    # print(f"Response content: {response.content}")
-    return response.json()
-def fetch_blocks_from_rpc_no_async(range_from: int, range_till: int, rpc_url: str, delay=0.1) -> List[Union[BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai]]: 
+def fetch_blocks_from_rpc_no_async(
+    range_from: int, range_till: int, rpc_url: str, delay=0.1
+) -> List[Union[BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai]]:
     """
     # Fetches blocks from RPC in batches of RPC_BATCH_MAX_SIZE
     # Returns a list of block headers
@@ -36,21 +36,34 @@ def fetch_blocks_from_rpc_no_async(range_from: int, range_till: int, rpc_url: st
     all_results = []
 
     for i in range(1, rpc_batches_amount + 1):
-        current_batch_size = last_batch_size if (i == rpc_batches_amount and last_batch_size) else RPC_BATCH_MAX_SIZE
-        requests = list(map(lambda j: {
-            "jsonrpc": '2.0',
-            "method": 'eth_getBlockByNumber',
-            "params": [hex(range_from - (i - 1) * RPC_BATCH_MAX_SIZE - j), False],
-            "id": str(j)
-        }, range(0, current_batch_size)))
+        current_batch_size = (
+            last_batch_size
+            if (i == rpc_batches_amount and last_batch_size)
+            else RPC_BATCH_MAX_SIZE
+        )
+        requests = list(
+            map(
+                lambda j: {
+                    "jsonrpc": "2.0",
+                    "method": "eth_getBlockByNumber",
+                    "params": [
+                        hex(range_from - (i - 1) * RPC_BATCH_MAX_SIZE - j),
+                        False,
+                    ],
+                    "id": str(j),
+                },
+                range(0, current_batch_size),
+            )
+        )
 
         # Send all requests in the current batch in a single HTTP request
         results = rpc_request(rpc_url, requests)
         # print(results)
         for result in results:
-            block_header:Union[BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai] = build_block_header(result['result'])
+            block_header: Union[
+                BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai
+            ] = build_block_header(result["result"])
             all_results.append(block_header)
-
 
         time.sleep(delay)  # Add delay
     time.sleep(delay)  # Add delay

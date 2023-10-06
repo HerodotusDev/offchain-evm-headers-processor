@@ -11,9 +11,9 @@ func main{range_check_ptr}() {
     // assert pow2_array[128] = 2 ** 128;
     with pow2_array {
         let x = get_felt_bitlength(1);
-        assert x = 1;
+        assert 0 = x - 1;
         let x = get_felt_bitlength(2 ** 127 - 1);
-        assert x = 127;
+        assert 0 = x - 127;
 
         // let x = get_felt_bitlength(0);
         // let x = get_felt_bitlength(2**128);
