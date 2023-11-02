@@ -31,9 +31,8 @@ from src.libs.mmr import (
 )
 
 // Recursively verifies that Cairo_Keccak(block_header_i) = parent_hash(block_header_i+1)_little_endian for all from i=index to i=0
-// Reverses each block_header_i back to big endian and hashes it with poseidon_hash_many
-// Stores the poseidon hash of each block header in poseidon_hash_array
-// Reverses endianness of the keccak hash of each block header back to big endian and stores it in keccak_hash_array
+// Hashes each block header (in 8 bytes little endian chunks) with poseidon_hash_many and stores the result in poseidon_hash_array
+// Stores the little endian keccak hash of each block header in keccak_hash_array
 //
 // Implicit arguments :
 // - poseidon_hash_array: felt* - array of poseidon hashes of block headers to fill
