@@ -80,4 +80,4 @@ forge build
 forge test
 ```
 
-Herodotus Dev - 2023
+Herodotus Dev Ltd - 2023
