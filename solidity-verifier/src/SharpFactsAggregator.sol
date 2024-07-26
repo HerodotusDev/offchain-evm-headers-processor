@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
 import {Initializable} from "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
@@ -9,7 +9,7 @@ import {Uint256Splitter} from "./lib/Uint256Splitter.sol";
 
 /// @title SharpFactsAggregator
 /// @dev Aggregator contract to handle SHARP job outputs and update the global aggregator state.
-/// @author Herodotus Dev
+/// @author Herodotus Dev Ltd
 /// ------------------
 /// Example:
 /// Blocks inside brackets are the ones processed during their SHARP job execution
