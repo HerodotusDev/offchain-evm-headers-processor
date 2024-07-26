@@ -2,7 +2,7 @@
     "name": "herodotus-solidity-sharp-verifier",
     "version": "1.0.0",
     "description": "Solidity SHARP verifier",
-    "author": "Herodotus Dev",
+    "author": "Herodotus Dev Ltd",
     "files": [
         "src/**/*.sol"
     ],
