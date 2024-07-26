@@ -7,7 +7,7 @@ import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessContr
 import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
 
 /// @title AggregatorsFactory
-/// @author Herodotus Dev
+/// @author Herodotus Dev Ltd
 /// @notice A factory contract for creating new SharpFactsAggregator contracts
 ///         and upgrading new one's starter template
 contract AggregatorsFactory is AccessControl {
