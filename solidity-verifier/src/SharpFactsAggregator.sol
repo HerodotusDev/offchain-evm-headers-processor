@@ -9,7 +9,7 @@ import {Uint256Splitter} from "./lib/Uint256Splitter.sol";
 
 /// @title SharpFactsAggregator
 /// @dev Aggregator contract to handle SHARP job outputs and update the global aggregator state.
-/// @author Herodotus Dev
+/// @author Herodotus Dev Ltd
 /// ------------------
 /// Example:
 /// Blocks inside brackets are the ones processed during their SHARP job execution
