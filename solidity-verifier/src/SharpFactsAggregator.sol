@@ -93,6 +93,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     error NotEnoughBlockConfirmations();
     error TooManyBlocksConfirmations();
     error NotEnoughJobs();
+    error TargetBlockInFuture();
     error UnknownParentHash();
     error AggregationError(string message); // Generic error with a message
     error AggregationBlockMismatch();
@@ -175,11 +176,19 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
     /// Registers a new range to aggregate from
     /// @notice Caches a recent block hash (MINIMUM_BLOCKS_CONFIRMATIONS to -MAXIMUM_BLOCKS_CONFIRMATIONS from present), relying on the global `blockhash` Solidity function
-    /// @param blocksConfirmations Number of blocks preceding the current block
+    /// @param targetBlock Target block to register
     function registerNewRange(
-        uint256 blocksConfirmations
+        uint256 targetBlock
     ) external onlyOperator {
+        uint256 currentBlock = block.number;
+
+        // Ensure the target block is not in the future
+        if (targetBlock > currentBlock) {
+            revert TargetBlockInFuture();
+        }
+
         // Minimum blocks confirmations to avoid reorgs
+        uint256 blocksConfirmations = currentBlock - targetBlock;
         if (blocksConfirmations < MINIMUM_BLOCKS_CONFIRMATIONS) {
             revert NotEnoughBlockConfirmations();
         }
@@ -190,11 +199,8 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             revert TooManyBlocksConfirmations();
         }
 
-        // Determine the target block number (i.e. the child block)
-        uint256 targetBlock = block.number - blocksConfirmations;
-
         // Extract its parent hash.
-        bytes32 targetBlockParentHash = blockhash(targetBlock - 1);
+        bytes32 targetBlockParentHash = blockhash(targetBlock);
 
         // If the parent hash is not available, revert
         // (This should never happen under the current EVM rules)
