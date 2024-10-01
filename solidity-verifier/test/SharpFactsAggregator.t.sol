@@ -11,7 +11,7 @@ import {IFactsRegistry} from "../src/interfaces/IFactsRegistry.sol";
 contract SharpFactsAggregatorTest is Test {
     using Uint256Splitter for uint256;
 
-    uint256 latestBlockNumber;
+    uint256 public latestBlockNumber;
 
     SharpFactsAggregator public sharpFactsAggregator;
 
@@ -35,8 +35,8 @@ contract SharpFactsAggregatorTest is Test {
     function setUp() public {
         // The config hereunder must be specified in `foundry.toml`:
         // [rpc_endpoints]
-        // goerli="GOERLI_RPC_URL"
-        vm.createSelectFork(vm.rpcUrl("goerli"));
+        // sepolia="SEPOLIA_RPC_URL"
+        vm.createSelectFork(vm.rpcUrl("sepolia"));
 
         latestBlockNumber = block.number;
 
@@ -50,7 +50,7 @@ contract SharpFactsAggregatorTest is Test {
                 });
 
         sharpFactsAggregator = new SharpFactsAggregator(
-            IFactsRegistry(0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168) // Goërli
+            IFactsRegistry(0x07ec0D28e50322Eb0C159B9090ecF3aeA8346DFe) // Sepolia
         );
 
         // Ensure roles were not granted
@@ -125,13 +125,9 @@ contract SharpFactsAggregatorTest is Test {
         // Start at block no. 70
         vm.rollFork(pastBlockStart);
 
-        sharpFactsAggregator.registerNewRange(
-            pastBlockStart - firstRangeStartChildBlock - 1
-        );
+        sharpFactsAggregator.registerNewRange(firstRangeStartChildBlock);
 
-        sharpFactsAggregator.registerNewRange(
-            pastBlockStart - secondRangeStartChildBlock - 1
-        );
+        sharpFactsAggregator.registerNewRange(secondRangeStartChildBlock);
 
         (
             bytes32 poseidonMmrRoot,
@@ -153,12 +149,11 @@ contract SharpFactsAggregatorTest is Test {
 
         SharpFactsAggregator.JobOutputPacked memory firstOutput = outputs[0];
         assert(mmrSize == 1); // New tree, with genesis element "brave new world" only
-        console.logBytes32(continuableParentHash);
         assert(continuableParentHash == firstOutput.blockNPlusOneParentHash);
         assert(poseidonMmrRoot == firstOutput.mmrPreviousRootPoseidon);
         assert(keccakMmrRoot == firstOutput.mmrPreviousRootKeccak);
 
-        vm.createSelectFork(vm.rpcUrl("goerli"));
+        vm.createSelectFork(vm.rpcUrl("sepolia"));
 
         vm.rollFork(latestBlockNumber);
 
@@ -175,7 +170,7 @@ contract SharpFactsAggregatorTest is Test {
             .decode(outputExtended, (SharpFactsAggregator.JobOutputPacked[]));
 
         sharpFactsAggregator.aggregateSharpJobs(
-            secondRangeStartChildBlock + 1,
+            secondRangeStartChildBlock,
             outputsExtended
         );
         ensureGlobalStateCorrectness(

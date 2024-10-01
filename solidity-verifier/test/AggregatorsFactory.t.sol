@@ -15,18 +15,25 @@ contract AggregatorsFactoryTest is Test {
 
     SharpFactsAggregator private aggregatorTemplate;
 
-    uint256 constant PROPOSAL_DELAY = 3 days;
+    uint256 public constant PROPOSAL_DELAY = 3 days;
 
     // Important events
     event UpgradeProposal(SharpFactsAggregator newTemplate);
-    event Upgrade(SharpFactsAggregator oldTemplate, SharpFactsAggregator newTemplate);
-    event AggregatorCreation(SharpFactsAggregator aggregator, uint256 newAggregatorId, uint256 detachedFromAggregatorId);
+    event Upgrade(
+        SharpFactsAggregator oldTemplate,
+        SharpFactsAggregator newTemplate
+    );
+    event AggregatorCreation(
+        SharpFactsAggregator aggregator,
+        uint256 newAggregatorId,
+        uint256 detachedFromAggregatorId
+    );
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("goerli"));
+        vm.createSelectFork(vm.rpcUrl("sepolia"));
 
         aggregatorTemplate = new SharpFactsAggregator(
-            IFactsRegistry(0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168) // Goërli
+            IFactsRegistry(0x07ec0D28e50322Eb0C159B9090ecF3aeA8346DFe) // Sepolia
         );
 
         factory = new AggregatorsFactory(aggregatorTemplate);
@@ -60,7 +67,7 @@ contract AggregatorsFactoryTest is Test {
             aggregator.hasRole(keccak256("UNLOCKER_ROLE"), address(this))
         );
 
-        aggregator.registerNewRange(42);
+        aggregator.registerNewRange(block.number - 42);
 
         aggregator.revokeRole(keccak256("UNLOCKER_ROLE"), address(this));
         aggregator.revokeRole(keccak256("OPERATOR_ROLE"), address(this));
@@ -73,7 +80,7 @@ contract AggregatorsFactoryTest is Test {
         );
 
         vm.expectRevert("Caller is not an operator");
-        aggregator.registerNewRange(50);
+        aggregator.registerNewRange(block.number - 50);
     }
 
     function testUpgrade() public {
