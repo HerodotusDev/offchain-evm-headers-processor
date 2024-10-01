@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-import "forge-std/console.sol";
+import {Test} from "forge-std/Test.sol";
+import {MockFactsRegistry} from "../src/mocks/MockFactsRegistry.sol";
 
 import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
 import {AggregatorsFactory} from "../src/AggregatorsFactory.sol";
@@ -33,7 +33,7 @@ contract AggregatorsFactoryTest is Test {
         vm.createSelectFork(vm.rpcUrl("sepolia"));
 
         aggregatorTemplate = new SharpFactsAggregator(
-            IFactsRegistry(0x07ec0D28e50322Eb0C159B9090ecF3aeA8346DFe) // Sepolia
+            IFactsRegistry(address(new MockFactsRegistry()))
         );
 
         factory = new AggregatorsFactory(aggregatorTemplate);

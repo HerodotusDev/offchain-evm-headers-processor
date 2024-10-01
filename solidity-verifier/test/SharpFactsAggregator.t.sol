@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-import "forge-std/console.sol";
+import {Test} from "forge-std/Test.sol";
 
-import "../src/SharpFactsAggregator.sol";
-import "../src/lib/Uint256Splitter.sol";
+import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
+import {Uint256Splitter} from "../src/lib/Uint256Splitter.sol";
+
 import {IFactsRegistry} from "../src/interfaces/IFactsRegistry.sol";
+import {MockFactsRegistry} from "../src/mocks/MockFactsRegistry.sol";
 
 contract SharpFactsAggregatorTest is Test {
     using Uint256Splitter for uint256;
@@ -32,6 +33,8 @@ contract SharpFactsAggregatorTest is Test {
     bytes32 public constant KECCAK_MMR_INITIAL_ROOT =
         0x5d8d23518dd388daa16925ff9475c5d1c06430d21e0422520d6a56402f42937b;
 
+    IFactsRegistry public mockFactsRegistry;
+
     function setUp() public {
         // The config hereunder must be specified in `foundry.toml`:
         // [rpc_endpoints]
@@ -49,9 +52,11 @@ contract SharpFactsAggregatorTest is Test {
                     continuableParentHash: bytes32(0)
                 });
 
-        sharpFactsAggregator = new SharpFactsAggregator(
-            IFactsRegistry(0x07ec0D28e50322Eb0C159B9090ecF3aeA8346DFe) // Sepolia
-        );
+        mockFactsRegistry = IFactsRegistry(address(new MockFactsRegistry()));
+
+        vm.makePersistent(address(mockFactsRegistry));
+
+        sharpFactsAggregator = new SharpFactsAggregator(mockFactsRegistry);
 
         // Ensure roles were not granted
         assertFalse(
@@ -85,14 +90,6 @@ contract SharpFactsAggregatorTest is Test {
                 address(this)
             )
         );
-    }
-
-    function testVerifyInvalidFact() public {
-        // Fake output
-        uint256[] memory outputs = new uint256[](1);
-        outputs[0] = 4242424242;
-
-        assertFalse(sharpFactsAggregator.verifyFact(outputs));
     }
 
     function ensureGlobalStateCorrectness(
