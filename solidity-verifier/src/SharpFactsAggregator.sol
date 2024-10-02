@@ -50,8 +50,18 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 continuableParentHash;
     }
 
+    // Checkpointed aggregator state
+    struct AggregatorStateCheckpoint {
+        bytes32 poseidonMmrRoot;
+        bytes32 keccakMmrRoot;
+    }
+
     // Current __global__ state of this aggregator
     AggregatorState public aggregatorState;
+
+    // Checkpointed states of the aggregator
+    // mmr_size -> (poseidon_mmr_root, keccak_mmr_root)
+    mapping(uint256 => AggregatorStateCheckpoint) public aggregatorStateCheckpoints;
 
     // Mapping to keep track of block number to its parent hash
     mapping(uint256 => bytes32) public blockNumberToParentHash;
@@ -227,6 +237,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     /// @param outputs Array of SHARP jobs outputs (packed for Solidity)
     function aggregateSharpJobs(
         uint256 rightBoundStartBlock,
+        bool checkpoint,
         JobOutputPacked[] calldata outputs
     ) external onlyOperator {
         // Ensuring at least one job output is provided
@@ -289,6 +300,14 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
         (uint256 fromBlock, ) = firstOutput.blockNumbersPacked.split128();
         (, uint256 toBlock) = lastOutput.blockNumbersPacked.split128();
+
+        // If checkpointing is enabled, we save the current state
+        if (checkpoint) {
+            aggregatorStateCheckpoints[mmrNewSize] = AggregatorStateCheckpoint(
+                aggregatorState.poseidonMmrRoot,
+                aggregatorState.keccakMmrRoot
+            );
+        }
 
         emit Aggregate(
             fromBlock,

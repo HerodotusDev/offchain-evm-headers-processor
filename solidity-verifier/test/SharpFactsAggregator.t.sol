@@ -154,7 +154,7 @@ contract SharpFactsAggregatorTest is Test {
 
         vm.rollFork(latestBlockNumber);
 
-        sharpFactsAggregator.aggregateSharpJobs(0, outputs);
+        sharpFactsAggregator.aggregateSharpJobs(0, false, outputs);
         ensureGlobalStateCorrectness(outputs[outputs.length - 1]);
 
         string[] memory inputsExtended = new string[](3);
@@ -168,6 +168,7 @@ contract SharpFactsAggregatorTest is Test {
 
         sharpFactsAggregator.aggregateSharpJobs(
             secondRangeStartChildBlock,
+            false,
             outputsExtended
         );
         ensureGlobalStateCorrectness(
