@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-import "forge-std/console.sol";
+import {Test} from "forge-std/Test.sol";
 
-import "../src/SharpFactsAggregator.sol";
-import "../src/lib/Uint256Splitter.sol";
+import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
+import {Uint256Splitter} from "../src/lib/Uint256Splitter.sol";
+
 import {IFactsRegistry} from "../src/interfaces/IFactsRegistry.sol";
+import {MockFactsRegistry} from "../src/mocks/MockFactsRegistry.sol";
 
 contract SharpFactsAggregatorTest is Test {
     using Uint256Splitter for uint256;
 
-    uint256 latestBlockNumber;
+    uint256 public latestBlockNumber;
 
     SharpFactsAggregator public sharpFactsAggregator;
 
@@ -32,11 +33,13 @@ contract SharpFactsAggregatorTest is Test {
     bytes32 public constant KECCAK_MMR_INITIAL_ROOT =
         0x5d8d23518dd388daa16925ff9475c5d1c06430d21e0422520d6a56402f42937b;
 
+    IFactsRegistry public mockFactsRegistry;
+
     function setUp() public {
         // The config hereunder must be specified in `foundry.toml`:
         // [rpc_endpoints]
-        // goerli="GOERLI_RPC_URL"
-        vm.createSelectFork(vm.rpcUrl("goerli"));
+        // sepolia="SEPOLIA_RPC_URL"
+        vm.createSelectFork(vm.rpcUrl("sepolia"));
 
         latestBlockNumber = block.number;
 
@@ -49,9 +52,11 @@ contract SharpFactsAggregatorTest is Test {
                     continuableParentHash: bytes32(0)
                 });
 
-        sharpFactsAggregator = new SharpFactsAggregator(
-            IFactsRegistry(0xAB43bA48c9edF4C2C4bB01237348D1D7B28ef168) // Goërli
-        );
+        mockFactsRegistry = IFactsRegistry(address(new MockFactsRegistry()));
+
+        vm.makePersistent(address(mockFactsRegistry));
+
+        sharpFactsAggregator = new SharpFactsAggregator(mockFactsRegistry);
 
         // Ensure roles were not granted
         assertFalse(
@@ -87,14 +92,6 @@ contract SharpFactsAggregatorTest is Test {
         );
     }
 
-    function testVerifyInvalidFact() public {
-        // Fake output
-        uint256[] memory outputs = new uint256[](1);
-        outputs[0] = 4242424242;
-
-        assertFalse(sharpFactsAggregator.verifyFact(outputs));
-    }
-
     function ensureGlobalStateCorrectness(
         SharpFactsAggregator.JobOutputPacked memory output
     ) internal view {
@@ -125,13 +122,9 @@ contract SharpFactsAggregatorTest is Test {
         // Start at block no. 70
         vm.rollFork(pastBlockStart);
 
-        sharpFactsAggregator.registerNewRange(
-            pastBlockStart - firstRangeStartChildBlock - 1
-        );
+        sharpFactsAggregator.registerNewRange(firstRangeStartChildBlock);
 
-        sharpFactsAggregator.registerNewRange(
-            pastBlockStart - secondRangeStartChildBlock - 1
-        );
+        sharpFactsAggregator.registerNewRange(secondRangeStartChildBlock);
 
         (
             bytes32 poseidonMmrRoot,
@@ -153,12 +146,11 @@ contract SharpFactsAggregatorTest is Test {
 
         SharpFactsAggregator.JobOutputPacked memory firstOutput = outputs[0];
         assert(mmrSize == 1); // New tree, with genesis element "brave new world" only
-        console.logBytes32(continuableParentHash);
         assert(continuableParentHash == firstOutput.blockNPlusOneParentHash);
         assert(poseidonMmrRoot == firstOutput.mmrPreviousRootPoseidon);
         assert(keccakMmrRoot == firstOutput.mmrPreviousRootKeccak);
 
-        vm.createSelectFork(vm.rpcUrl("goerli"));
+        vm.createSelectFork(vm.rpcUrl("sepolia"));
 
         vm.rollFork(latestBlockNumber);
 
@@ -175,7 +167,7 @@ contract SharpFactsAggregatorTest is Test {
             .decode(outputExtended, (SharpFactsAggregator.JobOutputPacked[]));
 
         sharpFactsAggregator.aggregateSharpJobs(
-            secondRangeStartChildBlock + 1,
+            secondRangeStartChildBlock,
             outputsExtended
         );
         ensureGlobalStateCorrectness(

@@ -9,7 +9,7 @@ import {Uint256Splitter} from "./lib/Uint256Splitter.sol";
 
 /// @title SharpFactsAggregator
 /// @dev Aggregator contract to handle SHARP job outputs and update the global aggregator state.
-/// @author Herodotus Dev
+/// @author Herodotus Dev Ltd
 /// ------------------
 /// Example:
 /// Blocks inside brackets are the ones processed during their SHARP job execution
@@ -175,11 +175,10 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     }
 
     /// Registers a new range to aggregate from
-    /// @notice Caches a recent block hash (MINIMUM_BLOCKS_CONFIRMATIONS to -MAXIMUM_BLOCKS_CONFIRMATIONS from present), relying on the global `blockhash` Solidity function
+    /// @notice Caches a recent block hash (-MINIMUM_BLOCKS_CONFIRMATIONS to -MAXIMUM_BLOCKS_CONFIRMATIONS from present)
+    //  relying on the global `blockhash` Solidity function
     /// @param targetBlock Target block to register
-    function registerNewRange(
-        uint256 targetBlock
-    ) external onlyOperator {
+    function registerNewRange(uint256 targetBlock) external onlyOperator {
         uint256 currentBlock = block.number;
 
         // Ensure the target block is not in the future
@@ -214,7 +213,8 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         // If we cannot aggregate further in the past (e.g., genesis block is reached or it's a new tree)
         if (aggregatorState.continuableParentHash == bytes32(0)) {
             // Set the aggregator state's `continuableParentHash` to the target block's parent hash
-            // so we can easily continue aggregating from it without specifying `rightBoundStartBlock` in `aggregateSharpJobs`
+            // so we can easily continue aggregating from it
+            // without specifying `rightBoundStartBlock` in `aggregateSharpJobs`
             aggregatorState.continuableParentHash = targetBlockParentHash;
         }
 
@@ -222,7 +222,8 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     }
 
     /// @notice Aggregate SHARP jobs outputs (min. 1) to update the global aggregator state
-    /// @param rightBoundStartBlock The reference block to start from. Defaults to continuing from the global state if set to `0`
+    /// @param rightBoundStartBlock The reference block to start from.
+    //  `rightBoundStartBlock` defaults to continuing from the global state if set to `0`
     /// @param outputs Array of SHARP jobs outputs (packed for Solidity)
     function aggregateSharpJobs(
         uint256 rightBoundStartBlock,
@@ -258,7 +259,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
                 .split128();
 
             // We check that block numbers are consecutives
-            if (fromBlockHighStart != rightBoundStartBlock - 1) {
+            if (fromBlockHighStart != rightBoundStartBlock) {
                 revert AggregationBlockMismatch();
             }
         }
