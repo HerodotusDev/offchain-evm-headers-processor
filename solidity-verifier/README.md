@@ -55,7 +55,7 @@ Note: the aggregation state is stored in the `SharpFactsAggregator` contract and
 Make sure to have a `.env` file configured with the variables defined in `.env.example`, then run:
 
 ```sh
-source .env; forge script script/AggregatorsFactory.s.sol:AggregatorsFactoryDeployer --rpc-url $DEPLOY_RPC_URL --broadcast --verify -vvvv
+pnpm run deploy
 ```
 
 ## Quick Start
@@ -65,7 +65,7 @@ source .env; forge script script/AggregatorsFactory.s.sol:AggregatorsFactoryDepl
 cd solidity-verifier
 
 # Install node_modules
-yarn install
+pnpm install
 
 # (Optional) Switch node to v18.16.1 (or higher)
 nvm use

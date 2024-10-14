@@ -14,5 +14,8 @@
     "dependencies": {
         "bn.js": "^5.2.1",
         "ethers": "^5.7.2"
+    },
+    "scripts": {
+        "deploy": "source .env; forge script script/AggregatorsFactory.s.sol:AggregatorsFactoryDeployer --rpc-url $DEPLOY_RPC_URL --broadcast --verify -vvvv"
     }
 }
