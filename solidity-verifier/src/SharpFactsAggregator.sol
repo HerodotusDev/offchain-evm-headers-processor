@@ -199,7 +199,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         }
 
         // Extract its parent hash.
-        bytes32 targetBlockParentHash = blockhash(targetBlock);
+        bytes32 targetBlockParentHash = blockhash(targetBlock - 1);
 
         // If the parent hash is not available, revert
         // (This should never happen under the current EVM rules)
