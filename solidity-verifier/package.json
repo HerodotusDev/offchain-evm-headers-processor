@@ -18,6 +18,7 @@
   "scripts": {
     "prettier": "prettier --write --list-different .",
     "lint": "prettier --check .",
-    "deploy": "source .env; forge script script/AggregatorsFactory.s.sol:AggregatorsFactoryDeployer --rpc-url $DEPLOY_RPC_URL --broadcast --verify -vvvv"
+    "deploy": "source .env; forge script script/AggregatorsFactory.s.sol:AggregatorsFactoryDeployer --rpc-url $DEPLOY_RPC_URL --broadcast --verify -vvvv",
+    "verify:template": "source .env; forge verify-contract $DEPLOYED_CONTRACT_ADDRESS SharpFactsAggregator --etherscan-api-key $ETHERSCAN_API_KEY --watch --chain=11155111 --guess-constructor-args --rpc-url $DEPLOY_RPC_URL"
   }
 }
