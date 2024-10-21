@@ -34,7 +34,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     // Sharp Facts Registry
     IFactsRegistry public immutable FACTS_REGISTRY;
 
-    // Cairo program hash (i.e., the off-chain block headers accumulator program)
+    // Cairo program hash calculated wity Poseidon (i.e., the off-chain block headers accumulator program)
     bytes32 public constant PROGRAM_HASH =
         bytes32(
             uint256(
@@ -54,7 +54,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     AggregatorState public aggregatorState;
 
     // Mapping to keep track of block number to its parent hash
-    mapping(uint256 => bytes32) public blockNumberToBlockHash;
+    mapping(uint256 => bytes32) public blockNumberToParentHash;
 
     // Flag to control operator role requirements
     bool public isOperatorRequired;
@@ -199,7 +199,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         }
 
         // Extract its parent hash.
-        bytes32 targetBlockParentHash = blockhash(targetBlock);
+        bytes32 targetBlockParentHash = blockhash(targetBlock - 1);
 
         // If the parent hash is not available, revert
         // (This should never happen under the current EVM rules)
@@ -208,7 +208,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         }
 
         // Cache the parent hash so that we can later on continue accumlating from it
-        blockNumberToBlockHash[targetBlock] = targetBlockParentHash;
+        blockNumberToParentHash[targetBlock] = targetBlockParentHash;
 
         // If we cannot aggregate further in the past (e.g., genesis block is reached or it's a new tree)
         if (aggregatorState.continuableParentHash == bytes32(0)) {
@@ -234,26 +234,26 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             revert NotEnoughJobs();
         }
 
-        bytes32 rightBoundStartBlockParentHash = bytes32(0);
+        bytes32 rightBoundStartPlusOneParentHash = bytes32(0);
 
         // Start from a different block than the current state if `rightBoundStartBlock` is specified
         if (rightBoundStartBlock != 0) {
             // Retrieve from cache the parent hash of the block to start from
-            rightBoundStartBlockParentHash = blockNumberToBlockHash[
-                rightBoundStartBlock
+            rightBoundStartPlusOneParentHash = blockNumberToParentHash[
+                rightBoundStartBlock + 1
             ];
 
             // If not present in the cache, hash is not authenticated and we cannot continue from it
-            if (rightBoundStartBlockParentHash == bytes32(0)) {
+            if (rightBoundStartPlusOneParentHash == bytes32(0)) {
                 revert UnknownParentHash();
             }
         }
 
         JobOutputPacked calldata firstOutput = outputs[0];
         // Ensure the first job is continuable
-        ensureContinuable(rightBoundStartBlockParentHash, firstOutput);
+        ensureContinuable(rightBoundStartPlusOneParentHash, firstOutput);
 
-        if (rightBoundStartBlockParentHash != bytes32(0)) {
+        if (rightBoundStartPlusOneParentHash != bytes32(0)) {
             (uint256 fromBlockHighStart, ) = firstOutput
                 .blockNumbersPacked
                 .split128();
@@ -360,13 +360,28 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     }
 
     /// @notice Ensures the job output is cryptographically sound to continue from
-    /// @param rightBoundStartParentHash The parent hash of the block to start from
+    /// @param rightBoundStartPlusOneParentHash The parent hash of the block to start from + 1
     /// @param output The job output to check
     function ensureContinuable(
-        bytes32 rightBoundStartParentHash,
+        bytes32 rightBoundStartPlusOneParentHash,
         JobOutputPacked memory output
     ) internal view {
+        if (rightBoundStartPlusOneParentHash == bytes32(0)) {
+            revert AggregationError("Parent hash cannot be 0");
+        }
+
+        // If the right bound start parent hash __is__ specified,
+        // we check that the job's `blockN + 1 parent hash` is matching with a previously stored parent hash
+        if (
+            output.blockNPlusOneParentHash != rightBoundStartPlusOneParentHash
+        ) {
+            revert AggregationError("Parent hash mismatch: ensureContinuable");
+        }
+
         (uint256 mmrPreviousSize, ) = output.mmrSizesPacked.split128();
+        // Check that the job's previous MMR size is the same as the one stored in the contract state
+        if (mmrPreviousSize != aggregatorState.mmrSize)
+            revert AggregationError("MMR size mismatch");
 
         // Check that the job's previous Poseidon MMR root is the same as the one stored in the contract state
         if (output.mmrPreviousRootPoseidon != aggregatorState.poseidonMmrRoot)
@@ -375,29 +390,6 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         // Check that the job's previous Keccak MMR root is the same as the one stored in the contract state
         if (output.mmrPreviousRootKeccak != aggregatorState.keccakMmrRoot)
             revert AggregationError("Keccak root mismatch");
-
-        // Check that the job's previous MMR size is the same as the one stored in the contract state
-        if (mmrPreviousSize != aggregatorState.mmrSize)
-            revert AggregationError("MMR size mismatch");
-
-        if (rightBoundStartParentHash == bytes32(0)) {
-            // If the right bound start parent hash __is not__ specified,
-            // we check that the job's `blockN + 1 parent hash` is matching with the previously stored parent hash
-            if (
-                output.blockNPlusOneParentHash !=
-                aggregatorState.continuableParentHash
-            ) {
-                revert AggregationError("Global state: Parent hash mismatch");
-            }
-        } else {
-            // If the right bound start parent hash __is__ specified,
-            // we check that the job's `blockN + 1 parent hash` is matching with a previously stored parent hash
-            if (output.blockNPlusOneParentHash != rightBoundStartParentHash) {
-                revert AggregationError(
-                    "Parent hash mismatch: ensureContinuable"
-                );
-            }
-        }
     }
 
     /// @notice Ensures the job outputs are correctly linked

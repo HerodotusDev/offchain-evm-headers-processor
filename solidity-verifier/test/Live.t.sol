@@ -16,39 +16,39 @@ contract Live is Test {
         vm.createSelectFork(SEPOLIA_RPC_URL);
 
         //? For testing of a fully live contract use this:
-        address aggregatorAddress = address(
-            0x00d91dd5e6376202f3eaf5336179b5d1c5a136df66
-        );
-        aggregator = SharpFactsAggregator(aggregatorAddress);
+        // address aggregatorAddress = address(
+        //     0x00d91dd5e6376202f3eaf5336179b5d1c5a136df66
+        // );
+        // aggregator = SharpFactsAggregator(aggregatorAddress);
 
         //? For debugging and changing the contract code, but using the actual facts registry use this:
-        // SharpFactsAggregator.AggregatorState
-        //     memory initialAggregatorState = SharpFactsAggregator
-        //         .AggregatorState({
-        //             poseidonMmrRoot: 0x06759138078831011e3bc0b4a135af21c008dda64586363531697207fb5a2bae,
-        //             keccakMmrRoot: 0x5d8d23518dd388daa16925ff9475c5d1c06430d21e0422520d6a56402f42937b,
-        //             mmrSize: 1,
-        //             continuableParentHash: 0xcfc3c668129a2a395dd69132d7ae224de1bceca9f915f1430bf4d3c1b1620510
-        //         });
-        // IFactsRegistry factsRegistry = IFactsRegistry(
-        //     address(0x000ed8c44415e882F3033B4F3AFF916BbB4997f915)
-        // );
+        SharpFactsAggregator.AggregatorState
+            memory initialAggregatorState = SharpFactsAggregator
+                .AggregatorState({
+                    poseidonMmrRoot: 0x06759138078831011e3bc0b4a135af21c008dda64586363531697207fb5a2bae,
+                    keccakMmrRoot: 0x5d8d23518dd388daa16925ff9475c5d1c06430d21e0422520d6a56402f42937b,
+                    mmrSize: 1,
+                    continuableParentHash: 0xcfc3c668129a2a395dd69132d7ae224de1bceca9f915f1430bf4d3c1b1620510
+                });
+        IFactsRegistry factsRegistry = IFactsRegistry(
+            address(0x000ed8c44415e882F3033B4F3AFF916BbB4997f915)
+        );
 
-        // vm.startBroadcast(privateKey);
-        // aggregator = new SharpFactsAggregator(factsRegistry);
-        // aggregator.initialize(initialAggregatorState);
-        // vm.stopBroadcast();
+        vm.startBroadcast(privateKey);
+        aggregator = new SharpFactsAggregator(factsRegistry);
+        aggregator.initialize(initialAggregatorState);
+        vm.stopBroadcast();
     }
 
     // ['0x692d88', '0x692d85', '0x1309e6d97353aa7d712bb058dd2abeab', '0x8d38275adfe450dbb8a8961ba1f4c789', '0x8b52978a2d7876cc247ecbbd5900b71', '0x3d557adee5e7064f164bf5918deea805', '0x6759138078831011e3bc0b4a135af21c008dda64586363531697207fb5a2bae', '0xc06430d21e0422520d6a56402f42937b', '0x5d8d23518dd388daa16925ff9475c5d1', '0x1', '0x21274b8cfb5ba2ae9b1e2466122f933d24b9c1f21861878e8498fbcdd0f6141', '0x7630ae2ceb7f932a17d77cb539cfab00', '0x6e2f44b74a42d10a4ea513bab86a5da2', '0x8']
     function test_a() external {
         //? before this sync is requried:
-        // registerNewRange(6892936)
+        // registerNewRange(6892937)
         //
         // equivalent to:
         //
-        // blockNumberToBlockHash[
-        //     6892936
+        // blockNumberToParentHash[
+        //     6892937
         // ] = 0x8d38275adfe450dbb8a8961ba1f4c7891309e6d97353aa7d712bb058dd2abeab;
 
         SharpFactsAggregator.JobOutputPacked[]
