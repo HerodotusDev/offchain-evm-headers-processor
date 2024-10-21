@@ -38,7 +38,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     bytes32 public constant PROGRAM_HASH =
         bytes32(
             uint256(
-                0x01eca36d586f5356fba096edbf7414017d51cd0ed24b8fde80f78b61a9216ed2
+                0x65b6e7259ea513e896bc97cbc9445fd71eeb71fb8ce92bad1df9676f97df626
             )
         );
 
@@ -54,7 +54,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     AggregatorState public aggregatorState;
 
     // Mapping to keep track of block number to its parent hash
-    mapping(uint256 => bytes32) public blockNumberToParentHash;
+    mapping(uint256 => bytes32) public blockNumberToBlockHash;
 
     // Flag to control operator role requirements
     bool public isOperatorRequired;
@@ -96,7 +96,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     error TargetBlockInFuture();
     error UnknownParentHash();
     error AggregationError(string message); // Generic error with a message
-    error AggregationBlockMismatch();
+    error AggregationBlockMismatch(string message);
     error GenesisBlockReached();
     error InvalidFact();
 
@@ -199,7 +199,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         }
 
         // Extract its parent hash.
-        bytes32 targetBlockParentHash = blockhash(targetBlock - 1);
+        bytes32 targetBlockParentHash = blockhash(targetBlock);
 
         // If the parent hash is not available, revert
         // (This should never happen under the current EVM rules)
@@ -208,7 +208,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         }
 
         // Cache the parent hash so that we can later on continue accumlating from it
-        blockNumberToParentHash[targetBlock] = targetBlockParentHash;
+        blockNumberToBlockHash[targetBlock] = targetBlockParentHash;
 
         // If we cannot aggregate further in the past (e.g., genesis block is reached or it's a new tree)
         if (aggregatorState.continuableParentHash == bytes32(0)) {
@@ -239,7 +239,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         // Start from a different block than the current state if `rightBoundStartBlock` is specified
         if (rightBoundStartBlock != 0) {
             // Retrieve from cache the parent hash of the block to start from
-            rightBoundStartBlockParentHash = blockNumberToParentHash[
+            rightBoundStartBlockParentHash = blockNumberToBlockHash[
                 rightBoundStartBlock
             ];
 
@@ -260,7 +260,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
 
             // We check that block numbers are consecutives
             if (fromBlockHighStart != rightBoundStartBlock) {
-                revert AggregationBlockMismatch();
+                revert AggregationBlockMismatch("aggregateSharpJobs");
             }
         }
 
@@ -287,8 +287,9 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         aggregatorState.continuableParentHash = lastOutput
             .blockNMinusRPlusOneParentHash;
 
-        (uint256 fromBlock, ) = firstOutput.blockNumbersPacked.split128();
-        (, uint256 toBlock) = lastOutput.blockNumbersPacked.split128();
+        (uint256 fromBlock, uint256 toBlock) = firstOutput
+            .blockNumbersPacked
+            .split128();
 
         emit Aggregate(
             fromBlock,
@@ -392,7 +393,9 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             // If the right bound start parent hash __is__ specified,
             // we check that the job's `blockN + 1 parent hash` is matching with a previously stored parent hash
             if (output.blockNPlusOneParentHash != rightBoundStartParentHash) {
-                revert AggregationError("Parent hash mismatch");
+                revert AggregationError(
+                    "Parent hash mismatch: ensureContinuable"
+                );
             }
         }
     }
@@ -414,7 +417,8 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         (uint256 nextFromBlock, ) = nextOutput.blockNumbersPacked.split128();
 
         // We check that the next job's `from block` is the same as the previous job's `to block + 1`
-        if (toBlock - 1 != nextFromBlock) revert AggregationBlockMismatch();
+        if (toBlock - 1 != nextFromBlock)
+            revert AggregationBlockMismatch("ensureConsecutiveJobs");
 
         (, uint256 outputMmrNewSize) = output.mmrSizesPacked.split128();
         (uint256 nextOutputMmrPreviousSize, ) = nextOutput
@@ -437,7 +441,10 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         if (
             output.blockNMinusRPlusOneParentHash !=
             nextOutput.blockNPlusOneParentHash
-        ) revert AggregationError("Parent hash mismatch");
+        )
+            revert AggregationError(
+                "Parent hash mismatch: ensureConsecutiveJobs"
+            );
     }
 
     /// @dev Helper function to verify a fact based on a job output
