@@ -291,6 +291,13 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             .blockNumbersPacked
             .split128();
 
+        blockNumberToParentHash[toBlock] = lastOutput
+            .blockNMinusRPlusOneParentHash;
+        emit NewRangeRegistered(
+            toBlock,
+            lastOutput.blockNMinusRPlusOneParentHash
+        );
+
         emit Aggregate(
             fromBlock,
             toBlock,
