@@ -41,14 +41,20 @@ contract Live is Test {
     }
 
     function test_a() external {
-        //? before this sync is requried:
+        //? before this sync or continuable parent hash is requried:
+        //
         // registerNewRange(6892937)
         //
-        // equivalent to putting this in SharpFactsAggregator's constructor:
+        //? equivalent to putting this in SharpFactsAggregator's constructor:
         //
         // blockNumberToParentHash[
         //     6892937
         // ] = 0x8d38275adfe450dbb8a8961ba1f4c7891309e6d97353aa7d712bb058dd2abeab;
+        //
+        //? or
+        //
+        // aggregatorState
+        //     .continuableParentHash = 0x8d38275adfe450dbb8a8961ba1f4c7891309e6d97353aa7d712bb058dd2abeab;
 
         SharpFactsAggregator.JobOutputPacked[]
             memory jobOutputs = new SharpFactsAggregator.JobOutputPacked[](1);
@@ -67,6 +73,6 @@ contract Live is Test {
         });
 
         vm.startBroadcast(privateKey);
-        aggregator.aggregateSharpJobs(6892936, jobOutputs);
+        aggregator.aggregateSharpJobs(jobOutputs);
     }
 }

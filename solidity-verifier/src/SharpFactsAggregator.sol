@@ -222,11 +222,8 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     }
 
     /// @notice Aggregate SHARP jobs outputs (min. 1) to update the global aggregator state
-    /// @param rightBoundStartBlock The reference block to start from.
-    //  `rightBoundStartBlock` defaults to continuing from the global state if set to `0`
     /// @param outputs Array of SHARP jobs outputs (packed for Solidity)
     function aggregateSharpJobs(
-        uint256 rightBoundStartBlock,
         JobOutputPacked[] calldata outputs
     ) external onlyOperator {
         // Ensuring at least one job output is provided
@@ -234,35 +231,16 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
             revert NotEnoughJobs();
         }
 
-        bytes32 rightBoundStartPlusOneParentHash = bytes32(0);
-
-        // Start from a different block than the current state if `rightBoundStartBlock` is specified
-        if (rightBoundStartBlock != 0) {
-            // Retrieve from cache the parent hash of the block to start from
-            rightBoundStartPlusOneParentHash = blockNumberToParentHash[
-                rightBoundStartBlock + 1
-            ];
-
-            // If not present in the cache, hash is not authenticated and we cannot continue from it
-            if (rightBoundStartPlusOneParentHash == bytes32(0)) {
-                revert UnknownParentHash();
-            }
-        }
-
         JobOutputPacked calldata firstOutput = outputs[0];
+        (uint256 fromBlock, ) = firstOutput.blockNumbersPacked.split128();
+
+        // Retrieve from cache the parent hash of the block to start from
+        bytes32 fromBlockPlusOneParentHash = blockNumberToParentHash[
+            fromBlock + 1
+        ];
+
         // Ensure the first job is continuable
-        ensureContinuable(rightBoundStartPlusOneParentHash, firstOutput);
-
-        (uint256 fromBlockHighStart, ) = firstOutput
-            .blockNumbersPacked
-            .split128();
-
-        if (rightBoundStartPlusOneParentHash != bytes32(0)) {
-            // We check that block numbers are consecutives
-            if (fromBlockHighStart != rightBoundStartBlock) {
-                revert AggregationBlockMismatch("aggregateSharpJobs");
-            }
-        }
+        ensureContinuable(fromBlockPlusOneParentHash, firstOutput);
 
         uint256 limit = outputs.length - 1;
 
@@ -297,7 +275,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         );
 
         emit Aggregate(
-            fromBlockHighStart,
+            fromBlock,
             toBlock,
             lastOutput.mmrNewRootPoseidon,
             lastOutput.mmrNewRootKeccak,
@@ -365,10 +343,10 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     }
 
     /// @notice Ensures the job output is cryptographically sound to continue from
-    /// @param rightBoundStartPlusOneParentHash The parent hash of the block to start from + 1
+    /// @param fromBlockPlusOneParentHash The parent hash of the block to start from + 1
     /// @param output The job output to check
     function ensureContinuable(
-        bytes32 rightBoundStartPlusOneParentHash,
+        bytes32 fromBlockPlusOneParentHash,
         JobOutputPacked memory output
     ) internal view {
         (uint256 mmrPreviousSize, ) = output.mmrSizesPacked.split128();
@@ -385,7 +363,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         if (mmrPreviousSize != aggregatorState.mmrSize)
             revert AggregationError("MMR size mismatch");
 
-        if (rightBoundStartPlusOneParentHash == bytes32(0)) {
+        if (fromBlockPlusOneParentHash == bytes32(0)) {
             // If the right bound start parent hash __is not__ specified,
             // we check that the job's `blockN + 1 parent hash` is matching with the previously stored parent hash
             if (
@@ -397,10 +375,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         } else {
             // If the right bound start parent hash __is__ specified,
             // we check that the job's `blockN + 1 parent hash` is matching with a previously stored parent hash
-            if (
-                output.blockNPlusOneParentHash !=
-                rightBoundStartPlusOneParentHash
-            ) {
+            if (output.blockNPlusOneParentHash != fromBlockPlusOneParentHash) {
                 revert AggregationError(
                     "Parent hash mismatch: ensureContinuable"
                 );
