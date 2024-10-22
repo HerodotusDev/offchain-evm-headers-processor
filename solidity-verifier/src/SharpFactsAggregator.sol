@@ -253,11 +253,11 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         // Ensure the first job is continuable
         ensureContinuable(rightBoundStartPlusOneParentHash, firstOutput);
 
-        if (rightBoundStartPlusOneParentHash != bytes32(0)) {
-            (uint256 fromBlockHighStart, ) = firstOutput
-                .blockNumbersPacked
-                .split128();
+        (uint256 fromBlockHighStart, ) = firstOutput
+            .blockNumbersPacked
+            .split128();
 
+        if (rightBoundStartPlusOneParentHash != bytes32(0)) {
             // We check that block numbers are consecutives
             if (fromBlockHighStart != rightBoundStartBlock) {
                 revert AggregationBlockMismatch("aggregateSharpJobs");
@@ -287,9 +287,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         aggregatorState.continuableParentHash = lastOutput
             .blockNMinusRPlusOneParentHash;
 
-        (uint256 fromBlock, uint256 toBlock) = firstOutput
-            .blockNumbersPacked
-            .split128();
+        (, uint256 toBlock) = lastOutput.blockNumbersPacked.split128();
 
         blockNumberToParentHash[toBlock] = lastOutput
             .blockNMinusRPlusOneParentHash;
@@ -299,7 +297,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         );
 
         emit Aggregate(
-            fromBlock,
+            fromBlockHighStart,
             toBlock,
             lastOutput.mmrNewRootPoseidon,
             lastOutput.mmrNewRootKeccak,
@@ -373,22 +371,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         bytes32 rightBoundStartPlusOneParentHash,
         JobOutputPacked memory output
     ) internal view {
-        if (rightBoundStartPlusOneParentHash == bytes32(0)) {
-            revert AggregationError("Parent hash cannot be 0");
-        }
-
-        // If the right bound start parent hash __is__ specified,
-        // we check that the job's `blockN + 1 parent hash` is matching with a previously stored parent hash
-        if (
-            output.blockNPlusOneParentHash != rightBoundStartPlusOneParentHash
-        ) {
-            revert AggregationError("Parent hash mismatch: ensureContinuable");
-        }
-
         (uint256 mmrPreviousSize, ) = output.mmrSizesPacked.split128();
-        // Check that the job's previous MMR size is the same as the one stored in the contract state
-        if (mmrPreviousSize != aggregatorState.mmrSize)
-            revert AggregationError("MMR size mismatch");
 
         // Check that the job's previous Poseidon MMR root is the same as the one stored in the contract state
         if (output.mmrPreviousRootPoseidon != aggregatorState.poseidonMmrRoot)
@@ -397,6 +380,32 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
         // Check that the job's previous Keccak MMR root is the same as the one stored in the contract state
         if (output.mmrPreviousRootKeccak != aggregatorState.keccakMmrRoot)
             revert AggregationError("Keccak root mismatch");
+
+        // Check that the job's previous MMR size is the same as the one stored in the contract state
+        if (mmrPreviousSize != aggregatorState.mmrSize)
+            revert AggregationError("MMR size mismatch");
+
+        if (rightBoundStartPlusOneParentHash == bytes32(0)) {
+            // If the right bound start parent hash __is not__ specified,
+            // we check that the job's `blockN + 1 parent hash` is matching with the previously stored parent hash
+            if (
+                output.blockNPlusOneParentHash !=
+                aggregatorState.continuableParentHash
+            ) {
+                revert AggregationError("Parent hash mismatch: Global state");
+            }
+        } else {
+            // If the right bound start parent hash __is__ specified,
+            // we check that the job's `blockN + 1 parent hash` is matching with a previously stored parent hash
+            if (
+                output.blockNPlusOneParentHash !=
+                rightBoundStartPlusOneParentHash
+            ) {
+                revert AggregationError(
+                    "Parent hash mismatch: ensureContinuable"
+                );
+            }
+        }
     }
 
     /// @notice Ensures the job outputs are correctly linked
