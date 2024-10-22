@@ -154,7 +154,7 @@ contract SharpFactsAggregatorTest is Test {
 
         vm.rollFork(latestBlockNumber);
 
-        sharpFactsAggregator.aggregateSharpJobs(0, outputs);
+        sharpFactsAggregator.aggregateSharpJobs(outputs);
         ensureGlobalStateCorrectness(outputs[outputs.length - 1]);
 
         string[] memory inputsExtended = new string[](3);
@@ -166,10 +166,7 @@ contract SharpFactsAggregatorTest is Test {
         SharpFactsAggregator.JobOutputPacked[] memory outputsExtended = abi
             .decode(outputExtended, (SharpFactsAggregator.JobOutputPacked[]));
 
-        sharpFactsAggregator.aggregateSharpJobs(
-            secondRangeStartChildBlock,
-            outputsExtended
-        );
+        sharpFactsAggregator.aggregateSharpJobs(outputsExtended);
         ensureGlobalStateCorrectness(
             outputsExtended[outputsExtended.length - 1]
         );

@@ -12,7 +12,7 @@ contract Live is Test {
 
     constructor() {
         privateKey = vm.envUint("PRIVATE_KEY");
-        string memory SEPOLIA_RPC_URL = vm.envString("SEPOLIA_RPC_URL");
+        string memory SEPOLIA_RPC_URL = vm.rpcUrl("sepolia");
         vm.createSelectFork(SEPOLIA_RPC_URL);
 
         //? For testing of a fully live contract use this:
