@@ -7,7 +7,7 @@ import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
 import {Uint256Splitter} from "../src/lib/Uint256Splitter.sol";
 
 import {IFactsRegistry} from "../src/interfaces/IFactsRegistry.sol";
-import {MockFactsRegistry} from "../src/mocks/MockFactsRegistry.sol";
+import {MockedSharpFactsRegistry} from "../src/mocks/MockFactsRegistry.sol";
 
 contract SharpFactsAggregatorTest is Test {
     using Uint256Splitter for uint256;
@@ -52,7 +52,9 @@ contract SharpFactsAggregatorTest is Test {
                     continuableParentHash: bytes32(0)
                 });
 
-        mockFactsRegistry = IFactsRegistry(address(new MockFactsRegistry()));
+        mockFactsRegistry = IFactsRegistry(
+            address(new MockedSharpFactsRegistry())
+        );
 
         vm.makePersistent(address(mockFactsRegistry));
 

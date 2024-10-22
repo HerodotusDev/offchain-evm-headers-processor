@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import {MockFactsRegistry} from "../src/mocks/MockFactsRegistry.sol";
+import {MockedSharpFactsRegistry} from "../src/mocks/MockFactsRegistry.sol";
 
 import {SharpFactsAggregator} from "../src/SharpFactsAggregator.sol";
 import {AggregatorsFactory} from "../src/AggregatorsFactory.sol";
@@ -33,7 +33,7 @@ contract AggregatorsFactoryTest is Test {
         vm.createSelectFork(vm.rpcUrl("sepolia"));
 
         aggregatorTemplate = new SharpFactsAggregator(
-            IFactsRegistry(address(new MockFactsRegistry()))
+            IFactsRegistry(address(new MockedSharpFactsRegistry()))
         );
 
         factory = new AggregatorsFactory(aggregatorTemplate);

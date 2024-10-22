@@ -34,7 +34,7 @@ contract SharpFactsAggregator is Initializable, AccessControlUpgradeable {
     // Sharp Facts Registry
     IFactsRegistry public immutable FACTS_REGISTRY;
 
-    // Cairo program hash calculated wity Poseidon (i.e., the off-chain block headers accumulator program)
+    // Cairo program hash calculated with Poseidon (i.e., the off-chain block headers accumulator program)
     bytes32 public constant PROGRAM_HASH =
         bytes32(
             uint256(
