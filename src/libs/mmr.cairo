@@ -99,10 +99,8 @@ func is_valid_mmr_size_inner{range_check_ptr, pow2_array: felt*}(n: felt, prev_p
 func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) -> felt {
     alloc_locals;
     local bit_length;
-    %{
-        x = ids.x
-        ids.bit_length = x.bit_length()
-    %}
+    %{ ids.bit_length = ids.x.bit_length() %}
+
     // Computes N=2^bit_length and n=2^(bit_length-1)
     // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
 
@@ -143,10 +141,7 @@ func compute_height_pre_alloc_pow2{range_check_ptr, pow2_array: felt*}(x: felt) 
 func compute_first_peak_pos{range_check_ptr, pow2_array: felt*}(mmr_len: felt) -> felt {
     alloc_locals;
     local bit_length;
-    %{
-        mmr_len = ids.mmr_len
-        ids.bit_length = mmr_len.bit_length()
-    %}
+    %{ ids.bit_length = ids.mmr_len.bit_length() %}
     // Computes N=2^bit_length and n=2^(bit_length-1)
     // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
 
@@ -238,8 +233,8 @@ func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_le
 ) -> felt {
     alloc_locals;
     local in_mmr;
-
     %{ ids.in_mmr = 1 if ids.left_child<=ids.mmr_len else 0 %}
+    
     if (in_mmr != 0) {
         // Ensure left_child <= mmr_len
         assert [range_check_ptr] = mmr_len - left_child;

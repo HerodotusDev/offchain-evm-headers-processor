@@ -18,10 +18,7 @@ const DIV_32_MINUS_1 = DIV_32 - 1;
 func get_felt_bitlength{range_check_ptr, pow2_array: felt*}(x: felt) -> felt {
     alloc_locals;
     local bit_length;
-    %{
-        x = ids.x
-        ids.bit_length = x.bit_length()
-    %}
+    %{ ids.bit_length = ids.x.bit_length() %}
     // Computes N=2^bit_length and n=2^(bit_length-1)
     // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
     tempvar N = pow2_array[bit_length];
@@ -65,10 +62,10 @@ func felt_divmod_2pow32{range_check_ptr}(value: felt) -> (q: felt, r: felt) {
     %{
         from starkware.cairo.common.math_utils import assert_integer
         assert_integer(ids.DIV_32)
-        assert 0 < ids.DIV_32 <= PRIME // range_check_builtin.bound, \
-            f'div={hex(ids.DIV_32)} is out of the valid range.'
-        ids.q, ids.r = divmod(ids.value, ids.DIV_32)
+        if not (0 < ids.DIV_32 <= PRIME):
+            raise ValueError(f'div={hex(ids.DIV_32)} is out of the valid range.')
     %}
+    %{ ids.q, ids.r = divmod(ids.value, ids.DIV_32) %}
     assert [range_check_ptr + 2] = DIV_32_MINUS_1 - r;
     let range_check_ptr = range_check_ptr + 3;
 
@@ -110,11 +107,8 @@ func word_reverse_endian_64{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: f
 //   res: the reversed integer.
 func word_reverse_endian_16_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        word = ids.word
-        assert word < 2**16
-        word_bytes=word.to_bytes(2, byteorder='big')
-        for i in range(2):
-            memory[ap+i] = word_bytes[i]
+        from tools.py.hints import write_word_to_memory
+        write_word_to_memory(ids.word, 2, memory, ap)
     %}
     ap += 2;
 
@@ -140,11 +134,8 @@ func word_reverse_endian_16_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_24_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        word = ids.word
-        assert word < 2**24
-        word_bytes=word.to_bytes(3, byteorder='big')
-        for i in range(3):
-            memory[ap+i] = word_bytes[i]
+        from tools.py.hints import write_word_to_memory
+        write_word_to_memory(ids.word, 3, memory, ap)
     %}
     ap += 3;
 
@@ -173,11 +164,8 @@ func word_reverse_endian_24_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_32_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        word = ids.word
-        assert word < 2**32
-        word_bytes=word.to_bytes(4, byteorder='big')
-        for i in range(4):
-            memory[ap+i] = word_bytes[i]
+        from tools.py.hints import write_word_to_memory
+        write_word_to_memory(ids.word, 4, memory, ap)
     %}
     ap += 4;
 
@@ -209,11 +197,8 @@ func word_reverse_endian_32_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_40_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        word = ids.word
-        assert word < 2**40
-        word_bytes=word.to_bytes(5, byteorder='big')
-        for i in range(5):
-            memory[ap+i] = word_bytes[i]
+        from tools.py.hints import write_word_to_memory
+        write_word_to_memory(ids.word, 5, memory, ap)
     %}
     ap += 5;
 
@@ -248,11 +233,8 @@ func word_reverse_endian_40_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_48_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        word = ids.word
-        assert word < 2**48
-        word_bytes=word.to_bytes(6, byteorder='big')
-        for i in range(6):
-            memory[ap+i] = word_bytes[i]
+        from tools.py.hints import write_word_to_memory
+        write_word_to_memory(ids.word, 6, memory, ap)
     %}
     ap += 6;
 
@@ -290,11 +272,8 @@ func word_reverse_endian_48_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_56_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        word = ids.word
-        assert word < 2**56
-        word_bytes=word.to_bytes(7, byteorder='big')
-        for i in range(7):
-            memory[ap+i] = word_bytes[i]
+        from tools.py.hints import write_word_to_memory
+        write_word_to_memory(ids.word, 7, memory, ap)
     %}
     ap += 7;
 
