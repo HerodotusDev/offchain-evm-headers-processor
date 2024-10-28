@@ -5,6 +5,7 @@ from starkware.cairo.common.alloc import alloc
 
 const DIV_32 = 2 ** 32;
 const DIV_32_MINUS_1 = DIV_32 - 1;
+const PRIME = 3618502788666131213697322783095070105623107215331596699973092056135872020481;
 
 // Returns the number of bits in x.
 // Implicits arguments:

@@ -69,7 +69,7 @@ func verify_block_headers_and_hash_them{
     assert 0 = block_header_hash_little.low - expected_block_hash.low;
     assert 0 = block_header_hash_little.high - expected_block_hash.high;
 
-    %{ 
+    %{
         from tools.py.hints import print_u256
         print("\n")
         print_u256(ids.block_header_hash_little,f"block_header_keccak_hash_{ids.index}")
@@ -351,11 +351,11 @@ func main{
 
     // Common variable for both MMR :
     let mmr_array_len = 0;
-    %{
-        #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n)
-        #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n-1)
-        #print_block_header(ids.block_headers_array, ids.bytes_len_array, 0)
-    %}
+    // %{
+    //     #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n)
+    //     #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n-1)
+    //     #print_block_header(ids.block_headers_array, ids.bytes_len_array, 0)
+    // %}
 
     // -----------------------------------------------------
     // -----------------------------------------------------
@@ -396,7 +396,7 @@ func main{
         let (new_mmr_root_poseidon: felt, new_mmr_root_keccak: Uint256) = get_roots();
     }
 
-    %{ 
+    %{
         print("new root poseidon", ids.new_mmr_root_poseidon)
         print("new root keccak", ids.new_mmr_root_keccak.low, ids.new_mmr_root_keccak.high)
         print("new size", ids.mmr_array_len + ids.mmr_offset)

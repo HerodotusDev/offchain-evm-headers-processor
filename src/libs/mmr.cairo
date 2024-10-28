@@ -233,8 +233,8 @@ func left_child_jump_until_inside_mmr{range_check_ptr, pow2_array: felt*, mmr_le
 ) -> felt {
     alloc_locals;
     local in_mmr;
-    %{ ids.in_mmr = 1 if ids.left_child<=ids.mmr_len else 0 %}
-    
+    %{ ids.in_mmr = 1 if ids.left_child <= ids.mmr_len else 0 %}
+
     if (in_mmr != 0) {
         // Ensure left_child <= mmr_len
         assert [range_check_ptr] = mmr_len - left_child;

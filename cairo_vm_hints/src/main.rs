@@ -1,5 +1,7 @@
 #![deny(warnings)]
 #![forbid(unsafe_code)]
+pub mod hint_processor;
+
 use bincode::enc::write::Writer;
 use cairo_vm::air_public_input::PublicInputError;
 use cairo_vm::cairo_run::{self, EncodeTraceError};
@@ -15,8 +17,8 @@ use cairo_vm::vm::errors::vm_errors::VirtualMachineError;
 use cairo_vm::vm::runners::cairo_pie::CairoPie;
 // #[cfg(feature = "with_tracer")]
 // use cairo_vm::vm::runners::cairo_runner::CairoRunner;
+use crate::hint_processor::ExtendedHintProcessor;
 use cairo_vm::vm::runners::cairo_runner::RunResources;
-use cairo_vm_hints_processor::hint_processor::ExtendedHintProcessor;
 // #[cfg(feature = "with_tracer")]
 // use cairo_vm_tracer::error::trace_data_errors::TraceDataError;
 // #[cfg(feature = "with_tracer")]

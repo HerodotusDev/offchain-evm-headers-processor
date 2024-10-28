@@ -232,45 +232,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cairo_vm_hints"
-version = "0.1.0"
-source = "git+https://github.com/HerodotusDev/eth_essentials.git?rev=633bd7e23edd2aef9703078efd5a9e72bda95d3c#633bd7e23edd2aef9703078efd5a9e72bda95d3c"
-dependencies = [
- "bincode",
- "cairo-vm",
- "clap",
- "hex",
- "num-bigint",
- "num-traits",
- "rand",
- "sha3",
- "starknet-crypto 0.7.2",
- "starknet-types-core",
- "thiserror",
- "tiny-keccak",
-]
-
-[[package]]
-name = "cairo_vm_hints_processor"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "cairo-vm",
- "cairo_vm_hints",
- "clap",
- "hex",
- "num-bigint",
- "num-traits",
- "rand",
- "serde_json",
- "sha3",
- "starknet-crypto 0.7.2",
- "starknet-types-core",
- "thiserror",
- "tiny-keccak",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -408,6 +369,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
+name = "eth_essentials_cairo_vm_hints"
+version = "0.1.0"
+source = "git+https://github.com/HerodotusDev/eth_essentials.git?rev=4faa43104004e459b87645c5c30b82d31b9c6ad5#4faa43104004e459b87645c5c30b82d31b9c6ad5"
+dependencies = [
+ "bincode",
+ "cairo-vm",
+ "clap",
+ "hex",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "sha3",
+ "starknet-crypto 0.7.2",
+ "starknet-types-core",
+ "thiserror",
+ "tiny-keccak",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -472,6 +452,26 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
+]
+
+[[package]]
+name = "headers_processor_cairo_vm_hints"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "cairo-vm",
+ "clap",
+ "eth_essentials_cairo_vm_hints",
+ "hex",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "serde_json",
+ "sha3",
+ "starknet-crypto 0.7.2",
+ "starknet-types-core",
+ "thiserror",
+ "tiny-keccak",
 ]
 
 [[package]]

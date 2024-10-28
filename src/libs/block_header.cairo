@@ -84,7 +84,7 @@ func extract_parent_hash_little{range_check_ptr}(rlp: felt*) -> (res: Uint256) {
 //
 // Reference: https://ethereum.org/en/developers/docs/data-structures-and-encoding/rlp/#definition
 func get_bigint_byte_size{range_check_ptr}(byte: felt) -> felt {
-    %{ memory[ap]=1 if ids.byte<=127 else 0 %}
+    %{ memory[ap] = 1 if ids.byte <= 127 else 0 %}
     ap += 1;
     let is_single_byte = [ap - 1];
 

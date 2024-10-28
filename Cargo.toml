@@ -17,5 +17,5 @@ num-traits = "0.2.19"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 hex = "0.4.3"
 starknet-crypto = "0.7.2"
-cairo_vm_hints = { git = "https://github.com/HerodotusDev/eth_essentials.git", rev = "633bd7e23edd2aef9703078efd5a9e72bda95d3c" }
+eth_essentials_cairo_vm_hints = { git = "https://github.com/HerodotusDev/eth_essentials.git", rev = "4faa43104004e459b87645c5c30b82d31b9c6ad5" }
 serde_json = "1.0.132"

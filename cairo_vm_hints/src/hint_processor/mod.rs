@@ -17,7 +17,8 @@ use starknet_types_core::felt::Felt;
 use std::collections::HashMap;
 use std::{any::Any, rc::Rc};
 
-pub mod hints;
+pub mod print;
+pub mod read;
 
 #[derive(Default)]
 pub struct CustomHintProcessor {
@@ -37,9 +38,15 @@ impl CustomHintProcessor {
         constants: &HashMap<String, Felt252>,
     ) -> Result<(), HintError> {
         match hint_data.code.as_str() {
-            hints::HINT_READ_BLOCK_HEADERS => {
+            read::HINT_READ_BLOCK_HEADERS => {
                 self.hint_read_block_headers(vm, exec_scope, hint_data, constants)
             }
+            read::HINT_READ_INPUT => self.hint_read_input(vm, exec_scope, hint_data, constants),
+            read::HINT_READ_INPUT_PREV => {
+                self.hint_read_input_prev(vm, exec_scope, hint_data, constants)
+            }
+            print::HINT_PRINT_HASH => self.hint_print_hash(vm, exec_scope, hint_data, constants),
+            print::HINT_PRINT_FINAL => self.hint_print_final(vm, exec_scope, hint_data, constants),
             _ => Err(HintError::UnknownHint(
                 hint_data.code.to_string().into_boxed_str(),
             )),
@@ -59,7 +66,12 @@ impl HintProcessorLogic for CustomHintProcessor {
             .downcast_ref::<HintProcessorData>()
             .ok_or(HintError::WrongHintData)?;
 
-        cairo_vm_hints::hints::run_hint(vm, exec_scopes, hint_data, constants)?;
+        let res =
+            eth_essentials_cairo_vm_hints::hints::run_hint(vm, exec_scopes, hint_data, constants);
+        if !matches!(res, Err(HintError::UnknownHint(_))) {
+            return res;
+        }
+
         self.run_hint(vm, exec_scopes, hint_data, constants)
     }
 }

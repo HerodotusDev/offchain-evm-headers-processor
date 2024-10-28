@@ -1,5 +1,5 @@
 [package]
-name = "cairo_vm_hints_processor"
+name = "headers_processor_cairo_vm_hints"
 version = "0.1.0"
 edition = "2021"
 
@@ -16,5 +16,5 @@ num-traits.workspace = true
 tiny-keccak.workspace = true
 hex.workspace = true
 starknet-crypto.workspace = true
-cairo_vm_hints.workspace = true
+eth_essentials_cairo_vm_hints.workspace = true
 serde_json.workspace = true
