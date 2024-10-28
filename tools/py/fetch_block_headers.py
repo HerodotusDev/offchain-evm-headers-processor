@@ -60,9 +60,9 @@ def fetch_blocks_from_rpc_no_async(
         results = rpc_request(rpc_url, requests)
         # print(results)
         for result in results:
-            block_header: Union[
-                BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai
-            ] = build_block_header(result["result"])
+            block_header: Union[BlockHeader, BlockHeaderEIP1559, BlockHeaderShangai] = (
+                build_block_header(result["result"])
+            )
             all_results.append(block_header)
 
         time.sleep(delay)  # Add delay

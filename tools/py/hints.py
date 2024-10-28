@@ -4,6 +4,7 @@ def write_word_to_memory(word: int, n: int, memory, ap) -> None:
     for i in range(n):
         memory[ap + i] = word_bytes[i]
 
+
 def print_u256(x, name):
     value = x.low + (x.high << 128)
     print(f"{name} = {hex(value)}")
@@ -23,7 +24,7 @@ def print_block_header(memory, block_headers_array, bytes_len_array, index):
     rlp_array = [memory[rlp_ptr + i] for i in range(n_felts)]
     rlp_bytes_big_endian = [x.to_bytes(8, "big") for x in rlp_array]
     rlp_bytes_little_endian = [x.to_bytes(8, "little") for x in rlp_array]
-    rlp_array_little = [int.from_bytes(b, 'little') for b in rlp_bytes_big_endian]
+    rlp_array_little = [int.from_bytes(b, "little") for b in rlp_bytes_big_endian]
 
     print(f"\nBLOCK {index} :: bytes_len={n_bytes} || n_felts={n_felts}")
     print(f"RLP_felt = {rlp_array}")
