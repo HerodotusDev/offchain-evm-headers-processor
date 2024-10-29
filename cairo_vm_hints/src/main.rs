@@ -1,12 +1,12 @@
 #![deny(warnings)]
 #![forbid(unsafe_code)]
 pub mod hint_processor;
+pub mod hints;
 
 use bincode::enc::write::Writer;
 use cairo_vm::air_public_input::PublicInputError;
 use cairo_vm::cairo_run::{self, EncodeTraceError};
 use cairo_vm::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor;
-// TODO
 // #[cfg(feature = "with_tracer")]
 // use cairo_vm::serde::deserialize_program::DebugInfo;
 use cairo_vm::types::layout::CairoLayoutParams;

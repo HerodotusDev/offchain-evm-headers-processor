@@ -1,3 +1,6 @@
+pub mod input;
+
+use crate::hints;
 use cairo_vm::{
     hint_processor::{
         builtin_hint_processor::builtin_hint_processor_definition::{
@@ -17,9 +20,6 @@ use starknet_types_core::felt::Felt;
 use std::collections::HashMap;
 use std::{any::Any, rc::Rc};
 
-pub mod print;
-pub mod read;
-
 #[derive(Default)]
 pub struct CustomHintProcessor {
     pub private_inputs: serde_json::Value,
@@ -38,15 +38,11 @@ impl CustomHintProcessor {
         constants: &HashMap<String, Felt252>,
     ) -> Result<(), HintError> {
         match hint_data.code.as_str() {
-            read::HINT_READ_BLOCK_HEADERS => {
-                self.hint_read_block_headers(vm, exec_scope, hint_data, constants)
+            input::HINT_INPUT_BLOCK_HEADERS => {
+                self.hint_input_block_headers(vm, exec_scope, hint_data, constants)
             }
-            read::HINT_READ_INPUT => self.hint_read_input(vm, exec_scope, hint_data, constants),
-            read::HINT_READ_INPUT_PREV => {
-                self.hint_read_input_prev(vm, exec_scope, hint_data, constants)
-            }
-            print::HINT_PRINT_HASH => self.hint_print_hash(vm, exec_scope, hint_data, constants),
-            print::HINT_PRINT_FINAL => self.hint_print_final(vm, exec_scope, hint_data, constants),
+            input::HINT_INPUT => self.hint_input(vm, exec_scope, hint_data, constants),
+            input::HINT_INPUT_PREV => self.hint_input_prev(vm, exec_scope, hint_data, constants),
             _ => Err(HintError::UnknownHint(
                 hint_data.code.to_string().into_boxed_str(),
             )),
@@ -68,6 +64,11 @@ impl HintProcessorLogic for CustomHintProcessor {
 
         let res =
             eth_essentials_cairo_vm_hints::hints::run_hint(vm, exec_scopes, hint_data, constants);
+        if !matches!(res, Err(HintError::UnknownHint(_))) {
+            return res;
+        }
+
+        let res = hints::run_hint(vm, exec_scopes, hint_data, constants);
         if !matches!(res, Err(HintError::UnknownHint(_))) {
             return res;
         }

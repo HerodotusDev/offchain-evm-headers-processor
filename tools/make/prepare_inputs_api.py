@@ -388,8 +388,8 @@ def prepare_full_chain_inputs(
 
 if __name__ == "__main__":
     output = prepare_full_chain_inputs(
-        from_block_number_high=19999,
+        from_block_number_high=99999,
         to_block_number_low=0,
-        batch_size=20000,
+        batch_size=100000,
         dynamic=False,
     )

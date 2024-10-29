@@ -10,12 +10,12 @@ use cairo_vm::{
 use eth_essentials_cairo_vm_hints::utils;
 use std::collections::HashMap;
 
-pub const HINT_READ_INPUT: &str = "ids.from_block_number_high=program_input['from_block_number_high']\nids.to_block_number_low=program_input['to_block_number_low']\nids.mmr_offset=program_input['mmr_last_len'] \nids.mmr_last_root_poseidon=program_input['mmr_last_root_poseidon']\nids.mmr_last_root_keccak.low=program_input['mmr_last_root_keccak_low']\nids.mmr_last_root_keccak.high=program_input['mmr_last_root_keccak_high']\nids.block_n_plus_one_parent_hash_little.low = program_input['block_n_plus_one_parent_hash_little_low']\nids.block_n_plus_one_parent_hash_little.high = program_input['block_n_plus_one_parent_hash_little_high']";
-pub const HINT_READ_INPUT_PREV: &str = "from tools.py.hints import write_uint256_array\nsegments.write_arg(ids.previous_peaks_values_poseidon, program_input['poseidon_mmr_last_peaks']) \nwrite_uint256_array(memory, ids.previous_peaks_values_keccak, program_input['keccak_mmr_last_peaks'])";
-pub const HINT_READ_BLOCK_HEADERS: &str = "block_headers_array = program_input['block_headers_array']\nbytes_len_array = program_input['bytes_len_array']\nsegments.write_arg(ids.block_headers_array, block_headers_array)\nsegments.write_arg(ids.block_headers_array_bytes_len, bytes_len_array)";
+pub const HINT_INPUT: &str = "ids.from_block_number_high=program_input['from_block_number_high']\nids.to_block_number_low=program_input['to_block_number_low']\nids.mmr_offset=program_input['mmr_last_len'] \nids.mmr_last_root_poseidon=program_input['mmr_last_root_poseidon']\nids.mmr_last_root_keccak.low=program_input['mmr_last_root_keccak_low']\nids.mmr_last_root_keccak.high=program_input['mmr_last_root_keccak_high']\nids.block_n_plus_one_parent_hash_little.low = program_input['block_n_plus_one_parent_hash_little_low']\nids.block_n_plus_one_parent_hash_little.high = program_input['block_n_plus_one_parent_hash_little_high']";
+pub const HINT_INPUT_PREV: &str = "from tools.py.hints import write_uint256_array\nsegments.write_arg(ids.previous_peaks_values_poseidon, program_input['poseidon_mmr_last_peaks']) \nwrite_uint256_array(memory, ids.previous_peaks_values_keccak, program_input['keccak_mmr_last_peaks'])";
+pub const HINT_INPUT_BLOCK_HEADERS: &str = "block_headers_array = program_input['block_headers_array']\nbytes_len_array = program_input['bytes_len_array']\nsegments.write_arg(ids.block_headers_array, block_headers_array)\nsegments.write_arg(ids.block_headers_array_bytes_len, bytes_len_array)";
 
 impl CustomHintProcessor {
-    pub fn hint_read_input(
+    pub fn hint_input(
         &mut self,
         vm: &mut VirtualMachine,
         _exec_scope: &mut ExecutionScopes,
@@ -103,7 +103,7 @@ impl CustomHintProcessor {
         Ok(())
     }
 
-    pub fn hint_read_input_prev(
+    pub fn hint_input_prev(
         &mut self,
         vm: &mut VirtualMachine,
         _exec_scope: &mut ExecutionScopes,
@@ -145,7 +145,7 @@ impl CustomHintProcessor {
         Ok(())
     }
 
-    pub fn hint_read_block_headers(
+    pub fn hint_input_block_headers(
         &mut self,
         vm: &mut VirtualMachine,
         _exec_scope: &mut ExecutionScopes,
