@@ -7,7 +7,7 @@
     "src/**/*.sol"
   ],
   "devDependencies": {
-    "prettier": "^3.3.3",
+    "prettier": "^3.4.2",
     "prettier-plugin-solidity": "^1.4.1"
   },
   "private": true,
