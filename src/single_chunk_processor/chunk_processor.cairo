@@ -69,9 +69,12 @@ func verify_block_headers_and_hash_them{
     assert 0 = block_header_hash_little.low - expected_block_hash.low;
     assert 0 = block_header_hash_little.high - expected_block_hash.high;
 
-    %{ print("\n") %}
-    %{ print_u256(ids.block_header_hash_little,f"block_header_keccak_hash_{ids.index}") %}
-    %{ print_u256(ids.expected_block_hash,f"expected_keccak_hash_{ids.index}") %}
+    %{
+        from tools.py.hints import print_u256
+        print("\n")
+        print_u256(ids.block_header_hash_little,f"block_header_keccak_hash_{ids.index}")
+        print_u256(ids.expected_block_hash,f"expected_keccak_hash_{ids.index}")
+    %}
 
     let (number_of_exact_8bytes_chunks, number_of_bytes_in_last_chunk) = felt_divmod(
         bytes_len_array[index], 8
@@ -266,36 +269,6 @@ func main{
         ids.block_n_plus_one_parent_hash_little.low = program_input['block_n_plus_one_parent_hash_little_low']
         ids.block_n_plus_one_parent_hash_little.high = program_input['block_n_plus_one_parent_hash_little_high']
     %}
-    %{
-        def print_u256(u, un):
-            u = u.low + (u.high << 128) 
-            print(f" {un} = {hex(u)}")
-        def write_uint256_array(ptr, array):
-            counter = 0
-            for uint in array:
-                memory[ptr._reference_value+counter] = uint[0]
-                memory[ptr._reference_value+counter+1] = uint[1]
-                counter += 2
-        def print_block_header(block_headers_array, bytes_len_array, index):
-            rlp_ptr = memory[block_headers_array + index]
-            n_bytes= memory[bytes_len_array + index]
-            n_felts = n_bytes // 8 + 1 if n_bytes % 8 != 0 else n_bytes // 8
-            rlp_array = [memory[rlp_ptr + i] for i in range(n_felts)]
-            rlp_bytes_array=[int.to_bytes(x, 8, "big") for x in rlp_array]
-            rlp_bytes_array_little = [int.to_bytes(x, 8, "little") for x in rlp_array]
-            rlp_array_little = [int.from_bytes(x, 'little') for x in rlp_bytes_array]
-            x=[x.bit_length() for x in rlp_array]
-            print(f"\nBLOCK {index} :: bytes_len={n_bytes} || n_felts={n_felts}")
-            print(f"RLP_felt ={rlp_array}")
-            print(f"bit_big : {[x.bit_length() for x in rlp_array]}")
-            print(f"RLP_bytes_arr_big = {rlp_bytes_array}")
-            print(f"RLP_bytes_arr_lil = {rlp_bytes_array_little}")
-            print(f"bit_lil : {[x.bit_length() for x in rlp_array_little]}")
-        def print_mmr(mmr_array, mmr_array_len):
-            print(f"\nMMR :: mmr_array_len={mmr_array_len}")
-            mmr_values = [hex(memory[mmr_array + i]) for i in range(mmr_array_len)]
-            print(f"mmr_values = {mmr_values}")
-    %}
 
     // -----------------------------------------------------
     // -----------------------------------------------------
@@ -313,8 +286,9 @@ func main{
     let (previous_peaks_values_keccak: Uint256*) = alloc();  // From left to right
 
     %{
+        from tools.py.hints import write_uint256_array
         segments.write_arg(ids.previous_peaks_values_poseidon, program_input['poseidon_mmr_last_peaks']) 
-        write_uint256_array(ids.previous_peaks_values_keccak, program_input['keccak_mmr_last_peaks'])
+        write_uint256_array(memory, ids.previous_peaks_values_keccak, program_input['keccak_mmr_last_peaks'])
     %}
 
     // Ensure that the previous MMR size is valid.
@@ -377,11 +351,11 @@ func main{
 
     // Common variable for both MMR :
     let mmr_array_len = 0;
-    %{
-        #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n)
-        #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n-1)
-        #print_block_header(ids.block_headers_array, ids.bytes_len_array, 0)
-    %}
+    // %{
+    //     #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n)
+    //     #print_block_header(ids.block_headers_array, ids.bytes_len_array, ids.n-1)
+    //     #print_block_header(ids.block_headers_array, ids.bytes_len_array, 0)
+    // %}
 
     // -----------------------------------------------------
     // -----------------------------------------------------
@@ -422,9 +396,11 @@ func main{
         let (new_mmr_root_poseidon: felt, new_mmr_root_keccak: Uint256) = get_roots();
     }
 
-    %{ print("new root poseidon", ids.new_mmr_root_poseidon) %}
-    %{ print("new root keccak", ids.new_mmr_root_keccak.low, ids.new_mmr_root_keccak.high) %}
-    %{ print("new size", ids.mmr_array_len + ids.mmr_offset) %}
+    %{
+        print("new root poseidon", ids.new_mmr_root_poseidon)
+        print("new root keccak", ids.new_mmr_root_keccak.low, ids.new_mmr_root_keccak.high)
+        print("new size", ids.mmr_array_len + ids.mmr_offset)
+    %}
 
     default_dict_finalize(dict_start_poseidon, previous_peaks_dict_poseidon, 0);
     default_dict_finalize(dict_start_keccak, previous_peaks_dict_keccak, 0);

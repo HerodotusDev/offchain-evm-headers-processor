@@ -388,16 +388,8 @@ def prepare_full_chain_inputs(
 
 if __name__ == "__main__":
     output = prepare_full_chain_inputs(
-        from_block_number_high=20,
+        from_block_number_high=99999,
         to_block_number_low=0,
-        batch_size=5,
+        batch_size=100000,
         dynamic=False,
-    )
-
-    # Prepare _inputs.json and pre-compute _outputs.json using the last peaks, size and roots from the previous run:
-    prepare_full_chain_inputs(
-        from_block_number_high=30,
-        to_block_number_low=21,
-        batch_size=5,
-        initial_params=output,
     )
