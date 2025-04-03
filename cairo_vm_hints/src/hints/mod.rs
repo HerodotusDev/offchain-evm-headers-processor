@@ -7,6 +7,7 @@ use cairo_vm::{
 use std::collections::HashMap;
 
 pub mod print;
+pub mod write;
 
 pub fn run_hint(
     vm: &mut VirtualMachine,
@@ -14,7 +15,7 @@ pub fn run_hint(
     hint_data: &HintProcessorData,
     constants: &HashMap<String, Felt252>,
 ) -> Result<(), HintError> {
-    let hints = [print::run_hint];
+    let hints = [print::run_hint, write::run_hint];
 
     for hint in hints.iter() {
         let res = hint(vm, exec_scope, hint_data, constants);

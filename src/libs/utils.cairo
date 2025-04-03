@@ -108,8 +108,11 @@ func word_reverse_endian_64{bitwise_ptr: BitwiseBuiltin*}(word: felt) -> (res: f
 //   res: the reversed integer.
 func word_reverse_endian_16_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        from tools.py.hints import write_word_to_memory
-        write_word_to_memory(ids.word, 2, memory, ap)
+        word = ids.word
+        assert word < 2**16
+        word_bytes=word.to_bytes(2, byteorder='big')
+        for i in range(2):
+            memory[ap+i] = word_bytes[i]
     %}
     ap += 2;
 
@@ -135,8 +138,11 @@ func word_reverse_endian_16_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_24_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        from tools.py.hints import write_word_to_memory
-        write_word_to_memory(ids.word, 3, memory, ap)
+        word = ids.word
+        assert word < 2**24
+        word_bytes=word.to_bytes(3, byteorder='big')
+        for i in range(3):
+            memory[ap+i] = word_bytes[i]
     %}
     ap += 3;
 
@@ -165,8 +171,11 @@ func word_reverse_endian_24_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_32_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        from tools.py.hints import write_word_to_memory
-        write_word_to_memory(ids.word, 4, memory, ap)
+        word = ids.word
+        assert word < 2**32
+        word_bytes=word.to_bytes(4, byteorder='big')
+        for i in range(4):
+            memory[ap+i] = word_bytes[i]
     %}
     ap += 4;
 
@@ -198,8 +207,11 @@ func word_reverse_endian_32_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_40_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        from tools.py.hints import write_word_to_memory
-        write_word_to_memory(ids.word, 5, memory, ap)
+        word = ids.word
+        assert word < 2**40
+        word_bytes=word.to_bytes(5, byteorder='big')
+        for i in range(5):
+            memory[ap+i] = word_bytes[i]
     %}
     ap += 5;
 
@@ -234,8 +246,11 @@ func word_reverse_endian_40_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_48_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        from tools.py.hints import write_word_to_memory
-        write_word_to_memory(ids.word, 6, memory, ap)
+        word = ids.word
+        assert word < 2**48
+        word_bytes=word.to_bytes(6, byteorder='big')
+        for i in range(6):
+            memory[ap+i] = word_bytes[i]
     %}
     ap += 6;
 
@@ -273,8 +288,11 @@ func word_reverse_endian_48_RC{range_check_ptr}(word: felt) -> felt {
 //   res: the reversed integer.
 func word_reverse_endian_56_RC{range_check_ptr}(word: felt) -> felt {
     %{
-        from tools.py.hints import write_word_to_memory
-        write_word_to_memory(ids.word, 7, memory, ap)
+        word = ids.word
+        assert word < 2**56
+        word_bytes=word.to_bytes(7, byteorder='big')
+        for i in range(7):
+            memory[ap+i] = word_bytes[i]
     %}
     ap += 7;
 

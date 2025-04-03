@@ -282,7 +282,7 @@ fn run(args: impl Iterator<Item = String>) -> Result<(), Error> {
         cairo_runner
             .get_cairo_pie()
             .map_err(CairoRunError::Runner)?
-            .write_zip_file(file_path)?
+            .write_zip_file(file_path, true)?
     }
 
     Ok(())

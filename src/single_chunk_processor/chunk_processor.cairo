@@ -70,7 +70,6 @@ func verify_block_headers_and_hash_them{
     assert 0 = block_header_hash_little.high - expected_block_hash.high;
 
     %{
-        from tools.py.hints import print_u256
         print("\n")
         print_u256(ids.block_header_hash_little,f"block_header_keccak_hash_{ids.index}")
         print_u256(ids.expected_block_hash,f"expected_keccak_hash_{ids.index}")
@@ -268,6 +267,14 @@ func main{
         ids.mmr_last_root_keccak.high=program_input['mmr_last_root_keccak_high']
         ids.block_n_plus_one_parent_hash_little.low = program_input['block_n_plus_one_parent_hash_little_low']
         ids.block_n_plus_one_parent_hash_little.high = program_input['block_n_plus_one_parent_hash_little_high']
+
+        def print_u256(x, name):
+            value = x.low + (x.high << 128)
+            print(f"{name} = {hex(value)}")
+        def write_uint256_array(memory, ptr, array):
+            for i, uint in enumerate(array):
+                memory[ptr._reference_value + 2 * i] = uint[0]
+                memory[ptr._reference_value + 2 * i + 1] = uint[1]
     %}
 
     // -----------------------------------------------------
@@ -286,7 +293,6 @@ func main{
     let (previous_peaks_values_keccak: Uint256*) = alloc();  // From left to right
 
     %{
-        from tools.py.hints import write_uint256_array
         segments.write_arg(ids.previous_peaks_values_poseidon, program_input['poseidon_mmr_last_peaks']) 
         write_uint256_array(memory, ids.previous_peaks_values_keccak, program_input['keccak_mmr_last_peaks'])
     %}

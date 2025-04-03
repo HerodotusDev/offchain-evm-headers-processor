@@ -7,7 +7,7 @@ use cairo_vm::vm::{errors::hint_errors::HintError, vm_core::VirtualMachine};
 use cairo_vm::Felt252;
 use std::collections::HashMap;
 
-const HINT_PRINT_HASH: &str = "from tools.py.hints import print_u256\nprint(\"\\n\")\nprint_u256(ids.block_header_hash_little,f\"block_header_keccak_hash_{ids.index}\")\nprint_u256(ids.expected_block_hash,f\"expected_keccak_hash_{ids.index}\")";
+const HINT_PRINT_HASH: &str = "print(\"\\n\")\nprint_u256(ids.block_header_hash_little,f\"block_header_keccak_hash_{ids.index}\")\nprint_u256(ids.expected_block_hash,f\"expected_keccak_hash_{ids.index}\")";
 const HINT_PRINT_FINAL: &str = "print(\"new root poseidon\", ids.new_mmr_root_poseidon)\nprint(\"new root keccak\", ids.new_mmr_root_keccak.low, ids.new_mmr_root_keccak.high)\nprint(\"new size\", ids.mmr_array_len + ids.mmr_offset)";
 
 fn hint_print_hash(
