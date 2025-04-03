@@ -14,8 +14,8 @@ Considering that the two MMRs contain the same elements, the global `mmrSize` gr
 
 The contract allows two kinds of aggregation:
 
--   Aggregating from the latest contract state (i.e., continuing proving backward in the genesis block direction)
--   Aggregating from a specific block number (i.e., continuing proving from an authenticated block)
+- Aggregating from the latest contract state (i.e., continuing proving backward in the genesis block direction)
+- Aggregating from a specific block number (i.e., continuing proving from an authenticated block)
 
 Note: to continue aggregating from a higher block number than the current state, the higher block's parent hash must have been previously cached with the Solidity `blockhash()` global function by a call to `registerNewRange().`
 
@@ -25,8 +25,8 @@ Aggregators are created through the `createAggregator()` function called by the 
 
 Each created aggregator can either start:
 
--   (i) From an initial blank state (i.e., two MMRs initialized with a single hashed element of value "brave new world" and a `mmrSize` of 1).
--   (ii) From an existing aggregator's state (i.e., two MMRs initialized with the same elements and `mmrSize` as the existing aggregator). This process is referred to as "detaching from an existing aggregator."
+- (i) From an initial blank state (i.e., two MMRs initialized with a single hashed element of value "brave new world" and a `mmrSize` of 1).
+- (ii) From an existing aggregator's state (i.e., two MMRs initialized with the same elements and `mmrSize` as the existing aggregator). This process is referred to as "detaching from an existing aggregator."
 
 Note: when detaching from an existing aggregator, its aggregator ID must be specified and must have been created by the same factory contract.
 
@@ -40,11 +40,11 @@ It means that when `createAggregator()` is called, the aggregator contract is cl
 
 Pre-requisites:
 
--   Solidity (with solc >= 0.8.0)
--   Foundry
--   Yarn
--   Node.js (>= v18.16.1)
--   (Optional) nvm use
+- Solidity (with solc >= 0.8.0)
+- Foundry
+- Yarn
+- Node.js (>= v18.16.1)
+- (Optional) nvm use
 
 [Here](src/SharpFactsAggregator.sol) is the main contract.
 
@@ -55,7 +55,7 @@ Note: the aggregation state is stored in the `SharpFactsAggregator` contract and
 Make sure to have a `.env` file configured with the variables defined in `.env.example`, then run:
 
 ```sh
-source .env; forge script script/AggregatorsFactory.s.sol:AggregatorsFactoryDeployer --rpc-url $DEPLOY_RPC_URL --broadcast --verify -vvvv
+pnpm run deploy
 ```
 
 ## Quick Start
@@ -65,7 +65,7 @@ source .env; forge script script/AggregatorsFactory.s.sol:AggregatorsFactoryDepl
 cd solidity-verifier
 
 # Install node_modules
-yarn install
+pnpm install
 
 # (Optional) Switch node to v18.16.1 (or higher)
 nvm use

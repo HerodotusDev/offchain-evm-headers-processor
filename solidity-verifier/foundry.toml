@@ -8,12 +8,8 @@ optimizer_runs = 20000
 ffi = true
 
 [rpc_endpoints]
-goerli = "${GOERLI_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
 mainnet = "${MAINNET_RPC_URL}"
 
 [etherscan]
-goerli = { key = "${ETHERSCAN_API_KEY}" }
-
-# Remappings in remappings.txt
-
-# See more config options https://github.com/gakonst/foundry/tree/master/config
+sepolia = { key = "${ETHERSCAN_API_KEY}" }

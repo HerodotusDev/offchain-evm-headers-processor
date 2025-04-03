@@ -5,3 +5,9 @@ lib
 assets
 node_modules
 .next
+cache
+helpers
+bun.lockb
+foundry.toml
+remappings.txt
+yarn.lock

@@ -5,6 +5,7 @@ from starkware.cairo.common.alloc import alloc
 
 const DIV_32 = 2 ** 32;
 const DIV_32_MINUS_1 = DIV_32 - 1;
+const PRIME = 3618502788666131213697322783095070105623107215331596699973092056135872020481;
 
 // Returns the number of bits in x.
 // Implicits arguments:
@@ -18,10 +19,7 @@ const DIV_32_MINUS_1 = DIV_32 - 1;
 func get_felt_bitlength{range_check_ptr, pow2_array: felt*}(x: felt) -> felt {
     alloc_locals;
     local bit_length;
-    %{
-        x = ids.x
-        ids.bit_length = x.bit_length()
-    %}
+    %{ ids.bit_length = ids.x.bit_length() %}
     // Computes N=2^bit_length and n=2^(bit_length-1)
     // x is supposed to verify n = 2^(b-1) <= x < N = 2^bit_length <=> x has bit_length bits
     tempvar N = pow2_array[bit_length];
@@ -65,10 +63,10 @@ func felt_divmod_2pow32{range_check_ptr}(value: felt) -> (q: felt, r: felt) {
     %{
         from starkware.cairo.common.math_utils import assert_integer
         assert_integer(ids.DIV_32)
-        assert 0 < ids.DIV_32 <= PRIME // range_check_builtin.bound, \
-            f'div={hex(ids.DIV_32)} is out of the valid range.'
-        ids.q, ids.r = divmod(ids.value, ids.DIV_32)
+        if not (0 < ids.DIV_32 <= PRIME):
+            raise ValueError(f'div={hex(ids.DIV_32)} is out of the valid range.')
     %}
+    %{ ids.q, ids.r = divmod(ids.value, ids.DIV_32) %}
     assert [range_check_ptr + 2] = DIV_32_MINUS_1 - r;
     let range_check_ptr = range_check_ptr + 3;
 
