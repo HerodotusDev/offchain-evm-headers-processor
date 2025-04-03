@@ -1,5 +1,5 @@
 [package]
-name = "headers_processor_cairo_vm_hints"
+name = "evm_headers_processor_cairo_vm_hints"
 version = "0.1.0"
 edition = "2021"
 

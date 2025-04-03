@@ -1031,6 +1031,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "evm_headers_processor_cairo_vm_hints"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "cairo-vm",
+ "clap",
+ "eth_essentials_cairo_vm_hints",
+ "hex",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "serde_json",
+ "sha3",
+ "starknet-crypto",
+ "starknet-types-core",
+ "thiserror",
+ "tiny-keccak",
+]
+
+[[package]]
 name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1157,26 +1177,6 @@ dependencies = [
  "equivalent",
  "foldhash",
  "serde",
-]
-
-[[package]]
-name = "headers_processor_cairo_vm_hints"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "cairo-vm",
- "clap",
- "eth_essentials_cairo_vm_hints",
- "hex",
- "num-bigint",
- "num-traits",
- "rand",
- "serde_json",
- "sha3",
- "starknet-crypto",
- "starknet-types-core",
- "thiserror",
- "tiny-keccak",
 ]
 
 [[package]]
