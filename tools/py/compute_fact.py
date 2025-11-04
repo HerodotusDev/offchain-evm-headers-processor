@@ -49,8 +49,8 @@ sample_output = {
 
 
 def compute_fact(program_hash: int, program_output: List[int]):
-    kecOutput = Web3.solidityKeccak(["uint256[]"], [program_output])
-    fact = Web3.solidityKeccak(["uint256", "bytes32"], [program_hash, kecOutput])
+    kecOutput = Web3.solidity_keccak(["uint256[]"], [program_output])
+    fact = Web3.solidity_keccak(["uint256", "bytes32"], [program_hash, kecOutput])
     return fact.hex()
 
 
