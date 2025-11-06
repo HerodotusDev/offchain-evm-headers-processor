@@ -5,7 +5,7 @@ members = ["cairo_vm_hints"]
 
 [workspace.dependencies]
 bincode = { version = "2.0.1", default-features = false, features = ["serde"] }
-cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", tag = "v2.5.0", features = [
+cairo-vm = { git = "https://github.com/lakewik/cairo-vm", rev = "11ec1e3e69650d517680f6dba60b92cfcb1093e9", features = [
     "extensive_hints",
     "clap",
     "cairo-1-hints",
@@ -22,5 +22,5 @@ starknet-types-core = "0.2.0"
 thiserror = "1.0.64"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 
-eth_essentials_cairo_vm_hints = { git = "https://github.com/HerodotusDev/eth_essentials.git", rev = "77aaf9aa0eeb9091d2c6c1c9b456f19a7302baa3" }
+eth_essentials_cairo_vm_hints = { git = "https://github.com/HerodotusDev/eth_essentials.git", rev = "33c0f3b1114992ee76bf10ec39d902f11dcbb98d" }
 serde_json = "1.0.132"
