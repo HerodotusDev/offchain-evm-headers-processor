@@ -5,7 +5,9 @@ members = ["cairo_vm_hints"]
 
 [workspace.dependencies]
 bincode = { version = "2.0.1", default-features = false, features = ["serde"] }
-cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", tag = "v2.0.1", features = [
+# Align cairo-vm with rust-trace-gen (lambdaclass v2.0.1) to avoid multiple crate instances
+# Unify to local cairo-vm checkout to avoid duplicate crate instances and API mismatches
+cairo-vm = { git = "https://github.com/lakewik/cairo-vm", rev = "55970ab7587b3e0e8657abe4a95d440b9ce6db1d", features = [
     "extensive_hints",
     "clap",
     "cairo-1-hints",
@@ -22,5 +24,6 @@ starknet-types-core = "0.1.7"
 thiserror = "1.0.64"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 
-eth_essentials_cairo_vm_hints = { git = "https://github.com/HerodotusDev/eth_essentials.git", rev = "0e982d8114a165c89bed9c1bf7742846d23f1189" }
+# Use local eth_essentials to align cairo-vm version across the graph
+eth_essentials_cairo_vm_hints = { git = "https://github.com/HerodotusDev/eth_essentials", rev = "c9edcb15152c4ecf40da0fd3875818124b504fab" }
 serde_json = "1.0.132"
