@@ -34,7 +34,7 @@ func main{range_check_ptr, bitwise_ptr: BitwiseBuiltin*, keccak_ptr: KeccakBuilt
 
         # Implementation of solitidy keccak256(encodedPacked(x, y)) in python.
         def encode_packed_256_256(x_y):
-            return int(Web3.solidityKeccak(["uint256", "uint256"], [x_y[0], x_y[1]]).hex(), 16)
+            return int(Web3.solidity_keccak(["uint256", "uint256"], [x_y[0], x_y[1]]).hex(), 16)
         # Another implementation that uses sha3 directly and should be equal. 
         def keccak_256_256(x_y):
             k=sha3.keccak_256()
